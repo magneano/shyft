@@ -109,12 +109,13 @@ class SimulationTestCase(unittest.TestCase):
         state_repos = DefaultStateRepository(simulator.region_model)
         s0 = state_repos.get_state(0)
         param = simulator.region_model.get_region_parameter()
+        cid = 1228
+        simulator.region_model.set_calculation_filter(api.IntVector([cid]), api.IntVector())  # only this sub-catchment
         # not needed, we auto initialize to default if not done explicitely
         #if model_t in [pt_hs_k.PTHSKOptModel]:
         #    for i in range(len(s0)):
         #        s0[i].snow.distribute(param.hs)
         simulator.run(time_axis=time_axis, state=s0)
-        cid = 1228
 
         target_discharge_ts = simulator.region_model.statistics.discharge([cid])
         target_discharge_ts.set_point_interpretation(api.point_interpretation_policy.POINT_AVERAGE_VALUE)
@@ -126,10 +127,10 @@ class SimulationTestCase(unittest.TestCase):
         p_vec_guess = p_vec_orig[:]
         random.seed(0)
         p_names = []
-        for i in range(4):
+        for i in range(2):
             p_names.append(param.get_name(i))
-            p_vec_min[i] *= 0.5
-            p_vec_max[i] *= 1.5
+            p_vec_min[i] *= 0.9
+            p_vec_max[i] *= 1.1
             p_vec_guess[i] = random.uniform(p_vec_min[i], p_vec_max[i])
             if p_vec_min[i] > p_vec_max[i]:
                 p_vec_min[i], p_vec_max[i] = p_vec_max[i], p_vec_min[i]
