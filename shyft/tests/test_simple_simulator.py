@@ -2,28 +2,28 @@
 Tests for the simple simulator.
 """
 
-from os import path
-
+import operator
 import random
 import unittest
-import numpy as np
 from functools import reduce
-import operator
+from os import path
 
-from shyft import shyftdata_dir
+import numpy as np
+
 from shyft import api
+from shyft import shyftdata_dir
 from shyft.api import pt_gs_k
-from shyft.api import pt_ss_k
 from shyft.api import pt_hs_k
-from shyft.repository.netcdf.cf_region_model_repository import CFRegionModelRepository
-from shyft.repository.geo_ts_repository_collection import GeoTsRepositoryCollection
-from shyft.repository.netcdf.met_netcdf_data_repository import MetNetcdfDataRepository
-from shyft.repository.netcdf.cf_geo_ts_repository import CFDataRepository
-from shyft.repository.interpolation_parameter_repository import InterpolationParameterRepository
-from shyft.orchestration.configuration.yaml_configs import YamlContent, RegionConfig, ModelConfig, InterpolationConfig,\
-    YAMLSimConfig, YAMLCalibConfig
-from shyft.repository.default_state_repository import DefaultStateRepository
+from shyft.api import pt_ss_k
+from shyft.orchestration.configuration.yaml_configs import YamlContent, RegionConfig, ModelConfig, InterpolationConfig, \
+    YAMLSimConfig
 from shyft.orchestration.simulator import DefaultSimulator
+from shyft.repository.default_state_repository import DefaultStateRepository
+from shyft.repository.geo_ts_repository_collection import GeoTsRepositoryCollection
+from shyft.repository.interpolation_parameter_repository import InterpolationParameterRepository
+from shyft.repository.netcdf.cf_geo_ts_repository import CFDataRepository
+from shyft.repository.netcdf.cf_region_model_repository import CFRegionModelRepository
+from shyft.repository.netcdf.met_netcdf_data_repository import MetNetcdfDataRepository
 
 
 def print_param(header_text, param):
@@ -60,14 +60,14 @@ class SimulationTestCase(unittest.TestCase):
         state_repos = DefaultStateRepository(simulator.region_model)
         state = state_repos.get_state(0)
         simulator.run(time_axis=cfg.time_axis, state=state)  # Here we have already checked if StateIDs match with model cell ID. Further check is redundant.
-        #simulator.region_model.get_states(state.state_vector)
+        # simulator.region_model.get_states(state.state_vector)
         state = simulator.reg_model_state
         obs_discharge = 0.0
         state = simulator.discharge_adjusted_state(obs_discharge, state)
 
         self.assertAlmostEqual(0.0, reduce(operator.add, (state[i].state.kirchner.q for i
                                                           in range(len(state)))))
-        #simulator.region_model.get_states(state.state_vector)
+        # simulator.region_model.get_states(state.state_vector)
         state = simulator.reg_model_state
 
         obs_discharge = 10.0  # m3/s
@@ -87,8 +87,10 @@ class SimulationTestCase(unittest.TestCase):
                                      cfg.get_geots_repo(), cfg.get_interp_repo(), initial_state_repository=None,
                                      catchments=None)
         state_repos = DefaultStateRepository(simulator.region_model)
+        simulator.region_model.set_calculation_filter(api.IntVector([1228]), api.IntVector())
         simulator.run(time_axis=cfg.time_axis, state=state_repos.get_state(0))
         sim_copy = simulator.copy()
+        sim_copy.region_model.set_calculation_filter(api.IntVector([1228]), api.IntVector())
         sim_copy.run(cfg.time_axis, state_repos.get_state(0))
 
     def run_calibration(self, model_t):
@@ -98,6 +100,7 @@ class SimulationTestCase(unittest.TestCase):
              if r in p_dict else p_dict.update(
                 {r: {p: getattr(getattr(p_obj, r), p)}}) for r, p in [nm.split('.') for nm in [p_obj.get_name(i) for i in range(p_obj.size())]]]
             return p_dict
+
         # set up configuration
         cfg = YAMLSimConfig(self.sim_config_file, "neanidelva", overrides={'model': {'model_t': model_t, 'model_parameters': param_obj_2_dict(model_t.parameter_t())}})
 
@@ -112,7 +115,7 @@ class SimulationTestCase(unittest.TestCase):
         cid = 1228
         simulator.region_model.set_calculation_filter(api.IntVector([cid]), api.IntVector())  # only this sub-catchment
         # not needed, we auto initialize to default if not done explicitely
-        #if model_t in [pt_hs_k.PTHSKOptModel]:
+        # if model_t in [pt_hs_k.PTHSKOptModel]:
         #    for i in range(len(s0)):
         #        s0[i].snow.distribute(param.hs)
         simulator.run(time_axis=time_axis, state=s0)
@@ -205,7 +208,7 @@ class SimulationTestCase(unittest.TestCase):
         simulator.region_model.set_state_collection(cid, True)
         simulator.run(time_axis=time_axis, state=state_repos.get_state(0))
         # TODO: Update the regression test below with correct result
-        #self.assertAlmostEqual(simulator.region_model.cells[0].rc.pe_output.values[0], 0.039768354, 5)  # just to verify pot.evap by regression, mm/h
+        # self.assertAlmostEqual(simulator.region_model.cells[0].rc.pe_output.values[0], 0.039768354, 5)  # just to verify pot.evap by regression, mm/h
 
         percentile_list = [10, 25, 50, 75, 90]
         # From here, things could be calculated without copies (except for 't')
@@ -243,7 +246,7 @@ class SimulationTestCase(unittest.TestCase):
         region_id = 0
         interpolation_id = 0
         opt_model_t = self.model_config.model_type().opt_model_t
-        model_config = ModelConfig(self.model_config_file, overrides = {'model_t': opt_model_t})
+        model_config = ModelConfig(self.model_config_file, overrides={'model_t': opt_model_t})
         region_model_repository = CFRegionModelRepository(self.region_config, model_config)
         interp_repos = InterpolationParameterRepository(self.interpolation_config)
         netcdf_geo_ts_repos = [CFDataRepository(32633, source["params"]["filename"], padding=source["params"]['padding'])
@@ -354,7 +357,7 @@ class SimulationTestCase(unittest.TestCase):
         pattern = "fc*.nc"
         try:
             geo_ts_repository = MetNetcdfDataRepository(epsg, base_dir, filename=pattern,
-                                                    allow_subset=True)
+                                                        allow_subset=True)
         except Exception as e:
             print("**** test_run_arome_ensemble: Arome data missing or"
                   " wrong, test inconclusive ****")
