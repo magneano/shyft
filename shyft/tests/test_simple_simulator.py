@@ -59,7 +59,8 @@ class SimulationTestCase(unittest.TestCase):
 
         state_repos = DefaultStateRepository(simulator.region_model)
         state = state_repos.get_state(0)
-        simulator.run(time_axis=cfg.time_axis, state=state)  # Here we have already checked if StateIDs match with model cell ID. Further check is redundant.
+        small_time_axis = cfg.time_axis.__class__(cfg.time_axis.start,cfg.time_axis.delta_t,100)
+        simulator.run(time_axis=small_time_axis, state=state)  # Here we have already checked if StateIDs match with model cell ID. Further check is redundant.
         # simulator.region_model.get_states(state.state_vector)
         state = simulator.reg_model_state
         obs_discharge = 0.0
@@ -108,7 +109,7 @@ class SimulationTestCase(unittest.TestCase):
         simulator = DefaultSimulator(cfg.region_model_id, cfg.interpolation_id, cfg.get_region_model_repo(),
                                      cfg.get_geots_repo(), cfg.get_interp_repo(), initial_state_repository=None,
                                      catchments=None)
-        time_axis = cfg.time_axis
+        time_axis = cfg.time_axis.__class__(cfg.time_axis.start,cfg.time_axis.delta_t,2000)
         state_repos = DefaultStateRepository(simulator.region_model)
         s0 = state_repos.get_state(0)
         param = simulator.region_model.get_region_parameter()
