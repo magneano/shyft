@@ -14,11 +14,11 @@ from shyft.api import pt_hps_k
 class RegionModel(unittest.TestCase):
     @staticmethod
     def build_model(model_t, parameter_t, model_size, num_catchments=1):
-        cell_area = 1000 * 1000
+        cell_area = 1000*1000
         region_parameter = parameter_t()
         gcds = api.GeoCellDataVector()  # creating models from geo_cell-data is easier and more flexible
         for i in range(model_size):
-            gp = api.GeoPoint(500 + 1000.0 * i, 500.0, 500.0 * i / model_size)
+            gp = api.GeoPoint(500 + 1000.0*i, 500.0, 500.0*i/model_size)
             cid = 1
             if num_catchments > 1:
                 cid = random.randint(1, num_catchments + 1)
@@ -27,7 +27,6 @@ class RegionModel(unittest.TestCase):
             gcds.append(geo_cell_data)
 
         return model_t(gcds, region_parameter)
-
 
     def _create_constant_geo_ts(self, geo_ts_type, geo_point, utc_period, value):
         """Create a time point ts, with one value at the start
@@ -73,7 +72,7 @@ class RegionModel(unittest.TestCase):
         cids_unspecified = api.IntVector()
         states = model.state.extract_state(cids_unspecified)
         self.assertEqual(len(states), model.size())
-        state_str= str(states.serialize_to_str())
+        state_str = str(states.serialize_to_str())
         states2 = states.__class__.deserialize_from_str(state_str)
         unapplied_list = model.state.apply_state(states, cids_unspecified)
         self.assertEqual(len(unapplied_list), 0)
@@ -177,7 +176,7 @@ class RegionModel(unittest.TestCase):
         model.interpolate(
             model_interpolation_parameter,
             self.create_dummy_region_environment(time_axis,
-                                                 model.get_cells()[int(num_cells / 2)].geo.mid_point()))
+                                                 model.get_cells()[int(num_cells/2)].geo.mid_point()))
         m_ip_parameter = model.interpolation_parameter  # illustrate that we can get back the passed interpolation parameter as a property of the model
         self.assertEqual(m_ip_parameter.use_idw_for_temperature, True)  # just to ensure we really did get back what we passed in
         self.assertAlmostEqual(m_ip_parameter.temperature_idw.zscale, 0.5)
@@ -222,13 +221,13 @@ class RegionModel(unittest.TestCase):
             model2.set_states(s0)
             # now  after fix, it works Ok
             for section in range(10):
-                model2.run_cells(use_ncore=0, start_step=section * 24, n_steps=24)
+                model2.run_cells(use_ncore=0, start_step=section*24, n_steps=24)
                 section_discharge = model2.statistics.discharge(cids)
                 self.assertEqual(section_discharge.size(), sum_discharge.size())  # notice here that the values after current step are 0.0
         stepwise_sum_discharge = model2.statistics.discharge(cids)
         # assert stepwise_sum_discharge == sum_discharge
         diff_ts = sum_discharge.values.to_numpy() - stepwise_sum_discharge.values.to_numpy()
-        self.assertAlmostEqual((diff_ts * diff_ts).max(), 0.0, 4)
+        self.assertAlmostEqual((diff_ts*diff_ts).max(), 0.0, 4)
         # Verify that if we pass in illegal cids, then it raises exception(with first failing
         try:
             illegal_cids = api.IntVector([0, 4, 5])
@@ -260,7 +259,7 @@ class RegionModel(unittest.TestCase):
         #
         # 1st: add a river, with 36.000 meter hydro length, a UHGParameter with 1m/hour speed, alpha/beta suitable
         model.river_network.add(
-            api.River(1, api.RoutingInfo(0, 3000.0), api.UHGParameter(1 / 3.60, 7.0, 0.0)))  # river id =1
+            api.River(1, api.RoutingInfo(0, 3000.0), api.UHGParameter(1/3.60, 7.0, 0.0)))  # river id =1
         # 2nd: let cells route to the river
         model.connect_catchment_to_river(1, 1)  # now all cells in catchment 1 routes to river with id 1.
         self.assertTrue(model.has_routing())
@@ -283,84 +282,88 @@ class RegionModel(unittest.TestCase):
         q_0 = model.cells[0].state.kirchner.q
         model.adjust_q(2.0, cids)
         q_1 = model.cells[0].state.kirchner.q
-        self.assertAlmostEqual(q_0 * 2.0, q_1)
+        self.assertAlmostEqual(q_0*2.0, q_1)
         model.revert_to_initial_state()  # ensure we have a known state
         model.run_cells(0, 10, 1)  # just run step 10
         q_avg = model.statistics.discharge_value(cids, 10)  # get out the discharge for step 10
         x = 0.7  # we want x*q_avg as target
         model.revert_to_initial_state()  # important, need start state for the test here
-        adjust_result = model.adjust_state_to_target_flow(x * q_avg, cids, start_step=10, scale_range=3.0, scale_eps=1e-3,
+        adjust_result = model.adjust_state_to_target_flow(x*q_avg, cids, start_step=10, scale_range=3.0, scale_eps=1e-3,
                                                           max_iter=350)  # This is how to adjust state to observed average flow for cids for tstep 10
         self.assertEqual(len(adjust_result.diagnostics), 0)  # diag should be len(0) if ok.
-        self.assertAlmostEqual(adjust_result.q_r, q_avg * x, 3)  # verify we reached target
+        self.assertAlmostEqual(adjust_result.q_r, q_avg*x, 3)  # verify we reached target
         self.assertAlmostEqual(adjust_result.q_0, q_avg, 3)  # .q_0,
 
-        def test_optimization_model(self):
-            num_cells = 20
-            model_type = pt_gs_k.PTGSKOptModel
-            model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells)
-            cal = api.Calendar()
-            t0 = cal.time(2015, 1, 1, 0, 0, 0)
-            dt = api.deltahours(1)
-            n = 240
-            time_axis = api.TimeAxisFixedDeltaT(t0, dt, n)
-            model_interpolation_parameter = api.InterpolationParameter()
-            model.initialize_cell_environment(time_axis)  # just show how we can split the run_interpolation into two calls(second one optional)
-            model.interpolate(
-                model_interpolation_parameter,
-                self.create_dummy_region_environment(time_axis,
-                                                     model.get_cells()[int(num_cells / 2)].geo.mid_point()))
-            s0 = pt_gs_k.PTGSKStateVector()
-            for i in range(num_cells):
-                si = pt_gs_k.PTGSKState()
-                si.kirchner.q = 40.0
-                s0.append(si)
-            model.set_states(s0)  # at this point the intial state of model is established as well
-            model.run_cells()
-            cids = api.IntVector.from_numpy([0])  # optional, we can add selective catchment_ids here
-            sum_discharge = model.statistics.discharge(cids)
-            sum_discharge_value = model.statistics.discharge_value(cids, 0)  # at the first timestep
-            self.assertGreaterEqual(sum_discharge_value, 130.0)
-            # verify we can construct an optimizer
-            optimizer = model_type.optimizer_t(model)  # notice that a model type know it's optimizer type, e.g. PTGSKOptimizer
-            self.assertIsNotNone(optimizer)
-            #
-            # create target specification
-            #
-            model.revert_to_initial_state()  # set_states(s0)  # remember to set the s0 again, so we have the same initial condition for our game
-            tsa = api.TsTransform().to_average(t0, dt, n, sum_discharge)
-            t_spec_1 = api.TargetSpecificationPts(tsa, cids, 1.0, api.KLING_GUPTA, 1.0, 0.0, 0.0, api.DISCHARGE, 'test_uid')
+    def test_optimization_model(self):
+        num_cells = 20
+        model_type = pt_gs_k.PTGSKOptModel
+        model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells)
+        cal = api.Calendar()
+        t0 = cal.time(2015, 1, 1, 0, 0, 0)
+        dt = api.deltahours(1)
+        n = 240
+        time_axis = api.TimeAxisFixedDeltaT(t0, dt, n)
+        model_interpolation_parameter = api.InterpolationParameter()
+        model.initialize_cell_environment(time_axis)  # just show how we can split the run_interpolation into two calls(second one optional)
+        model.interpolate(
+            model_interpolation_parameter,
+            self.create_dummy_region_environment(time_axis,
+                                                 model.get_cells()[int(num_cells/2)].geo.mid_point()))
+        s0 = pt_gs_k.PTGSKStateVector()
+        for i in range(num_cells):
+            si = pt_gs_k.PTGSKState()
+            si.kirchner.q = 40.0
+            s0.append(si)
+        model.set_states(s0)  # at this point the intial state of model is established as well
+        model.run_cells()
+        cids = api.IntVector.from_numpy([1])  # optional, we can add selective catchment_ids here
+        sum_discharge = model.statistics.discharge(cids)
+        sum_discharge_value = model.statistics.discharge_value(cids, 0)  # at the first timestep
+        self.assertGreaterEqual(sum_discharge_value, 130.0)
+        # verify we can construct an optimizer
+        optimizer = model_type.optimizer_t(model)  # notice that a model type know it's optimizer type, e.g. PTGSKOptimizer
+        self.assertIsNotNone(optimizer)
+        #
+        # create target specification
+        #
+        model.revert_to_initial_state()  # set_states(s0)  # remember to set the s0 again, so we have the same initial condition for our game
+        tsa = api.TsTransform().to_average(t0, dt, n, sum_discharge)
+        t_spec_1 = api.TargetSpecificationPts(tsa, cids, 1.0, api.KLING_GUPTA, 1.0, 0.0, 0.0, api.DISCHARGE, 'test_uid')
 
-            target_spec = api.TargetSpecificationVector()
-            target_spec.append(t_spec_1)
-            upper_bound = model_type.parameter_t(model.get_region_parameter())  # the model_type know it's parameter_t
-            lower_bound = model_type.parameter_t(model.get_region_parameter())
-            upper_bound.kirchner.c1 = -1.9
-            lower_bound.kirchner.c1 = -3.0
-            upper_bound.kirchner.c2 = 0.99
-            lower_bound.kirchner.c2 = 0.80
+        target_spec = api.TargetSpecificationVector()
+        target_spec.append(t_spec_1)
+        upper_bound = model_type.parameter_t(model.get_region_parameter())  # the model_type know it's parameter_t
+        lower_bound = model_type.parameter_t(model.get_region_parameter())
+        upper_bound.kirchner.c1 = -1.9
+        lower_bound.kirchner.c1 = -3.0
+        upper_bound.kirchner.c2 = 0.99
+        lower_bound.kirchner.c2 = 0.80
 
-            optimizer.set_target_specification(target_spec, lower_bound, upper_bound)
-            # Not needed, it will automatically get one.
-            # optimizer.establish_initial_state_from_model()
-            # s0_0 = optimizer.get_initial_state(0)
-            # optimizer.set_verbose_level(1000)
-            p0 = model_type.parameter_t(model.get_region_parameter())
-            orig_c1 = p0.kirchner.c1
-            orig_c2 = p0.kirchner.c2
-            # model.get_cells()[0].env_ts.precipitation.set(0, 5.1)
-            # model.get_cells()[0].env_ts.precipitation.set(1, 4.9)
-            p0.kirchner.c1 = -2.4
-            p0.kirchner.c2 = 0.91
-            opt_param = optimizer.optimize(p0, 1500, 0.1, 1e-5)
-            goal_fx = optimizer.calculate_goal_function(opt_param)
-            p0.kirchner.c1 = -2.4
-            p0.kirchner.c2 = 0.91
-            # goal_fx1 = optimizer.calculate_goal_function(p0)
+        optimizer.set_target_specification(target_spec, lower_bound, upper_bound)
+        # Not needed, it will automatically get one.
+        # optimizer.establish_initial_state_from_model()
+        # s0_0 = optimizer.get_initial_state(0)
+        # optimizer.set_verbose_level(1000)
+        p0 = model_type.parameter_t(model.get_region_parameter())
+        orig_c1 = p0.kirchner.c1
+        orig_c2 = p0.kirchner.c2
+        # model.get_cells()[0].env_ts.precipitation.set(0, 5.1)
+        # model.get_cells()[0].env_ts.precipitation.set(1, 4.9)
+        p0.kirchner.c1 = -2.4
+        p0.kirchner.c2 = 0.91
+        opt_param = optimizer.optimize(p0, 1500, 0.1, 1e-5)
+        goal_fx = optimizer.calculate_goal_function(opt_param)
+        p0.kirchner.c1 = -2.4
+        p0.kirchner.c2 = 0.91
+        # goal_fx1 = optimizer.calculate_goal_function(p0)
 
-            self.assertLessEqual(goal_fx, 10.0)
-            self.assertAlmostEqual(orig_c1, opt_param.kirchner.c1, 4)
-            self.assertAlmostEqual(orig_c2, opt_param.kirchner.c2, 4)
+        self.assertLessEqual(goal_fx, 10.0)
+        self.assertAlmostEqual(orig_c1, opt_param.kirchner.c1, 4)
+        self.assertAlmostEqual(orig_c2, opt_param.kirchner.c2, 4)
+        # verify the interface to the new optimize_global function
+        global_opt_param = optimizer.optimize_global(p0, max_n_evaluations=1500, max_seconds=3.0, solver_eps=1e-5)
+        self.assertIsNotNone(global_opt_param)  # just to ensure signature and results are covered
+
 
     def test_hbv_model_initialize_and_run(self):
         num_cells = 20
@@ -401,7 +404,7 @@ class RegionModel(unittest.TestCase):
         model.run_interpolation(
             model_interpolation_parameter, time_axis,
             self.create_dummy_region_environment(time_axis,
-                                                 model.get_cells()[int(num_cells / 2)].geo.mid_point()))
+                                                 model.get_cells()[int(num_cells/2)].geo.mid_point()))
         s0 = hbv_stack.HbvStateVector()
         for i in range(num_cells):
             si = hbv_stack.HbvState()
@@ -409,7 +412,7 @@ class RegionModel(unittest.TestCase):
             si.tank.lz = 40.0
             s0.append(si)
         model.set_states(s0)
-        model.set_state_collection(-1, False) # with out collection
+        model.set_state_collection(-1, False)  # with out collection
         model.run_cells()
         model.set_states(s0)
         model.set_state_collection(-1, True)  # with collection
@@ -464,7 +467,7 @@ class RegionModel(unittest.TestCase):
         model = self.build_model(pt_gs_k.PTGSKModel, pt_gs_k.PTGSKParameter, n_cells)
         cell_vector = model.get_cells()
         geo_cell_data_vector = cell_vector.geo_cell_data_vector(cell_vector)  # This gives a string, ultra fast, containing the serialized form of all geo-cell data
-        self.assertEqual(len(geo_cell_data_vector), n_values_pr_gcd * n_cells)
+        self.assertEqual(len(geo_cell_data_vector), n_values_pr_gcd*n_cells)
         cell_vector2 = pt_gs_k.PTGSKCellAllVector.create_from_geo_cell_data_vector(
             geo_cell_data_vector)  # This gives a cell_vector, of specified type, with exactly the same geo-cell data as the original
         self.assertEqual(len(cell_vector), len(cell_vector2))  # just verify equal size, and then geometry, the remaining tests are covered by C++ testing
@@ -476,25 +479,24 @@ class RegionModel(unittest.TestCase):
     def test_model_catchment_ids(self):
         num_cells = 50
         model_type = pt_gs_k.PTGSKModel
-        for n_cids in [1,2,3]:
+        for n_cids in [1, 2, 3]:
             model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells, n_cids)
-            cids= sorted(model.catchment_ids)
+            cids = sorted(model.catchment_ids)
             self.assertEqual(len(cids), n_cids)
             for i in range(n_cids):
-                self.assertEqual(i+1, cids[i])
-
+                self.assertEqual(i + 1, cids[i])
 
     def test_region_environment_variable_list(self):
         """ just to verify ARegionEnvironment.variables container exposed to ease scripting"""
         cal = api.Calendar()
         time_axis = api.TimeAxisFixedDeltaT(cal.time(2015, 1, 1, 0, 0, 0), api.deltahours(1), 240)
-        e = self.create_dummy_region_environment(time_axis,api.GeoPoint(0.0,1.0,2.0))
+        e = self.create_dummy_region_environment(time_axis, api.GeoPoint(0.0, 1.0, 2.0))
         self.assertIsNotNone(e)
-        self.assertEqual(len(e.variables),5)
+        self.assertEqual(len(e.variables), 5)
         for v in e.variables:
             self.assertIsNotNone(v[1])
-            self.assertEqual(getattr(e,v[0])[0].mid_point_,v[1][0].mid_point_)  # equivalent, just check first midpoint
-            self.assertEqual(getattr(e,v[0])[0].ts.value(0),v[1][0].ts.value(0))  # and value
+            self.assertEqual(getattr(e, v[0])[0].mid_point_, v[1][0].mid_point_)  # equivalent, just check first midpoint
+            self.assertEqual(getattr(e, v[0])[0].ts.value(0), v[1][0].ts.value(0))  # and value
 
     def test_state_with_id_handler(self):
         num_cells = 20
@@ -509,11 +511,11 @@ class RegionModel(unittest.TestCase):
         model_state_2 = model.state.extract_state(cids_2)
         self.assertEqual(len(model_state_1) + len(model_state_2), len(model_state_12))
         # We need to store state into yaml text files, for this its nice to have it as a string:
-        ms2=pt_gs_k.PTGSKStateWithIdVector.deserialize_from_str(model_state_2.serialize_to_str()) # [0] verify state serialization
-        self.assertEqual(len(ms2),len(model_state_2))
-        for a,b in zip(ms2,model_state_2):
-            self.assertEqual(a.id,b.id)
-            self.assertAlmostEqual(a.state.kirchner.q,b.state.kirchner.q)
+        ms2 = pt_gs_k.PTGSKStateWithIdVector.deserialize_from_str(model_state_2.serialize_to_str())  # [0] verify state serialization
+        self.assertEqual(len(ms2), len(model_state_2))
+        for a, b in zip(ms2, model_state_2):
+            self.assertEqual(a.id, b.id)
+            self.assertAlmostEqual(a.state.kirchner.q, b.state.kirchner.q)
 
         self.assertGreater(len(model_state_1), 0)
         self.assertGreater(len(model_state_2), 0)
@@ -561,12 +563,12 @@ class RegionModel(unittest.TestCase):
         #     rm.state.apply( state_with_id) .. and maybe check the result, number of states== expected applied
         #     rm.initial_state=rm.current_state  .. a new property to ease typical tasks
         sv_2 = ms_2.state_vector
-        self.assertEqual(len(sv_2),len(ms_2))
-        for s,sid in zip(sv_2,ms_2):
-            self.assertAlmostEqual(s.kirchner.q,sid.state.kirchner.q)
+        self.assertEqual(len(sv_2), len(ms_2))
+        for s, sid in zip(sv_2, ms_2):
+            self.assertAlmostEqual(s.kirchner.q, sid.state.kirchner.q)
         # example apply, then initial state:
-        model.state.apply_state(ms_2,cids_unspecified)
-        model.initial_state=model.current_state
+        model.state.apply_state(ms_2, cids_unspecified)
+        model.initial_state = model.current_state
 
     if __name__ == "__main__":
         unittest.main()

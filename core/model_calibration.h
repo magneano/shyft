@@ -10,7 +10,9 @@
 #include <memory>
 #include <stdexcept>
 #include <iostream>
-#include <dlib/optimization/optimization_bobyqa.h>
+#include <chrono>
+#include <dlib/optimization.h>
+#include <dlib/global_optimization.h>
 #include <dlib/matrix.h>
 #include <dlib/statistics.h>
 
@@ -68,6 +70,51 @@ namespace shyft {
                 x = model.from_scaled(_x);
                 return res;
             }
+
+            /** \brief Minimize the functional defined by model using the DLIB find_min_global
+             *
+             *
+             * For reference , see <a href="http://dlib.net/optimization.html#global_function_search">dlib global_function_search</a>.
+             *
+             * \tparam M Model to be optimized, implementing the interface:
+             *   -# double operator()(const dlib::matrix<double, 0, 1> params) --> Evaluate the functional for parameter set params.
+             *   -# vector<double> to_scaled(std::vector<double> params) --> Scale original parameters to [0,1]
+             *   -# vector<double> from_scaled(const dlib::matrix<double, 0, 1> scaled_params) --> Unscale parameters
+             *  \param model the model to be optimized
+             *  \param x Initial guess
+             *  \param max_n_evaluations stop  after n evaluations
+             *  \param max_seconds stop search after  time used
+             *  \param solver_epsilon conclude on minimum within this accuracy before stop or search other minimums
+             */
+            template  <class M>
+            double min_global(M& model, vector<double>& x, int max_n_evaluations, double max_seconds, double solver_epsilon ) {
+
+                typedef dlib::matrix<double, 0, 1> column_vector;
+
+                // Scale all parameter ranges to [0, 1] for better initial trust region radius balance.
+                std::vector<double> x_s = model.to_scaled(x);
+
+                column_vector _x = dlib::mat(x_s);
+
+                // Scaled region min and max
+                column_vector x_l(_x.nr()); x_l = 0.0;
+                column_vector x_u(_x.nr()); x_u = 1.0;
+
+                auto res = dlib::find_min_global([&model](column_vector x) { return model(x); },
+                    //_x,
+                    x_l,
+                    x_u,
+                    dlib::max_function_calls( max_n_evaluations),         // max number of objective function evaluations
+                    chrono::nanoseconds{int64_t(max_seconds*1e9)} ,
+                    solver_epsilon
+                );
+
+                // Convert back to real parameter range
+                x = model.from_scaled(res.x);
+                return res.y;
+            }
+
+            
             ///<Template class to transform model evaluation into something that dream can run
             template<class M>
             struct dream_fx : public shyft::core::optimizer::ifx {
@@ -541,6 +588,34 @@ namespace shyft {
                     return r;
                 }
 
+                /**\brief Call to global optimize model, starting with p parameter set, using p_min..p_max as boundaries.
+                 * where p is the full parameter vector.
+                 * the p_min,p_max specified in constructor is used to reduce the parameterspace for the optimizer
+                 * down to a minimum number to facilitate fast run.
+                 * \param p contains the starting point for the parameters
+                 * \param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.
+                 * \param max_seconds  stop after max_seconds
+                 * \param solver_epsilon search for minimums within this accuracy(stop or search for other minima when this accuracy is reached)
+                 * \return the optimized parameter vector
+                 */
+                vector<double> optimize_global(const vector<double>& p, size_t max_n_evaluations, double max_seconds, double solver_epsilon ) {
+                    prepare_optimize();
+                    // reduce using min..max the parameter space,
+                    p_expanded = p;//put all parameters into class scope so that we can reduce/expand as needed during optimization
+                    auto rp = reduce_p_vector(p);
+                    min_global(*this, rp, max_n_evaluations,max_seconds,solver_epsilon);
+                    // expand,put inplace p to return vector.
+                    return  expand_p_vector(rp);
+                }
+
+                /**optimize using minbobyqa, using p as starting parameters, return new optimized parameters */
+                PA optimize_global(const PA &p,size_t max_n_evaluations, double max_seconds, double solver_epsilon) {
+                    PA r;
+                    r.set(optimize_global(p_vector(p), max_n_evaluations, max_seconds, solver_epsilon));
+                    return r;
+                }
+
+                
                 /**\brief Call to optimize model, using DREAM alg., find p, using p_min..p_max as boundaries.
                  * where p is the full parameter vector.
                  * the p_min,p_max specified in constructor is used to reduce the parameterspace for the optimizer

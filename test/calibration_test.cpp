@@ -296,13 +296,14 @@ namespace shyfttest {
 } //  shyfttest
 
 TEST_SUITE("calibration") {
-TEST_CASE("test_dummy") {
+TEST_CASE("test_optimizers") {
     std::vector<double> target = {-5.0,1.0,1.0,1.0};
     std::vector<double> lower = {-10, 0, 0, 0};
     std::vector<double> upper = {-4, 2, 2, 2};
     std::vector<double> x = {-9.0, 0.5, 0.9, 0.3};
     std::vector<double> x2 = {-9.0, 0.5, 0.9, 0.3};
     std::vector<double> x3 = {-9.0, 0.5, 0.9, 0.3};
+    std::vector<double> x4 = {-9.0, 0.5, 0.9, 0.3};
     shyfttest::TestModel model(target, lower, upper);
     double residual = model_calibration::min_bobyqa(model, x, 500,0.05, 1.0e-16);
     TS_ASSERT_DELTA(residual, 0.0, 1.0e-16);
@@ -324,11 +325,16 @@ TEST_CASE("test_dummy") {
     for (size_t i = 0; i < x3.size(); ++i)
         TS_ASSERT_DELTA(x3[i], target[i], 0.02);
 
+    double glob_eps=1e-6;
+    double residual4 = model_calibration::min_global(model, x4, 500,1.0,glob_eps);
+    TS_ASSERT_DELTA(residual4, 0.0, glob_eps);
+    for (size_t i = 0; i < x.size(); ++i)
+        TS_ASSERT_DELTA(x[i], target[i], glob_eps);
 
 }
 
 
-TEST_CASE("test_simple") {
+TEST_CASE("test_simple_min_bobyqa") {
     using namespace shyft::core::model_calibration;
     // Make a simple model setup
     calendar cal;
@@ -439,6 +445,119 @@ TEST_CASE("test_simple") {
 	}
 
 }
+
+TEST_CASE("test_simple_min_global") {
+    using namespace shyft::core::model_calibration;
+    // Make a simple model setup
+    calendar cal;
+    utctime t0 = cal.time(YMDhms(2014,8,1,0,0,0));
+    const int nhours=1;
+    utctimespan dt = 1*deltahours(nhours);
+    size_t num_days= 10;
+    ta::fixed_dt time_axis(t0, dt, 24*num_days);
+
+    size_t n_dests = 10*10;
+    std::vector<PTGSKCell> destinations;
+    destinations.reserve(n_dests);
+
+    pt::parameter pt_param;
+    gs::parameter gs_param;
+    ae::parameter ae_param;
+    kr::parameter k_param;
+
+    pc::parameter p_corr_param;
+    using TestModel = shyfttest::PTGSKTestModel<pt_gs_k::parameter_t>;
+    TestModel::parameter_t parameter{pt_param, gs_param, ae_param, k_param,  p_corr_param};
+
+    // Some initial state is needed:
+
+	kr::state kirchner_state{ 5.0 };
+    gs::state gs_state={0.6, 1.0, 0.0, 0.7 /*1.0/(gs_param.snow_cv*gs_param.snow_cv)*/, 10.0, -1.0, 0.0, 0.0};
+    pt_gs_k::state_t state{ gs_state, kirchner_state};
+
+    // Set up the model and store the synthetic discharge
+	shyfttest::PTGSKTestModel<TestModel::parameter_t> model(t0, dt, 24*num_days, parameter, state);
+    model.init(n_dests, time_axis);
+    catchment_t synthetic_discharge = model.run(parameter);
+    model.set_measured_discharge(synthetic_discharge);
+
+    // Define parameter ranges
+    const size_t n_params = model.parameter.size();
+    std::vector<double> lower; lower.reserve(n_params);
+    std::vector<double> upper; upper.reserve(n_params);
+    const size_t n_calib_params = 4;
+    for (size_t i = 0; i < n_params; ++i) {
+        double v = model.parameter.get(i);
+        lower.emplace_back(i < n_calib_params ? 0.5*v : v);
+        upper.emplace_back(i < n_calib_params ? 1.5*v : v);
+    }
+
+    model.set_parameter_ranges(lower, upper);
+
+    // Perturb parameter set
+    std::vector<double> x(n_params);
+    std::default_random_engine re; re.seed(1023);
+	for (size_t i = 0; i < n_params; ++i) {
+        if(i<n_calib_params) {
+            x[i] = lower[i]< upper[i] ? std::uniform_real_distribution<double>(lower[i], upper[i])(re) : std::uniform_real_distribution<double>(upper[i], lower[i])(re);
+        } else {
+            x[i] = (lower[i] + upper[i])*0.5;
+        }
+	}
+    using std::cout;
+    using std::endl;
+    model.p_expanded = x;
+    bool verbose = getenv("SHYFT_VERBOSE")!=nullptr;
+    if(verbose) {
+        cout << "True Parameter settings:" << endl;
+        cout << "========================" << endl;
+        for (size_t i = 0; i < n_params; ++i)
+            cout << model.parameter.get_name(i) << " = " << model.parameter.get(i) << endl;
+        cout << "===============" << endl;
+        cout << "Initial guess :" << endl;
+        cout << "===============" << endl;
+        for (size_t i = 0; i < n_params; ++i)
+            cout << model.parameter.get_name(i) << " = " << x[i] << endl;
+        cout << "====================" << endl;
+        cout << "Found:" << endl;
+        cout << "Found:" << endl;
+    }
+    // Solve the optimization problem
+	size_t n_max = 15000;
+	const double solver_eps = 0.001;
+    const double max_seconds=10.0;
+	auto rx = model.reduce_p_vector(x);
+    double residual = min_global(model, rx, n_max, max_seconds, solver_eps);
+	x = model.expand_p_vector(rx);
+	model.p_expanded = x;
+    if(verbose) {
+        cout << "====================" << endl;
+        for (size_t i = 0; i < n_params; ++i)
+            cout << model.parameter.get_name(i) << " = " << x[i] << endl;
+        cout << "====================" << endl;
+        cout << "Residual = " << residual << endl;
+        cout << "Number of function evals = " << model.n_evals << endl;
+        cout << "====================" << endl;
+        cout << "Trying once more:" << endl;
+    }
+    model.n_evals = 0;
+	rx = model.reduce_p_vector(x);
+    residual = min_global(model, rx, n_max*2, max_seconds*2, solver_eps/2.0);
+	x = model.expand_p_vector(rx);
+	model.p_expanded = x;
+	if(verbose) {
+        cout << "====================" << endl;
+        cout << "min_bobyqa:" << endl;
+        for (size_t i = 0; i < n_params; ++i)
+            cout << model.parameter.get_name(i) << " = " << x[i] << endl;
+        cout << "====================" << endl;
+        cout << "Residual = " << residual << endl;
+        cout << "Number of function evals = " << model.n_evals << endl;
+        cout << "====================" << endl;
+	}
+
+}
+
 TEST_CASE("test_nash_sutcliffe_goal_function") {
 	calendar utc;
 	utctime start = utc.time(YMDhms(2000, 1, 1, 0, 0, 0));

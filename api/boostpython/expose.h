@@ -96,9 +96,9 @@ namespace expose {
     template <class T>
     static void cell(const char *cell_name,const char* cell_doc) {
       class_<T>(cell_name,cell_doc)
-        .def_readwrite("geo",&T::geo,"geo_cell_data information for the cell")
+        .def_readwrite("geo",&T::geo,"geo_cell_data information for the cell, such as mid-point, forest-fraction and other cell-specific personalities.")
         .add_property("parameter",&T::get_parameter,&T::set_parameter,"reference to parameter for this cell, typically shared for a catchment")
-        .def_readwrite("env_ts",&T::env_ts,"environment time-series as projected to the cell")
+        .def_readwrite("env_ts",&T::env_ts,"environment time-series as projected to the cell after the interpolation/preparation step")
         .def_readwrite("state",&T::state,"Current state of the cell")
         .def_readonly("sc",&T::sc,"state collector for the cell")
         .def_readonly("rc",&T::rc,"response collector for the cell")
@@ -445,6 +445,8 @@ namespace expose {
         std::vector<double>(Optimizer::*optimize_v)(const std::vector<double>&, size_t, double, double ) = &Optimizer::optimize;
         parameter_t(Optimizer::*optimize_p)(const parameter_t&, size_t, double, double) = &Optimizer::optimize;
 
+        parameter_t(Optimizer::*optimize_global_p)(const parameter_t&, size_t, double, double) = &Optimizer::optimize_global;
+
         std::vector<double>(Optimizer::*optimize_dream_v)(const std::vector<double>&, size_t) = &Optimizer::optimize_dream;
         parameter_t(Optimizer::*optimize_dream_p)(const parameter_t&, size_t) = &Optimizer::optimize_dream;
 
@@ -457,62 +459,82 @@ namespace expose {
 
 
         class_<Optimizer>(optimizer_name,
-            "The optimizer for parameters in a ref: shyft::core::region_model\n"
-            "It provides needed functionality to orchestrate a search for the optimal parameters so that the goal function\n"
-            "specified by the target_specifications are minimized.\n"
-            "The user can specify which parameters (model specific) to optimize, giving range min..max for each of the\n"
-            "parameters. Only parameters with min != max are used, thus minimizing the parameter space.\n"
-            "\n"
-            "Target specification ref: target_specification allows a lot of flexibility when it comes to what\n"
-            "goes into the ref: nash_sutcliffe goal function.\n"
-            "\n"
-            "The search for optimium starts with the current parameter-set, the current start state, over the specified model time-axis.\n"
-            "After a run, the goal function is calculated and returned back to the minbobyqa algorithm that continue searching for the minimum\n"
-            "value until tolerances/iterations area reached.\n"
+            doc_intro(
+                "The optimizer for parameters for a region model\n"
+                "It provides needed functionality to orchestrate a search for the optimal parameters so that the goal function\n"
+                "specified by the target_specifications are minimized.\n"
+                "The user can specify which parameters (model specific) to optimize, giving range min..max for each of the\n"
+                "parameters. Only parameters with min != max are used, thus minimizing the parameter space.\n"
+                "\n"
+                "Target specification ref: TargetSpecificationVector allows a lot of flexibility when it comes to what\n"
+                "goes into the goal-function.\n"
+                "\n"
+                "This class provides several goal-function search algorithms:\n"
+                "    .optimize               min-bobyqa  a fast local optimizer, http://dlib.net/optimization.html#find_min_bobyqa\n"
+                "    .optimize_global   a global optimizer, http://dlib.net/optimization.html#global_function_search\n"
+                "    .optimize_sceua   a global optimizer,  https://www.sciencedirect.com/science/article/pii/0022169494900574\n"
+                "    .optimize_dream  a global optimizer,\n"
+                "                                                            Theory is found in: Vrugt, J. et al: Accelerating Markov Chain Monte Carlo\n"
+                "                                                            simulations by Differential Evolution with Self-Adaptive Randomized Subspace\n"
+                "                                                            Sampling. Int. J. of Nonlinear Sciences and Numerical Simulation 10(3) 2009.\n"
+                "\n\n"
+                "Each method searches for the optimum parameter-set, given the input-constraints and time-limit, max_iterations and accuracy(method dependent).\n"
+                "Also note that after the optimization, you have a complete trace of the parameter-search with the corresponding goal-function value\n"
+                "This enable you to analyze the search-function, and allows you to select other parameter-sets that based on \n"
+                "hydrological criterias that is not captured in the goal-function specification\n"
+            )
             ,no_init
         )
         .def(init< RegionModel&,
                    const std::vector<target_specification_t>&,
                    const std::vector<double>&,
                    const std::vector<double>& >(
-                   args("model","targets","p_min","p_max"),
-                    "construct an opt model for ptgsk, use p_min=p_max to disable optimization for a parameter\n"
-                    "param model reference to the model to be optimized, the model should be initialized, i.e. the interpolation step done.\n"
-                    "param vector<target_specification_t> specifies how to calculate the goal-function, \ref shyft::core::model_calibration::target_specification\n"
-                    "param p_min minimum values for the parameters to be optimized\n"
-                    "param p_max maximum values for the parameters to be  optimized\n"
+                   (py::arg("self"), py::arg("model"), py::arg("targets"), py::arg("p_min"), py::arg("p_max")),
+                    doc_intro(
+                        "Construct an optimizer for the specified region model.\n"
+                        "Set  p_min.param.x = p_max.param.x  to disable optimization for a parameter param.x\n"
+                    )
+                    doc_parameters()
+                    doc_parameter("model","OptModel","the model to be optimized, the model should be initialized, interpolation/preparation  step done" )
+                    doc_parameter("targets","TargetSpecificationVector","specifies how to calculate the goal-function")
+                    doc_parameter("p_min","Parameter","minimum values for the parameters to be optimized")
+                    doc_parameter("p_max","Parameter","maximum values for the parameters to be optimized")
                   )
         )
         .def(init<RegionModel&>(py::args("model"),
-            "Construct a parameter Optimizer for the supplied model\n"
+            doc_intro("Construct a parameter Optimizer for the supplied model\n"
             "Use method .set_target_specification(...) to provide the target specification,\n"
             "then invoke opt_param= o.optimize(p_starting_point..)\n"
             "to get back the optimized parameters for the supplied model and target-specification\n"
             )
+            doc_parameters()
+            doc_parameter("model","OptModel","the model to be optimized, the model should be initialized, interpolation/preparation  step done" )
+            )
         )
-        .def("set_target_specification",&Optimizer::set_target_specification,py::args("target_specification","parameter_lower_bound","parameter_upper_bound"),
-            "Set the target specification, parameter lower and upper bound to be used during \n"
-            "subsequent call to the .optimize() methods.\n"
-            "Only parameters with lower_bound != upper_bound will be subject to optimization\n"
-            "The object properties target_specification,lower and upper bound are updated and\n"
-            "will reflect the current setting.\n"
-            "Parameters\n"
-            "----------\n"
-            "target_specification : TargetSpecificationVectorPts\n"
-            "\t the complete target specification composition\n"
-            "parameter_lower_bound : XXXXParameter\n"
-            "\t the lower bounds of the parameters\n"
-            "parameter_upper_bound: XXXXParameter\n"
-            "\t the upper bounds of the parameters\n"
+        .def("set_target_specification",&Optimizer::set_target_specification,
+             (py::arg("self"),py::arg("target_specification"),py::arg("parameter_lower_bound"),py::arg("parameter_upper_bound")),
+            doc_intro(
+                "Set the target specification, parameter lower and upper bound to be used during \n"
+                "subsequent call to the .optimize() methods.\n"
+                "Only parameters with lower_bound != upper_bound will be subject to optimization\n"
+                "The object properties target_specification,lower and upper bound are updated and\n"
+                "will reflect the current setting.\n"
+            )
+            doc_parameters()
+            doc_parameter("target_specification","TargetSpecificationVector","the complete target specification composition of one or more criteria")
+            doc_parameter("parameter_lower_bound", "Parameter", "the lower bounds of the parameters")
+            doc_parameter("parameter_upper_bound", "Parameter", "the upper bounds of the parameters")
         )
         .def("establish_initial_state_from_model", &Optimizer::establish_initial_state_from_model,
-            "copies the Optimizer referenced region-model current state\n"
-            "to a private store in the Optimizer object.\n"
-            "This state is used to for restore prior to each run of the model during calibration\n"
-            "notice that if you forget to call this method, it will be called automatically once you\n"
-            "call one of the optimize methods.\n"
+             doc_intro(
+                "Copies the Optimizer referenced region-model current state\n"
+                "to a private store in the Optimizer object.\n"
+                "This state is used to for restore prior to each run of the model during calibration\n"
+                "notice that if you forget to call this method, it will be called automatically once you\n"
+                "call one of the optimize methods.\n"
+             )
         )
-        .def("get_initial_state",&Optimizer::get_initial_state,args("i"),"get a copy of the i'th cells initial state")
+        .def("get_initial_state",&Optimizer::get_initial_state,(py::arg("self"),py::arg("i")),"returns a copy of the i'th cells initial state")
         .def("optimize",optimize_v,args("p","max_n_evaluations","tr_start","tr_stop"),
                 "(deprecated)Call to optimize model, starting with p parameter set, using p_min..p_max as boundaries.\n"
                 "where p is the full parameter vector.\n"
@@ -524,84 +546,132 @@ namespace expose {
                 "param tr_stop is the trust region stop, default 1e-5, ref bobyqa\n"
                 "return the optimized parameter vector\n"
         )
-        .def("optimize", optimize_p, args("p", "max_n_evaluations", "tr_start", "tr_stop"),
-            "Call to optimize model, starting with p parameters\n"
-            "as the start point\n"
-            "The current target specification, parameter lower and upper bound\n"
-            "is taken into account\n"
-            "param p contains the starting point for the parameters\n"
-            "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
-            "param tr_start is the trust region start , default 0.1, ref bobyqa\n"
-            "param tr_stop is the trust region stop, default 1e-5, ref bobyqa\n"
-            "return the optimized parameters\n"
+        .def("optimize", optimize_p, (py::arg("self"), py::arg("p"),py::arg( "max_n_evaluations"),py::arg( "tr_start"), py::arg("tr_stop")),
+            doc_intro(
+                "Call to optimize model, using find_min_bobyqa,  starting with p parameters\n"
+                "as the start point\n"
+                "The current target specification, parameter lower and upper bound\n"
+                "is taken into account\n"
+            )
+            doc_parameters()
+            doc_parameter("p","Parameter","contains the starting point for the parameters")
+            doc_parameter("max_n_evaluations","int","stop after n calls of the objective functions, i.e. simulations.")
+            doc_parameter("tr_start","float","minbobyqa is the trust region start , default 0.1, ref bobyqa")
+            doc_parameter("tr_stop","float"," is the trust region stop, default 1e-5, ref bobyqa")
+            doc_returns("p_opt","Parameter","the the optimized parameters")
+        )
+        .def("optimize_global", optimize_global_p,(py::arg("self"),py::arg("p"),py::arg("max_n_evaluations"),py::arg("max_seconds"),py::arg("solver_eps")),
+            doc_intro("Finds the global optimum parameters for the model.\n"
+                "The current target specification, parameter lower and upper bound\n"
+                "is taken into account\n"
+                ".. refer to _dlib_global_search:\n"
+                " http://dlib.net/optimization.html#global_function_search\n"
+            )
+            doc_parameters()
+            doc_parameter("p","Parameter", "the potential starting point for the global search(currently not used by dlib impl)")
+            doc_parameter("max_n_evaluations","int","stop after n calls of the objective functions, i.e. simulations.")
+            doc_parameter("max_seconds","float", "stop search for for solution after specified time-limit")
+            doc_parameter("solver_eps","float","search for minimum goal-function value at this accuracy, continue search for possibly other global minima when this accuracy is reached.")
+            doc_returns("p_opt","Parameter","the optimal found minima given the inputs")
         )
 
-        .def("optimize_dream",optimize_dream_v,args("p","max_n_evaluations"),
-                "Call to optimize model, using DREAM alg., find p, using p_min..p_max as boundaries.\n"
-                "where p is the full parameter vector.\n"
-                "the p_min,p_max specified in constructor is used to reduce the parameterspace for the optimizer\n"
-                "down to a minimum number to facilitate fast run.\n"
-                "param p is used as start point (not really, DREAM use random, but we should be able to pass u and q....\n"
-                "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
-                "return the optimized parameter vector\n"
+        .def("optimize_dream",optimize_dream_v,(py::arg("self"), py::arg("p"),py::arg("max_n_evaluations")),
+                doc_intro(
+                    "(Deprecated)Call to optimize model, using DREAM alg., find p, using p_min..p_max as boundaries.\n"
+                    "where p is the full parameter vector.\n"
+                    "the p_min,p_max specified in constructor is used to reduce the parameterspace for the optimizer\n"
+                    "down to a minimum number to facilitate fast run.\n"
+                    "param p is used as start point (not really, DREAM use random, but we should be able to pass u and q....\n"
+                    "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
+                    "return the optimized parameter vector\n"
+                )
         )
-        .def("optimize_dream", optimize_dream_p, args("p", "max_n_evaluations"),
-            "Call to optimize model with the DREAM algorithm.\n"
-            "Currently, the supplied p is ignored (DREAM selects starting point randomly)\n"
-            "The current target specification, parameter lower and upper bound\n"
-            "is taken into account\n"
-            "param p is used as start point (not really, DREAM use random, but we should be able to pass u and q....\n"
-            "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
-            "return the optimized parameter vector\n"
+        .def("optimize_dream", optimize_dream_p, (py::arg("self"), py::arg("p"),py::arg("max_n_evaluations")),
+            doc_intro(
+                "Call to optimize model with the DREAM algorithm.\n"
+                "The supplied p is ignored (DREAM selects starting point randomly)\n"
+                "The current target specification, parameter lower and upper bound\n"
+                "is taken into account\n"
+            )
+            doc_parameters()
+            doc_parameter("p","Parameter", "the potential starting point for the global search(currently not used by dlib impl)")
+            doc_parameter("max_n_evaluations","int","stop after n calls of the objective functions, i.e. simulations.")
+            doc_returns("p_opt","Parameter","the optimal found minima given the inputs")
+        )
+        .def("optimize_sceua",optimize_sceua_v,(py::arg("self"), py::arg("p"),py::arg("max_n_evaluations"),py::arg("x_eps"),py::arg("y_eps")),
+               doc_intro(
+                    "(Deprecated)Call to optimize model, using SCE UA, using p as startpoint, find p, using p_min..p_max as boundaries.\n"
+                    "where p is the full parameter vector.\n"
+                    "the p_min,p_max specified in constructor is used to reduce the parameter-space for the optimizer\n"
+                    "down to a minimum number to facilitate fast run.\n"
+                    "param p is used as start point and is updated with the found optimal points\n"
+                    "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
+                    "param x_eps is stop condition when all changes in x's are within this range\n"
+                    "param y_eps is stop condition, and search is stopped when goal function does not improve anymore within this range\n"
+                    "return the optimized parameter vector\n"
+               )
+        )
+        .def("optimize_sceua", optimize_sceua_p,(py::arg("self"), py::arg("p"),py::arg("max_n_evaluations"),py::arg("x_eps"),py::arg("y_eps")),
+            doc_intro(
+                "Call to optimize model using SCE UA algorithm, starting with p parameters\n"
+                "as the start point\n"
+                "The current target specification, parameter lower and upper bound\n"
+                "is taken into account\n"
+            )
+            doc_parameters()
+            doc_parameter("p","Parameter", "the potential starting point for the global search")
+            doc_parameter("max_n_evaluations","int","stop after n calls of the objective functions, i.e. simulations.")
+            doc_parameter("x_eps","float","is stop condition when all changes in x's are within this range")
+            doc_parameter("y_eps","float","is stop condition, and search is stopped when goal function does not improve anymore within this range")
+            doc_returns("p_opt","Parameter","the optimal found minima given the inputs")
         )
 
-        .def("optimize_sceua",optimize_sceua_v,args("p","max_n_evaluations","x_eps","y_eps"),
-                "Call to optimize model, using SCE UA, using p as startpoint, find p, using p_min..p_max as boundaries.\n"
-                "where p is the full parameter vector.\n"
-                "the p_min,p_max specified in constructor is used to reduce the parameter-space for the optimizer\n"
-                "down to a minimum number to facilitate fast run.\n"
-                "param p is used as start point and is updated with the found optimal points\n"
-                "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
-                "param x_eps is stop condition when all changes in x's are within this range\n"
-                "param y_eps is stop condition, and search is stopped when goal function does not improve anymore within this range\n"
-                "return the optimized parameter vector\n"
+        .def("reset_states",&Optimizer::reset_states,(py::arg("self")),"reset the state of the model to the initial state before starting the run/optimize")
+        .def("set_parameter_ranges",&Optimizer::set_parameter_ranges,(py::arg("self"),py::arg("p_min"), py::arg("p_max")),
+             doc_intro(
+                 "Set the parameter ranges for the optimization search.\n"
+                " Set min=max=wanted parameter value for those not subject to change during optimization\n"
+                " - changes/sets the parameter_lower_bound.. paramter_upper_bound as specified in constructor\n"
+             )
+             doc_parameters()
+             doc_parameter("p_min", "Parameter", "the lower bounds of the parameters")
+             doc_parameter("p_max", "Parameter", "the upper bounds of the parameters")
         )
-        .def("optimize_sceua", optimize_sceua_p, args("p", "max_n_evaluations", "x_eps", "y_eps"),
-            "Call to optimize model using SCE UA algorithm, starting with p parameters\n"
-            "as the start point\n"
-            "The current target specification, parameter lower and upper bound\n"
-            "is taken into account\n"
-            "param p is used as start point and is updated with the found optimal points\n"
-            "param max_n_evaluations stop after n calls of the objective functions, i.e. simulations.\n"
-            "param x_eps is stop condition when all changes in x's are within this range\n"
-            "param y_eps is stop condition, and search is stopped when goal function does not improve anymore within this range\n"
-            "return the optimized parameter vector\n"
+        .def("set_verbose_level",&Optimizer::set_verbose_level,(py::arg("self"),py::arg("level")),"set verbose level on stdout during calibration,0 is silent,1 is more etc.")
+        .def("calculate_goal_function",calculate_goal_function_v,(py::arg("self"),py::arg("full_vector_of_parameters")),
+                doc_intro(
+                    "(Deprecated)calculate the goal_function as used by minbobyqa,etc.,\n"
+                    "using the full set of  parameters vectors (as passed to optimize())\n"
+                    "and also ensures that the shyft state/cell/catchment result is consistent\n"
+                    "with the passed parameters passed\n"
+                    "param full_vector_of_parameters contains all parameters that will be applied to the run.\n"
+                    "returns the goal-function, weigthed nash_sutcliffe|Kling-Gupta sum \n"
+                )
         )
-
-        .def("reset_states",&Optimizer::reset_states,"reset the state of the model to the initial state before starting the run/optimize")
-        .def("set_parameter_ranges",&Optimizer::set_parameter_ranges,args("p_min","p_max"),"set the parameter ranges, set min=max=wanted parameter value for those not subject to change during optimization")
-        .def("set_verbose_level",&Optimizer::set_verbose_level,args("level"),"set verbose level on stdout during calibration,0 is silent,1 is more etc.")
-        .def("calculate_goal_function",calculate_goal_function_v,args("full_vector_of_parameters"),
-                "(deprecated)calculate the goal_function as used by minbobyqa,etc.,\n"
-                "using the full set of  parameters vectors (as passed to optimize())\n"
+        .def("calculate_goal_function", calculate_goal_function_p, (py::arg("self"), py::arg("parameters")),
+            doc_intro(
+                "Calculate the goal_function as used by minbobyqa,etc.,\n"
+                "using the supplied set of parameters\n"
                 "and also ensures that the shyft state/cell/catchment result is consistent\n"
                 "with the passed parameters passed\n"
-                "param full_vector_of_parameters contains all parameters that will be applied to the run.\n"
-                "returns the goal-function, weigthed nash_sutcliffe|Kling-Gupta sum \n"
-        )
-        .def("calculate_goal_function", calculate_goal_function_p, args("parameters"),
-            "calculate the goal_function as used by minbobyqa,etc.,\n"
-            "using the supplied set of parameters\n"
-            "and also ensures that the shyft state/cell/catchment result is consistent\n"
-            "with the passed parameters passed\n"
-            "param parameters contains all parameters that will be applied to the run.\n"
-            "returns the goal-function, weigthed nash_sutcliffe|Kling-Gupta sum \n"
+                "param parameters contains all parameters that will be applied to the run.\n"
+                "You can also use this function to build your own external supplied optimizer in python"
+            )
+            doc_parameters()
+            doc_parameter("parameters", "Parameter", "the region model parameter to use when evaluating the goal-function")
+            doc_returns("goal_function_value", "float", "the goal-function, weigthed nash_sutcliffe|Kling-Gupta sum etc. value ")
         )
         .def_readwrite("target_specification",&Optimizer::targets,
-            "The current target-specification used during optimization\n")
+           doc_intro("The current target-specifications used during optimization")
+        )
         .def_readwrite("parameter_lower_bound",&Optimizer::parameter_lower_bound,"the lower bound parameters\n")
         .def_readwrite("parameter_upper_bound",&Optimizer::parameter_upper_bound,"the upper bound parameters\n")
-        .def("parameter_active",&Optimizer::active_parameter,"returns true if the parameter is active, i.e. lower != upper bound\n")
+        .def("parameter_active",&Optimizer::active_parameter,(py::arg("self"), py::arg("i")),
+            doc_intro("returns true if the i'th parameter is active, i.e. lower != upper bound\n")
+            doc_parameters()
+            doc_parameter("i","int","the index of the parameter")
+            doc_returns("active","bool","True if the parameter abs(p[i].min -p[i].max)> zero_limit")
+        )
         .def_readonly("trace_size",&Optimizer::trace_size,
             doc_intro("returns the size of the parameter-trace")
             doc_see_also("trace_goal_function_value,trace_parameter")
@@ -611,10 +681,10 @@ namespace expose {
             doc_intro("The trace_parameter(i) gives the corresponding i'th parameter")
             doc_see_also("trace_parameter,trace_value,trace_size")
         )
-        .def("trace_goal_function_value",&Optimizer::trace_goal_fn,args("i"),
+        .def("trace_goal_function_value",&Optimizer::trace_goal_fn,(py::arg("self"),py::args("i")),
             doc_intro("returns the i'th goal function value")
         )
-        .def("trace_parameter",&Optimizer::trace_parameter,args("i"),
+        .def("trace_parameter",&Optimizer::trace_parameter,(py::arg("self"),py::args("i")),
             doc_intro("returns the i'th parameter tried, corresponding to the ")
             doc_intro("i'th trace_goal_function value")
             doc_see_also("trace_goal_function,trace_size")
