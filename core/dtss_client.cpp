@@ -223,18 +223,28 @@ client::evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,boo
                 for(size_t i=0;i<pt.size();++i)
                     rt[i0+i]=pt[i];
         };
-        size_t partition_size = 1+tsv.size()/srv_con.size();// if tsv.size() < srv_con.size() ->
+        size_t n_ts_pr_server = tsv.size()/srv_con.size(); 
+        size_t remainder = tsv.size() - n_ts_pr_server*srv_con.size();
         vector<future<void>> calcs;
-        for(size_t i=0;i<srv_con.size();++i) {
-            size_t i0= i*partition_size;
-            size_t n = min(partition_size,tsv.size()-i0);
+        size_t b=0;
+        for(size_t i=0;i<srv_con.size() && b<tsv.size();++i) {
+            size_t e = b+n_ts_pr_server;
+            if(remainder>0) {
+                e+=1;// spread remainder equally between servers
+                --remainder;
+            } else if (e>tsv.size()) {
+                e=tsv.size();
+            }
+                
+            size_t n = e-b;
             calcs.push_back(std::async(
                             std::launch::async,
-                            [this,i,i0,n,&eval_partition] () {
-                                eval_partition (*(srv_con[i].io),i0,n);
+                            [this,i,b,n,&eval_partition] () {
+                                eval_partition (*(srv_con[i].io),b,n);
                             }
                            )
                   );
+            b=e;
         }
         for (auto &f : calcs)
             f.get();

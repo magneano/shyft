@@ -444,25 +444,31 @@ TEST_CASE("dlib_multi_server_basics") {
             host_ports.push_back(string("localhost:") + to_string(base_port + i));
         }
         {
-            dlog << dlib::LINFO << "sending an expression ts to "<<n_servers<< " hosts" ;
-            std::vector<apoint_ts> tsl;
-            for (size_t kb = 4;kb < 16;kb += 2)
-                tsl.push_back(mk_expression(t, dt, kb * 1000)*apoint_ts(string("netcdf://group/path/ts") + std::to_string(kb)));
-
+            dlog << dlib::LINFO << "sending permutation of an expression sizes/vectors ts to "<<n_servers<< " hosts" ;
             client c(host_ports,false,1000);
-            auto ts_b = c.evaluate(tsl, ta.total_period(),true,true);
-            dlog << dlib::LINFO << "Got vector back, size= " << ts_b.size();
-            for (const auto& ts : ts_b)
-                dlog << dlib::LINFO << "ts.size()" << ts.size();
-            dlog << dlib::LINFO << "ok, -now testing percentiles";
-            std::vector<int64_t> percentile_spec{ 0,25,50,-1,75,100 };
-            auto percentiles = c.percentiles(tsl, ta.total_period(), ta24, percentile_spec,true,true);
-            FAST_CHECK_EQ(percentiles.size(), percentile_spec.size());
-            FAST_CHECK_EQ(percentiles[0].size(), ta24.size());
-            dlog << dlib::LINFO << "done with percentiles, stopping localhost server";
+            for(size_t n_ts=1;n_ts<10;n_ts+=1) {
+                std::vector<apoint_ts> tsl;
+                for (size_t kb = 1;kb <= n_ts;kb += 1) {
+                    tsl.push_back(mk_expression(t, dt, (kb+1) * 10)*apoint_ts(string("netcdf://group/path/ts") + std::to_string(kb)));
+                }
+                //dlog << dlib::LINFO<< "Try with size " << tsl.size();
+                auto ts_b = c.evaluate(tsl, ta.total_period(),false,false);
+                //dlog << dlib::LINFO << "Got vector back, size= " << ts_b.size();
+                //for (const auto& ts : ts_b)
+                //    dlog << dlib::LINFO << "ts.size()" << ts.size();
+                //dlog << dlib::LINFO << "-now testing percentiles";
+                std::vector<int64_t> percentile_spec{ 0,25,50,-1,75,100 };
+                auto percentiles = c.percentiles(tsl, ta.total_period(), ta24, percentile_spec,false,false);
+                //dlog<<dlib::LINFO<<"done calc, verify";
+                FAST_CHECK_EQ(percentiles.size(), percentile_spec.size());
+                FAST_CHECK_EQ(percentiles[0].size(), ta24.size());
+            }
+            dlog << dlib::LINFO << "done with multi-server requests, stopping localhost server";
             c.close();
-            for(size_t i =0;i<n_servers;++i)
+            for(size_t i =0;i<n_servers;++i) {
+                dlog<<dlib::LINFO<<"Terminating server "<<i;
                 servers[i]->clear();
+            }
             dlog << dlib::LINFO << "done";
         }
     } catch (exception& e) {
