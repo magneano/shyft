@@ -132,6 +132,8 @@ class Calendar(unittest.TestCase):
         p = api.UtcPeriod(t, t + api.deltahours(1))
         s = str(p)
         self.assertEqual(s, "[2000-01-02T03:04:05Z,2000-01-02T04:04:05Z>")
+        s = repr(p)
+        self.assertEqual(s, "[2000-01-02T03:04:05Z,2000-01-02T04:04:05Z>")
 
     def test_UtcPeriod_methods(self):
         p0 = api.UtcPeriod()

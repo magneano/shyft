@@ -324,6 +324,7 @@ void run_full_model_test(const std::vector<int>& calibration_parameter_list){
 		return;
 	ok_ip = rm.interpolate(ip, re);
 	REQUIRE(ok_ip);
+    FAST_CHECK_EQ(rm.is_cell_env_ts_ok(),true);
 	vector<typename cell_t::state_t> s0;
 	// not needed, the rm will provide the initial_state for us.rm.get_states(s0);
     //

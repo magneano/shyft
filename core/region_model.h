@@ -949,6 +949,19 @@ namespace shyft {
                 }
                 return r;
             }
+            
+            /** check if all values in cell.env_ts for selected calculation-filter is non-nan,
+             * i.e. valid numbers 
+             */
+            bool is_cell_env_ts_ok() {
+                for(const auto& c: *cells) {
+                    if ( is_calculated_by_catchment_ix(c.geo.catchment_ix)) {
+                        if(c.env_ts.has_nan_values())
+                            return false;
+                    }
+                }
+                return true;
+            }
         protected:
             /** \brief parallell_run using a mid-point split + async to engange multicore execution
              *

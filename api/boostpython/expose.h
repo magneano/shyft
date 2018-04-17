@@ -396,6 +396,12 @@ namespace expose {
         .def("size",&M::size,(py::arg("self")),"return number of cells")
         .add_property("cells",&M::get_cells,"cells of the model")
         .add_property("current_state",&M::current_state," a copy of the current model state")
+        .def("is_cell_env_ts_ok",&M::is_cell_env_ts_ok,(py::arg("self")),
+             doc_intro("Use this function after the interpolation step, before .run_cells(), to verify")
+             doc_intro("that all cells selected for computation (calculation_filter), do have ")
+             doc_intro("valid values.")
+             doc_returns("all_ok","bool","return false if any nan is found, otherwise true")
+         )
          ;
 
     }

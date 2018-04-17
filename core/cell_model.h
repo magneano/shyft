@@ -68,6 +68,14 @@ namespace shyft {
                     wind_speed.fill(shyft::nan);
                 }
 			}
+			bool has_nan_values() const {
+                for(size_t i=0;i<temperature.size();++i) if(!std::isfinite(temperature.value(i))) return true;
+                for(size_t i=0;i<precipitation.size();++i) if(!std::isfinite(precipitation.value(i))) return true;
+                for(size_t i=0;i<rel_hum.size();++i) if(!std::isfinite(rel_hum.value(i))) return true;
+                for(size_t i=0;i<radiation.size();++i) if(!std::isfinite(radiation.value(i))) return true;
+                for(size_t i=0;i<wind_speed.size();++i) if(!std::isfinite(wind_speed.value(i))) return true;
+                return false;
+            }
 		};
 
 		///< environment variant with const relative humidity and wind (speed up calc &reduce mem)

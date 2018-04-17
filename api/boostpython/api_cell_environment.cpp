@@ -9,7 +9,7 @@
 
 namespace expose {
     using namespace boost::python;
-
+    namespace py=boost::python;
     void cell_environment() {
 
         typedef shyft::core::environment_t CellEnvironment;
@@ -19,7 +19,13 @@ namespace expose {
             .def_readwrite("radiation",&CellEnvironment::radiation)
             .def_readwrite("wind_speed",&CellEnvironment::wind_speed)
             .def_readwrite("rel_hum",&CellEnvironment::rel_hum)
-            .def("init",&CellEnvironment::init,args("ta"),"zero all series, set time-axis ta")
+            .def("init",&CellEnvironment::init,(py::arg("self"),py::arg("ta")),
+                 "zero all series, set time-axis ta"
+            )
+            .def("has_nan_values",&CellEnvironment::has_nan_values,(py::arg("self")),
+                doc_intro("scans all time-series for nan-values")
+                doc_returns("has_nan","bool","true if any nan is encounted, otherwise false")
+            )
             ;
 
         typedef shyft::core::environment_const_rhum_and_wind_t CellEnvironmentConstRHumWind;

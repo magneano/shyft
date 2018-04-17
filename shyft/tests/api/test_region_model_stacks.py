@@ -180,6 +180,22 @@ class RegionModel(unittest.TestCase):
         m_ip_parameter = model.interpolation_parameter  # illustrate that we can get back the passed interpolation parameter as a property of the model
         self.assertEqual(m_ip_parameter.use_idw_for_temperature, True)  # just to ensure we really did get back what we passed in
         self.assertAlmostEqual(m_ip_parameter.temperature_idw.zscale, 0.5)
+        #
+        # Section to demo that we can ensure that model.cells[].env_ts.xxx
+        # have finite-values only
+        #
+        for env_ts_x in [model.cells[0].env_ts.temperature,
+                         model.cells[0].env_ts.precipitation,
+                         model.cells[0].env_ts.rel_hum,
+                         model.cells[0].env_ts.radiation,
+                         model.cells[0].env_ts.wind_speed]:
+            self.assertTrue(model.is_cell_env_ts_ok())  # demon how to verify that cell.env_ts can be checked prior to run
+            vx = env_ts_x.value(0)  # save value
+            env_ts_x.set(0, float('nan'))  # insert a nan
+            self.assertFalse(model.is_cell_env_ts_ok())  # demo it returns false if nan @cell.env_ts
+            env_ts_x.set(0, vx)  # insert back original value
+            self.assertTrue(model.is_cell_env_ts_ok())  # ready to run again
+
         s0 = pt_gs_k.PTGSKStateVector()
         for i in range(num_cells):
             si = pt_gs_k.PTGSKState()

@@ -129,9 +129,10 @@ def StrGeoCellData(gcd):
 
 
 GeoCellData.__str__ = lambda self: StrGeoCellData(self)
-
+GeoCellData.__repr__ = GeoCellData.__str__
 # Fix up UtcPeriod
 UtcPeriod.to_string = lambda self: str(self)
+UtcPeriod.__repr__ = UtcPeriod.__str__
 
 # Fix up TimeAxis
 
@@ -148,18 +149,21 @@ def ta_next(ta):
     return ta(ta.counter - 1)
 
 TimeAxisFixedDeltaT.__str__ = lambda self: "TimeAxisFixedDeltaT({0},{1},{2})".format(Calendar().to_string(self.start), self.delta_t, self.n)
+TimeAxisFixedDeltaT.__repr__ = TimeAxisFixedDeltaT.__str__
 TimeAxisFixedDeltaT.__len__ = lambda self: self.size()
 TimeAxisFixedDeltaT.__call__ = lambda self, i: self.period(i)
 TimeAxisFixedDeltaT.__iter__ = lambda self: ta_iter(self)
 TimeAxisFixedDeltaT.__next__ = lambda self: ta_next(self)
 
 TimeAxisCalendarDeltaT.__str__ = lambda self: "TimeAxisCalendarDeltaT(Calendar('{3}'),{0},{1},{2})".format(Calendar().to_string(self.start), self.delta_t, self.n,self.calendar.tz_info.name())
+TimeAxisCalendarDeltaT.__repr__ = TimeAxisCalendarDeltaT.__str__ 
 TimeAxisCalendarDeltaT.__len__ = lambda self: self.size()
 TimeAxisCalendarDeltaT.__call__ = lambda self, i: self.period(i)
 TimeAxisCalendarDeltaT.__iter__ = lambda self: ta_iter(self)
 TimeAxisCalendarDeltaT.__next__ = lambda self: ta_next(self)
 
 TimeAxisByPoints.__str__ = lambda self: "TimeAxisByPoints(total_period={0}, n={1},points={2} )".format(str(self.total_period()),len(self),repr(TimeAxis(self).time_points))
+TimeAxisByPoints.__repr__ = TimeAxisByPoints.__str__
 TimeAxisByPoints.__len__ = lambda self: self.size()
 TimeAxisByPoints.__call__ = lambda self, i: self.period(i)
 TimeAxisByPoints.__iter__ = lambda self: ta_iter(self)
@@ -167,13 +171,17 @@ TimeAxisByPoints.__next__ = lambda self: ta_next(self)
 
 def nice_ta_string(time_axis):
     if time_axis.timeaxis_type == TimeAxisType.FIXED:
-        return '{0}'.format(str(time_axis.fixed_dt))
+        ta = time_axis.fixed_dt
+        return f"TimeAxis('{Calendar().to_string(ta.start)}', {ta.delta_t}, {ta.n})"
     if time_axis.timeaxis_type == TimeAxisType.CALENDAR:
-        return '{0}'.format(str(time_axis.calendar_dt))
-    return '{0}'.format(str(time_axis.point_dt))
+        ta = time_axis.calendar_dt
+        return f"TimeAxis( Calendar('{ta.calendar.tz_info.name()}'), '{ta.calendar.to_string(ta.start)}', {ta.delta_t}, {ta.n})"
+    ta = time_axis.point_dt
+    return f"TimeAxis( '{ta.total_period()}', {len(ta)},{repr(time_axis.time_points)})"
 
 
 TimeAxis.__str__ = lambda self: nice_ta_string(self)
+TimeAxis.__repr__ = TimeAxis.__str__
 TimeAxis.__len__ = lambda self: self.size()
 TimeAxis.__call__ = lambda self, i: self.period(i)
 TimeAxis.__iter__ = lambda self: ta_iter(self)
