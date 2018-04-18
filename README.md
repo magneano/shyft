@@ -7,8 +7,6 @@
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
 
 
-
-
 # ABOUT
 
 Shyft is an open source hydrological toolbox developed at [Statkraft](http://www.statkraft.com). It is optimized for highly efficient modeling of hydrologic processes following the paradigm of distributed, lumped parameter models -- with recent developments introducing more physically based / process-level methods.
