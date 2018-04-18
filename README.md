@@ -1,11 +1,10 @@
 
-|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Shyft Documentation      | [![Documentation Status](https://readthedocs.org/projects/shyft/badge/?version=latest)](http://shyft.readthedocs.org/en/latest/)                                                                             |
-| Travis Build           | [![Build Status](https://travis-ci.org/statkraft/shyft.svg?branch=master)](https://travis-ci.org/startkraft/shyft)                                                                                             |
-| Shyft Google Group    | [![Shyft Google Group](https://img.shields.io/badge/Shyft%20Google%20Group-active-blue.svg)](https://groups.google.com/forum/#!forum/shyft)                                              |
-| License                | [![Gnu GPL license](https://img.shields.io/badge/license-GPLv2-blue.svg)](https://raw.githubusercontent.com/statkraft/shyft/master/LICENSE.txt)                                                              |
-
-----------
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Shyft Documentation    | [![Documentation Status](https://readthedocs.org/projects/shyft/badge/?version=latest)](http://shyft.readthedocs.org/en/latest/)                                        |
+| Travis Build           | [![Build Status](https://travis-ci.org/statkraft/shyft.svg?branch=master)](https://travis-ci.org/statkraft/shyft)                                                      |
+| Shyft Google Group     | [![Shyft Google Group](https://img.shields.io/badge/Shyft%20Google%20Group-active-blue.svg)](https://groups.google.com/forum/#!forum/shyft)                             |
+| License                | [![Gnu GPL license](https://img.shields.io/badge/license-GPLv2-blue.svg)](https://github.com/statkraft/shyft/blob/master/LICENSE)                         |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 
 
