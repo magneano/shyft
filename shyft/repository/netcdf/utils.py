@@ -189,7 +189,7 @@ def _limit_2D(x, y, data_cs, target_cs, geo_location_criteria, padding, err, cli
         if clip_in_data_cs:
             # Transform from source coordinates to target coordinates
             x_in_poly, y_in_poly = pyproj.transform(data_proj, target_proj, xy_in_poly[:, 0],
-                                                    xy_in_poly[:, 1])  # in SHyFT coord sys
+                                                    xy_in_poly[:, 1])  # in Shyft coord sys
         else:
             x_in_poly, y_in_poly = xy_in_poly[:, 0], xy_in_poly[:, 1]
 
@@ -243,7 +243,7 @@ def _limit_2D(x, y, data_cs, target_cs, geo_location_criteria, padding, err, cli
         if clip_in_data_cs:
             # Transform from source coordinates to target coordinates
             x_in_poly, y_in_poly = pyproj.transform(data_proj, target_proj, xy_in_poly[:, 0],
-                                                    xy_in_poly[:, 1])  # in SHyFT coord sys
+                                                    xy_in_poly[:, 1])  # in Shyft coord sys
         else:
             x_in_poly, y_in_poly = xy_in_poly[:, 0], xy_in_poly[:, 1]
 

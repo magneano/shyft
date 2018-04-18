@@ -148,7 +148,7 @@ std::string win_short_path(const std::string& long_path) {
 
 BOOST_PYTHON_MODULE(_api) {
     namespace py = boost::python;
-    py::scope().attr("__doc__") = "SHyFT python api providing basic types";
+    py::scope().attr("__doc__") = "Shyft python api providing basic types";
     py::def("version", version);
     py::docstring_options doc_options(true, true, false);// all except c++ signatures
     expose::api();

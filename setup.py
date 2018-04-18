@@ -8,7 +8,7 @@ import subprocess
 from setuptools import setup, find_packages
 
 
-print('Building SHyFT')
+print('Building Shyft')
 
 # VERSION should be set in a previous build step (ex: TeamCity)
 VERSION = open('VERSION').read().strip()

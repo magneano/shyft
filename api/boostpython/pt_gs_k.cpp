@@ -160,7 +160,7 @@ namespace expose {
 BOOST_PYTHON_MODULE(_pt_gs_k)
 {
 
-    boost::python::scope().attr("__doc__")="SHyFT python api for the pt_gs_k model";
+    boost::python::scope().attr("__doc__")="Shyft python api for the pt_gs_k model";
     boost::python::def("version", version);
 	boost::python::docstring_options doc_options(true, true, false);// all except c++ signatures
     expose::pt_gs_k::parameter_state_response();

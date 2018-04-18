@@ -1,14 +1,19 @@
 
-|Branch      |Status   |Docs   |
-|------------|---------|---------|
-|master       | [![Build Status](https://travis-ci.org/statkraft/shyft.svg?branch=master)](https://travis-ci.org/statkraft/shyft) | [![Doc Development](https://img.shields.io/badge/docs-latest-blue.svg)](http://shyft.readthedocs.io/en/latest/) |
+|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Shyft Documentation      | [![Documentation Status](https://readthedocs.org/projects/shyft/badge/?version=latest)](http://shyft.readthedocs.org/en/latest/)                                                                             |
+| Travis Build           | [![Build Status](https://travis-ci.org/statkraft/shyft.svg?branch=master)](https://travis-ci.org/startkraft/shyft)                                                                                             |
+| Shyft Google Group    | [![Shyft Google Group](https://img.shields.io/badge/Shyft%20Google%20Group-active-blue.svg)](https://groups.google.com/forum/#!forum/shyft)                                              |
+| License                | [![Gnu GPL license](https://img.shields.io/badge/license-GPLv2-blue.svg)](https://raw.githubusercontent.com/statkraft/shyft/master/LICENSE.txt)                                                              |
+
+----------
+
+
+
 
 # ABOUT
 
-Shyft is an OpenSource hydrological toolbox developed by [Statkraft](http://www.statkraft.com). It is optimized for highly efficient modeling of hydrologic processes following the paradigm of distributed, lumped parameter models -- though recent developments have introduced more physically based / process-level methods.
+Shyft is an open source hydrological toolbox developed at [Statkraft](http://www.statkraft.com). It is optimized for highly efficient modeling of hydrologic processes following the paradigm of distributed, lumped parameter models -- with recent developments introducing more physically based / process-level methods.
 
-
-The code is based on an early [initiative for distributed hydrological simulation](http://www.sintef.no/sintef-energi/xergi/xergi-2004/nr-1---april/betre-tilsigsprognoser-med-meir-informasjon/) , called [ENKI](https://bitbucket.org/enkiopensource/enki) funded by Statkraft and developed at Sintef by Sjur Kolberg with contributions from Kolbjorn Engeland and Oddbjorn Bruland.
 
 # DOCUMENTATION
 
@@ -26,14 +31,13 @@ the C++ core were Sigbjørn Helset <Sigbjorn.Helset@statkraft.com> and
 Ola Skavhaug <ola@xal.no>.
 
 Orchestration and the Python wrappers were originally developed by
-John F. Burkhart <john.burkhart@statkraft.com>
+John F. Burkhart <john.burkhart@statkraft.com> with later contributions
+from Yisak Abdella Sultan <yisaksultan.abdella@statkraft.com>
 
 Copyright (C) Sigbjørn Helset (SiH), John F. Burkhart (JFB), Ola Skavhaug (OS), Yisak Abdella Sultan (YAS), Statkraft AS
 
 
-
 # THANKS
-
 
 Contributors and current project participants include:
  * Sigbjørn Helset <Sigbjorn.Helset@statkraft.com>
@@ -42,6 +46,7 @@ Contributors and current project participants include:
  * Yisak Sultan Abdella <YisakSultan.Abdella@statkraft.com>
  * Felix Matt <f.n.matt@geo.uio.no>
  * Francesc Alted <faltet@gmail.com>
+
 
 
 # COPYING / LICENSE

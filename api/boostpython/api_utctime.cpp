@@ -27,7 +27,7 @@ namespace expose {
         utctime (calendar::*time_from_week_6)(int, int, int, int, int, int) const = &calendar::time_from_week;
         class_<calendar, shared_ptr<calendar>>("Calendar",
             doc_intro("Calendar deals with the concept of human calendar")
-            doc_intro(" In SHyFT we practice the 'utctime-perimeter' principle,")
+            doc_intro(" In Shyft we practice the 'utctime-perimeter' principle,")
             doc_intro("  * so the core is utc-time only ")
             doc_intro("  * we deal with time-zone and calendars at the interfaces/perimeters")
             doc_intro(" in python, this corresponds to timestamp[64], or as the integer version of the time package representation")

@@ -63,7 +63,7 @@ class Vectors(unittest.TestCase):
 
     def test_string_vector(self):
         # NOTE: support for string vector is very limited, e.g. numpy does not work, only lists
-        #     but for now this is sufficient in SHyFT
+        #     but for now this is sufficient in Shyft
         s_list = ['abc', 'def']
         dv_from_list = api.StringVector(s_list)
         self.assertEqual(len(dv_from_list), 2)
