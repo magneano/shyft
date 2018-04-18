@@ -1,3 +1,5 @@
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
 from __future__ import absolute_import
 from . import interfaces
 from .. import api

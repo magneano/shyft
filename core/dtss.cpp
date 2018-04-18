@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include <boost/functional/hash.hpp>
 #include "dtss.h"
 #include "core_serialization.h"

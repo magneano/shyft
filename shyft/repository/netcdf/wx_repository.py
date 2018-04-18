@@ -1,3 +1,5 @@
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
 import os
 from shyft import api
 from netCDF4 import Dataset

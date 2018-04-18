@@ -28,6 +28,9 @@ Ola Skavhaug <ola@xal.no>.
 Orchestration and the Python wrappers were originally developed by
 John F. Burkhart <john.burkhart@statkraft.com>
 
+Copyright (C) Sigbjørn Helset (SiH), John F. Burkhart (JFB), Ola Skavhaug (OS), Yisak Abdella Sultan (YAS), Statkraft AS
+
+
 
 # THANKS
 

@@ -1,4 +1,6 @@
-﻿from abc import ABCMeta, abstractmethod
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
+from abc import ABCMeta, abstractmethod
 from shyft import api
 
 """Module description: This module contain the abstract base-classes for the
