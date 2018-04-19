@@ -2,7 +2,7 @@
 @echo !
 @echo ---------------------------------------------------------------------------------------------------
 @echo !
-@echo !  SHyFT MS Visual C++ build script
+@echo !  Shyft MS Visual C++ build script
 @echo !
 @echo !   1. Before executing this script, start a command window, and start the ms vc mode compile like this
 @echo !   cmd /k ""C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"" amd64
@@ -11,7 +11,7 @@
 @echo ! 2. Also note that you need to build boost 
 @echo !
 @echo !   in the ..\boost directory prior to invoking this command
-@echo !   How to build boost for SHyFT is described on wiki: 
+@echo !   How to build boost for Shyft is described on wiki: 
 @echo !       https://github.com/statkraft/shyft/wiki/BuildCplusplus
 @echo !   
 @if exist D:\Anaconda\64 set PYTHONROOT=D:\Anaconda\64
@@ -48,7 +48,7 @@ link /OUT:api\hbv_stack\_hbv_stack.pyd /libpath:..\..\shyft-data\blaslapack /lib
 popd 
 @echo Done (you can ignore all the Note: Use of this header(..) deprecated messages )
 @echo !
-@echo ! Notice that in order to have a fully working SHyFT api, you must have
+@echo ! Notice that in order to have a fully working Shyft api, you must have
 @echo ! PATH pointing to 
 @echo !    ..\boost\stage\lib that contains the boost runtime-dlls for boost
 @echo !    ..\shyft-data\blaslapack that contains the blas_win64_MT.dll and lapack_win64_MT.dll 

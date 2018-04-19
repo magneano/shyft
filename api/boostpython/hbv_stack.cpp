@@ -151,7 +151,7 @@ namespace expose {
 BOOST_PYTHON_MODULE(_hbv_stack)
 {
 
-	boost::python::scope().attr("__doc__") = "SHyFT python api for the hbv_stack model";
+	boost::python::scope().attr("__doc__") = "Shyft python api for the hbv_stack model";
 	boost::python::def("version", version);
 	boost::python::docstring_options doc_options(true, true, false);// all except c++ signatures
 	expose::hbv_stack::parameter_state_response();

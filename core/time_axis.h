@@ -22,7 +22,7 @@ namespace shyft {
      *
      *   notice:
      *      a) the most usual time-axis is the fixed_dt time-axis
-     *         in the SHyFT core, this is the one we use(could even need a highspeed-nocompromise version)
+     *         in the Shyft core, this is the one we use(could even need a highspeed-nocompromise version)
      *
      *      b) continuous/dense time-axis: there are no holes in total_period
      *                               types: fixed_dt, calendar_dt, point_dt

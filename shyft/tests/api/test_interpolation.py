@@ -9,7 +9,7 @@ class BayesianKriging(unittest.TestCase):
     The purpose of this testsuite is to verify and illustrate BayesianKriging Temperature interpolation
 
     The scenarios foreseen where this function is useful is
-       in pre-processing data before passing it into SHyFT region-environment
+       in pre-processing data before passing it into Shyft region-environment
     or
        for studying and testing the algorithm and parameters from python
 

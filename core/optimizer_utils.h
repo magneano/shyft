@@ -3,18 +3,18 @@ See file COPYING for more details **/
 #pragma once
 ///	Copyright 2012 Statkraft Energi A/S
 ///
-///	This file is part of SHyFT.
+///	This file is part of Shyft.
 ///
-///	SHyFT is free software: you can redistribute it and/or modify it under the terms of
+///	Shyft is free software: you can redistribute it and/or modify it under the terms of
 /// the GNU Lesser General Public License as published by the Free Software Foundation,
 /// either version 3 of the License, or (at your option) any later version.
 ///
-///	SHyFT is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+///	Shyft is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 /// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 /// PURPOSE. See the GNU Lesser General Public License for more details.
 ///
 ///	You should have received a copy of the GNU Lesser General Public License along with
-/// SHyFT, usually located under the SHyFT root directory in two files named COPYING.txt
+/// Shyft, usually located under the Shyft root directory in two files named COPYING.txt
 /// and COPYING_LESSER.txt.	If not, see <http://www.gnu.org/licenses/>.
 ///
 ///  Theory is found in: Vrugt, J. et al: Accelerating Markov Chain Monte Carlo
