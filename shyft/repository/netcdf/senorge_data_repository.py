@@ -32,7 +32,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         http://www2.mmm.ucar.edu/wrf/users/docs/user_guide_V3/users_guide_chap5.htm
     """
 
-    def __init__(self, epsg, directory, filename=None, padding=5000., allow_subset=False):
+    def __init__(self, epsg, directory, filename=None, elevation_file=None, padding=5000., allow_subset=False):
         """
         Construct the netCDF4 dataset reader for data from WRF NWP model,
         and initialize data retrieval.
@@ -62,6 +62,14 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         self.allow_subset = allow_subset
         if not os.path.isdir(directory):
             raise SeNorgeDataRepositoryError("No such directory '{}'".format(directory))
+
+        if elevation_file is not None:
+            self.elevation_file = os.path.join(self._directory, elevation_file)
+            if not os.path.isfile(self.elevation_file):
+                raise SeNorgeDataRepositoryError(
+                    "Elevation file '{}' not found".format(self.elevation_file))
+        else:
+            self.elevation_file = None
 
         self.shyft_cs = "+init=EPSG:{}".format(epsg)
         self._padding = padding
@@ -100,8 +108,9 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             else:
                 raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
         with Dataset(filename) as dataset:
-            return self._get_data_from_dataset(dataset, input_source_types,
-                                               utc_period, geo_location_criteria)
+            return self._get_data_from_dataset(dataset, input_source_types, utc_period, geo_location_criteria)
+
+
 
     """
     def _calculate_rel_hum(self, T2, PSFC, Q2):
@@ -124,82 +133,120 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         return RH
     """
 
-    def _get_data_from_dataset(self, dataset, input_source_types, utc_period,
-                               geo_location_criteria, ensemble_member=None):
-        input_source_types_orig = list(input_source_types)
-        """
-        if "wind_speed" in input_source_types:
-            input_source_types = list(input_source_types)  # We change input list, so take a copy
-            input_source_types.remove("wind_speed")
-            input_source_types.append("x_wind")
-            input_source_types.append("y_wind")
 
-        if "relative_humidity" in input_source_types:
-            input_source_types = list(input_source_types)  # We change input list, so take a copy
-            input_source_types.remove("relative_humidity")
-            input_source_types.append("mixing_ratio")
-            input_source_types.append("pressure")
-            if not "temperature" in input_source_types:
-                input_source_types.append("temperature")  # Needed for rel_hum calculation
-        """
-        raw_data = {}
+    def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria, ensemble_member=None):
+
         x_var = dataset.variables.get("X", None)
         y_var = dataset.variables.get("Y", None)
         time = dataset.variables.get("time", None)
         if not all([x_var, y_var, time]):
             raise SeNorgeDataRepositoryError("Something is wrong with the dataset."
                                          " x/y coords or time not found.")
+
         time = convert_netcdf_time(time.units, time)
         data_cs_proj4 = "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
         if data_cs_proj4 is None:
             raise SeNorgeDataRepositoryError("No coordinate system information in dataset.")
 
+
+        #copied from met_netcdf repo
+        # Check for presence and consistency of coordinate variables
+#        time, x_var, y_var, data_cs, coord_conv = self._check_and_get_coord_vars(dataset, input_source_types)
+
+        # Check units of meteorological variables
+#        unit_ok = {k: dataset.variables[k].units in self.var_units[k]
+#                   for k in dataset.variables.keys() if self._arome_shyft_map.get(k, None) in input_source_types}
+#        if not all(unit_ok.values()):
+#            raise MetNetcdfDataRepositoryError("The following variables have wrong unit: {}.".format(
+#                ', '.join([k for k, v in unit_ok.items() if not v])))
+        # Make spatial slice
+#        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:] * coord_conv, y_var[:] * coord_conv,
+#                                                               data_cs.proj4, self.shyft_cs, geo_location_criteria,
+        # Make temporal slilce
         time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
-        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[0], y_var[0], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
+
+        # from wrf_repo
+        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:], y_var[:], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
+        # end from wrf repo
+
+
+        raw_data = {}
         for k in dataset.variables.keys():
             if self.senorge_shyft_map.get(k, None) in input_source_types:
-                if k in self._shift_fields and issubset:  # Add one to time slice
-                    data_time_slice = slice(time_slice.start, time_slice.stop + 1)
-                else:
-                    data_time_slice = time_slice
+                # if k in self._shift_fields and issubset:  # Add one to time slice
+                #     data_time_slice = slice(time_slice.start, time_slice.stop + 1)  # to supply the extra value that is needed for accumulated variables
+                # else:
+                #     data_time_slice = time_slice
                 data = dataset.variables[k]
-                pure_arr = _slice_var_2D(data, x_var.dimensions[2], y_var.dimensions[1], x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
-                                         slices={'Time': data_time_slice, 'ensemble_member': ensemble_member}
-                )
-                raw_data[self.senorge_shyft_map[k]] = pure_arr, k
+                pure_arr = _slice_var_2D(data, x_var.name, y_var.name, x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
+                                         # slices={'time': data_time_slice, 'ensemble_member': ensemble_member})
+                                         slices={'time': time_slice, 'ensemble_member': ensemble_member})
+                raw_data[self.senorge_shyft_map[k]] = pure_arr, k, data.units
 
-        """
-        if 'HGT' in dataset.variables.keys():
-            data = dataset.variables['HGT']
-            z = _slice_var_2D(data, x_var.dimensions[2], y_var.dimensions[1], x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
-                              slices={'Time': 0}
-            )
+        if self.elevation_file is not None:
+            _x, _y, z = self._read_elevation_file(self.elevation_file, x_var.name, y_var.name,
+                                                  geo_location_criteria)
+            assert np.linalg.norm(x - _x) < 1.0e-10  # x/y coordinates should match
+            assert np.linalg.norm(y - _y) < 1.0e-10
+        elif any([nm in dataset.variables.keys() for nm in ['altitude', 'surface_geopotential']]):
+            var_nm = ['altitude', 'surface_geopotential'][
+                [nm in dataset.variables.keys() for nm in ['altitude', 'surface_geopotential']].index(True)]
+            z_data = dataset.variables[var_nm]
+            z = _slice_var_2D(z_data, x_var.name, y_var.name, x_slice, y_slice, x_inds, y_inds,
+                              SeNorgeDataRepositoryError)
+            if var_nm == 'surface_geopotential':
+                z /= self._G
         else:
-            raise SeNorgeDataRepositoryError("No elevations found in dataset.")
-        """
+            raise SeNorgeDataRepositoryError("No elevations found in dataset"
+                                               ", and no elevation file given.")
 
         # Make sure requested fields are valid, and that dataset contains the requested data.
         if not self.allow_subset and not (set(raw_data.keys()).issuperset(input_source_types)):
             raise SeNorgeDataRepositoryError("Could not find all data fields")
 
-        """
-        if {"x_wind", "y_wind"}.issubset(raw_data):
-            x_wind, _ = raw_data.pop("x_wind")
-            y_wind, _ = raw_data.pop("y_wind")
-            raw_data["wind_speed"] = np.sqrt(np.square(x_wind) + np.square(y_wind)), "wind_speed"
-        if {"temperature", "pressure", "mixing_ratio"}.issubset(raw_data):
-            pressure, _ = raw_data.pop("pressure")
-            mixing_ratio, _ = raw_data.pop("mixing_ratio")
-            if "temperature" in input_source_types_orig:
-                temperature, _ = raw_data["temperature"]  # Temperature input requested
-            else:
-                temperature, _ = raw_data.pop("temperature")  # Temperature only needed for relhum calculation
-            raw_data["relative_humidity"] = self._calculate_rel_hum(temperature, pressure,
-                                                                    mixing_ratio), "relative_humidity_2m"
-        """
+        #end of copy
+
+#        time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
+#        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:], y_var[:], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
+
+#        raw_data = {}
+
+#        for k in dataset.variables.keys():
+#            if self.senorge_shyft_map.get(k, None) in input_source_types:
+#                if k in self._shift_fields and issubset:  # Add one to time slice
+#                    data_time_slice = slice(time_slice.start, time_slice.stop + 1)
+#                else:
+#                    data_time_slice = time_slice
+#                data = dataset.variables[k]
+#                pure_arr = _slice_var_2D(data, x_var.dimensions[2], y_var.dimensions[1], x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
+#                                         slices={'Time': data_time_slice, 'ensemble_member': ensemble_member}
+#                )
+#                raw_data[self.senorge_shyft_map[k]] = pure_arr, k
+
+
+        # Make sure requested fields are valid, and that dataset contains the requested data.
+#        if not self.allow_subset and not (set(raw_data.keys()).issuperset(input_source_types)):
+#            raise SeNorgeDataRepositoryError("Could not find all data fields")
 
         extracted_data = self._transform_raw(raw_data, time[time_slice], issubset=issubset)
-        return _numpy_to_geo_ts_vec(extracted_data, x, y, z, SeNorgeDataRepositoryError)
+        return _numpy_to_geo_ts_vec(extracted_data, x, y, SeNorgeDataRepositoryError)
+
+
+    ######
+    # from metnetcdf repo
+
+    def _read_elevation_file(self, filename, x_var_name, y_var_name, geo_location_criteria):
+        with Dataset(filename) as dataset:
+            elev = dataset.variables["altitude"]
+            if "altitude" not in dataset.variables.keys():
+                raise interfaces.InterfaceError(
+                    "File '{}' does not contain altitudes".format(filename))
+            x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(dataset.variables[x_var_name][:], dataset.variables[y_var_name][:],
+                                                                   dataset.variables[elev.grid_mapping].proj4, self.shyft_cs, geo_location_criteria,
+                                                                   self._padding, SeNorgeDataRepositoryError)
+            z = _slice_var_2D(elev, x_var_name, y_var_name, x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError)
+            return x, y, z
+
 
     def _transform_raw(self, data, time, issubset=False):
         """
