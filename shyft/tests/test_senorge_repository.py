@@ -22,7 +22,7 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         # Period start
         n_hours = 60
         t0 = api.YMDhms(2015)
-        date_str = "{}-{:02}".format(t0.year)
+        date_str = "{}-{:02}".format(t0.year, t0.month)
         utc = api.Calendar()  # No offset gives Utc
         period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_hours))
 
@@ -39,12 +39,8 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         self.assertTrue(sources["temperature"][0].ts.size() == n_hours + 1)
         p0 = sources["precipitation"][0].ts
 #        temp0 = sources["temperature"][0].ts
-        self.assertTrue(r0.size() == n_hours + 1)
         self.assertTrue(p0.size() == n_hours + 1)
-        self.assertTrue(r0.time(0) == temp0.time(0))
-        self.assertTrue(p0.time(0) == temp0.time(0))
-        self.assertTrue(r0.time(r0.size() - 1) == temp0.time(temp0.size() - 1))
-        self.assertTrue(p0.time(r0.size() - 1) == temp0.time(temp0.size() - 1))
+#        self.assertTrue(p0.time(0) == temp0.time(0))
         self.assertTrue(p0.time(0), period.start)
 
         # Number test:
@@ -77,7 +73,7 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
                 m = (x == x_ts) & (y == y_ts)
                 idxs = np.where(m > 0)
                 x_idx, y_idx = idxs[0][0], idxs[1][0]  # assumung geo-location is unique in dataset
-                self.assertTrue(all(ts_values == wrf_d[:n_hours + 1, x_idx, y_idx]),
+                self.assertTrue(all(ts_values == senorge_d[:n_hours + 1, x_idx, y_idx]),
                                 "senorge and shyft-TS of {} are not the same.".format(name))
                 # if i ==0:
                 #    plt.figure()
@@ -111,6 +107,12 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
             ar1 = SeNorgeDataRepository(32632, shyftdata_dir, filename="plain_wrong.nc")
             ar1.get_timeseries(("temperature",), period, geo_location_criteria=None)
         self.assertTrue(all(x in context.exception.args[0] for x in ["File", "not found"]))
+
+    def test_wrong_elevation_file(self):
+        with self.assertRaises(SeNorgeDataRepositoryError) as context:
+            SeNorgeDataRepository(32632, shyftdata_dir, filename="", elevation_file="plain_wrong.nc")
+        self.assertTrue(all(x in context.exception.args[0] for x in ["Elevation file",
+                                                                     "not found"]))
 
     # TODO: geo_location_criteria is now of type shapely.geometry.Polygon. Replace with test verifying that error is raised when no point is found within polygon.
     # def test_non_overlapping_bbox(self):
@@ -169,8 +171,8 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         bpoly = box(min(bbox[0]), min(bbox[1]), max(bbox[0]), max(bbox[1]))
 
         # Period start
-        year = 1999
-        month = 10
+        year = 2015
+        month = 1
         n_hours = 30
         date_str = "{}-{:02}".format(year, month)
         utc = api.Calendar()  # No offset gives Utc
@@ -191,8 +193,8 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
     def test_subsets(self):
         EPSG, bbox, bpoly = self.senorge_epsg_bbox
         # Period start
-        year = 1999
-        month = 10
+        year = 2015
+        month = 1
         n_hours = 30
         date_str = "{}-{:02}".format(year, month)
         utc = api.Calendar()  # No offset gives Utc
