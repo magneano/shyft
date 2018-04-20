@@ -69,7 +69,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                 raise SeNorgeDataRepositoryError(
                     "Elevation file '{}' not found".format(self.elevation_file))
         else:
-            self.elevation_file = None
+            self.elevation_file = "/home/sven/workspace/shyft-data/repository/senorge_data_repository/seNorge2_dem_UTM33_comp.nc"
 
         self.shyft_cs = "+init=EPSG:{}".format(epsg)
         self._padding = padding
@@ -79,6 +79,16 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             "mean_temperature": "temperature",
             "precipitation_amount": "precipitation"
             }
+
+        self.var_units = {"mean_temperature": ['C'],
+                          "precipitation_amount": ['kg/m^2', 'Mg/m^2', 'm', 'mm'],
+                          "x_wind_10m": ['m/s'],
+                          "y_wind_10m": ['m/s'],
+                          "integral_of_surface_downwelling_shortwave_flux_in_air_wrt_time": ['W s/m^2'],
+                          'dew_point_temperature_2m': ['K'],
+                          'surface_air_pressure': ['Pa'],
+                          'sea_level_pressure': ['Pa'],
+                          }
 
         # Fields that need an additional timeslice because the measure average values
         # self._shift_fields = ("PREC_ACC_NC", "SWDOWN")
@@ -133,55 +143,104 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         return RH
     """
 
+    def _check_and_get_coord_vars(self, dataset, var_types):
+        cs = []
+        coord_names = []
+        for k, v in self.senorge_shyft_map.items():
+            if v in var_types and k in dataset.variables:
+                cs.append(dataset.variables[k].getncattr('grid_mapping'))
+                coord_names.append([d for d in dataset.variables[k].dimensions if d in ['time', 'X', 'Y', 'latitude', 'longitude']])
+        if not all(elem == cs[0] for elem in cs):
+            SeNorgeDataRepositoryError('Requested vars have different coord_sys. Do index extraction per var.')
+        if not all(elem == coord_names[0] for elem in coord_names):
+            SeNorgeDataRepositoryError('Requested vars have different coords. Do index extraction per var.')
+        time = dataset.variables.get("time", None)
+        if not time:
+            raise SeNorgeDataRepositoryError("Time variable not found in dataset.")
+        time = convert_netcdf_time(time.units, time)
+
+
+        if 'Y' in coord_names[0]:
+            x = dataset.variables.get("X", None)
+            y = dataset.variables.get("Y", None)
+        elif 'latitude' in coord_names[0]:
+            x = dataset.variables.get("longitude", None)
+            y = dataset.variables.get("latitude", None)
+        else:
+            SeNorgeDataRepositoryError('No recognized coordinate dimension names found.')
+
+        if not all([x, y]):
+            raise SeNorgeDataRepositoryError("Spatial Coordinate variables not found in dataset.")
+        if 'Y' in coord_names[0]:
+            if not all([var.units in ['km', 'm', 'meters'] for var in [x, y]]) and x.units == y.units:
+                raise SeNorgeDataRepositoryError("The unit for x and y coordinates should be either m or km.")
+        else:
+            if not (y.units == 'degrees_north' and x.units == 'degrees_east'):
+                raise SeNorgeDataRepositoryError("The unit for latitude and longitude coordinates should be "
+                                               "'degrees_north' and 'degrees_east' repectively.")
+        coord_conv = 1.
+        if y.units == 'km':
+            coord_conv = 1000.
+
+        data_cs = dataset.variables.get(cs[0], None)
+        if data_cs is None:
+            raise SeNorgeDataRepositoryError("No coordinate system information in dataset.")
+        return time, x, y, data_cs, coord_conv
+
 
     def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria, ensemble_member=None):
 
-        x_var = dataset.variables.get("X", None)
-        y_var = dataset.variables.get("Y", None)
-        time = dataset.variables.get("time", None)
-        if not all([x_var, y_var, time]):
-            raise SeNorgeDataRepositoryError("Something is wrong with the dataset."
-                                         " x/y coords or time not found.")
+        #x_var = dataset.variables.get("X", None)
+        #y_var = dataset.variables.get("Y", None)
+        #time = dataset.variables.get("time", None)
+        #if not all([x_var, y_var, time]):
+        #    raise SeNorgeDataRepositoryError("Something is wrong with the dataset."
+        #                                 " x/y coords or time not found.")
 
-        time = convert_netcdf_time(time.units, time)
-        data_cs_proj4 = "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
-        if data_cs_proj4 is None:
-            raise SeNorgeDataRepositoryError("No coordinate system information in dataset.")
+        #time = convert_netcdf_time(time.units, time)
+        #data_cs_proj4 = "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
+        #if data_cs_proj4 is None:
+        #    raise SeNorgeDataRepositoryError("No coordinate system information in dataset.")
 
 
         #copied from met_netcdf repo
         # Check for presence and consistency of coordinate variables
-#        time, x_var, y_var, data_cs, coord_conv = self._check_and_get_coord_vars(dataset, input_source_types)
+        time, x_var, y_var, data_cs, coord_conv = self._check_and_get_coord_vars(dataset, input_source_types)
+
 
         # Check units of meteorological variables
 #        unit_ok = {k: dataset.variables[k].units in self.var_units[k]
-#                   for k in dataset.variables.keys() if self._arome_shyft_map.get(k, None) in input_source_types}
+#                   for k in dataset.variables.keys() if self.senorge_shyft_map.get(k, None) in input_source_types}
 #        if not all(unit_ok.values()):
-#            raise MetNetcdfDataRepositoryError("The following variables have wrong unit: {}.".format(
+#            raise SeNorgeDataRepositoryError("The following variables have wrong unit: {}.".format(
 #                ', '.join([k for k, v in unit_ok.items() if not v])))
         # Make spatial slice
-#        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:] * coord_conv, y_var[:] * coord_conv,
-#                                                               data_cs.proj4, self.shyft_cs, geo_location_criteria,
+        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:] * coord_conv, y_var[:] * coord_conv,
+                                                               data_cs.proj4, self.shyft_cs, geo_location_criteria,
+                                                               self._padding, SeNorgeDataRepositoryError)
         # Make temporal slilce
         time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
 
         # from wrf_repo
-        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:], y_var[:], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
+#        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:], y_var[:], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
         # end from wrf repo
 
 
         raw_data = {}
         for k in dataset.variables.keys():
-            if self.senorge_shyft_map.get(k, None) in input_source_types:
+
+            if k in self.senorge_shyft_map.keys():
+                var = self.senorge_shyft_map.get(k, None)
+                if var in input_source_types:
                 # if k in self._shift_fields and issubset:  # Add one to time slice
                 #     data_time_slice = slice(time_slice.start, time_slice.stop + 1)  # to supply the extra value that is needed for accumulated variables
                 # else:
                 #     data_time_slice = time_slice
-                data = dataset.variables[k]
-                pure_arr = _slice_var_2D(data, x_var.name, y_var.name, x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
+                    data = dataset.variables[k]
+                    pure_arr = _slice_var_2D(data, x_var.name, y_var.name, x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
                                          # slices={'time': data_time_slice, 'ensemble_member': ensemble_member})
                                          slices={'time': time_slice, 'ensemble_member': ensemble_member})
-                raw_data[self.senorge_shyft_map[k]] = pure_arr, k, data.units
+                    raw_data[self.senorge_shyft_map[k]] = pure_arr, k, data.units
 
         if self.elevation_file is not None:
             _x, _y, z = self._read_elevation_file(self.elevation_file, x_var.name, y_var.name,
@@ -201,8 +260,26 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                                                ", and no elevation file given.")
 
         # Make sure requested fields are valid, and that dataset contains the requested data.
+
         if not self.allow_subset and not (set(raw_data.keys()).issuperset(input_source_types)):
             raise SeNorgeDataRepositoryError("Could not find all data fields")
+
+        if ensemble_member is None and 'ensemble_member' in data.dimensions:
+            dims_flat = [d for d in data.dimensions if d in ['time', 'ensemble_member', x_var.name]]
+            ens_dim_idx = dims_flat.index('ensemble_member')
+            ens_slice = len(dims_flat) * [slice(None)]
+            returned_data = []
+            for i in range(dataset.dimensions['ensemble_member'].size):
+                ens_slice[ens_dim_idx] = i
+                #print([(k, raw_data[k][0].shape) for k in raw_data])
+                ensemble_raw = {k: (raw_data[k][0][ens_slice], raw_data[k][1], raw_data[k][2]) for k in raw_data.keys()}
+                #print([(k,ensemble_raw[k][0].shape) for k in ensemble_raw])
+                returned_data.append(_numpy_to_geo_ts_vec(self._transform_raw(ensemble_raw, time[time_slice]),#, issubset=issubset)
+                                                          x, y, z, SeNorgeDataRepositoryError))
+        else:
+            returned_data = _numpy_to_geo_ts_vec(self._transform_raw(raw_data, time[time_slice]),#, issubset=issubset),
+                                                 x, y, z, SeNorgeDataRepositoryError)
+        return returned_data
 
         #end of copy
 
@@ -228,8 +305,8 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
 #        if not self.allow_subset and not (set(raw_data.keys()).issuperset(input_source_types)):
 #            raise SeNorgeDataRepositoryError("Could not find all data fields")
 
-        extracted_data = self._transform_raw(raw_data, time[time_slice], issubset=issubset)
-        return _numpy_to_geo_ts_vec(extracted_data, x, y, SeNorgeDataRepositoryError)
+        #extracted_data = self._transform_raw(raw_data, time[time_slice], issubset=issubset)
+        #return _numpy_to_geo_ts_vec(extracted_data, x, y, SeNorgeDataRepositoryError)
 
 
     ######
@@ -237,13 +314,15 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
 
     def _read_elevation_file(self, filename, x_var_name, y_var_name, geo_location_criteria):
         with Dataset(filename) as dataset:
-            elev = dataset.variables["altitude"]
-            if "altitude" not in dataset.variables.keys():
+            elev = dataset.variables["elevation"]
+            if "elevation" not in dataset.variables.keys():
                 raise interfaces.InterfaceError(
                     "File '{}' does not contain altitudes".format(filename))
-            x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(dataset.variables[x_var_name][:], dataset.variables[y_var_name][:],
-                                                                   dataset.variables[elev.grid_mapping].proj4, self.shyft_cs, geo_location_criteria,
+            x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(dataset.variables['easting'][:], dataset.variables['northing'][:],
+                                                                  elev.projection, self.shyft_cs, geo_location_criteria,
                                                                    self._padding, SeNorgeDataRepositoryError)
+            x_var_name = 'easting'
+            y_var_name = 'northing'
             z = _slice_var_2D(elev, x_var_name, y_var_name, x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError)
             return x, y, z
 
@@ -289,10 +368,10 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         # "precipitation_amount_acc": lambda x, t: (prec_acc_conv(x), dacc_time(t))}
         """
 
-        convert_map = {"mean_temperature": lambda x, t: (air_temp_conv(x), noop_time(t)),
-                       "precipitation_amount": lambda x, t: (prec_conv(x), noop_time(t))}
+        convert_map = {"mean_temperature": lambda x, t, u: (air_temp_conv(x), noop_time(t)),
+                       "precipitation_amount": lambda x, t, u: (prec_conv(x), noop_time(t))}
 
         res = {}
-        for k, (v, ak) in data.items():
-            res[k] = convert_map[ak](v, time)
+        for k, (v, ak, unit) in data.items():
+            res[k] = convert_map[ak](v, time, unit)
         return res
