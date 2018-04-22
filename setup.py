@@ -8,7 +8,13 @@ import subprocess
 from setuptools import setup, find_packages
 
 
-print('Building Shyft')
+
+if 'SHYFT_WORKSPACE' not in os.environ:
+    os.environ['SHYFT_WORKSPACE'] = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if 'SHYFT_DEPENDENCIES_DIR' not in os.environ:
+    os.environ['SHYFT_DEPENDENCIES_DIR'] = os.path.join(os.environ["SHYFT_WORKSPACE"], "shyft_dependencies")
+
+print('Building Shyft\n with dependencies to:\n {0}'.format(os.environ['SHYFT_DEPENDENCIES_DIR']))
 
 # VERSION should be set in a previous build step (ex: TeamCity)
 VERSION = open('VERSION').read().strip()
@@ -58,7 +64,7 @@ if needs_build_ext:
     elif "Linux" in platform.platform():
         try:
         # For Linux, use the cmake approach for compiling the extensions
-            print(subprocess.check_output("sh build_api_cmake.sh", shell=True))
+            print(subprocess.check_output("sh build_api_cmake.sh", shell=True, env=os.environ))
         except:
             print("Problems compiling shyft, try building with the build_api.sh "
                   "or build_api_cmake.sh (Linux only) script manually...")
