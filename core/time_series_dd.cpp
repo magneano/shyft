@@ -410,7 +410,12 @@ namespace shyft{
                 find_ts_bind_info(dynamic_cast<const rating_curve_ts*>(its.get())->ts.level_ts.ts, r);
 			} else if (dynamic_cast<const krls_interpolation_ts*>(its.get())) {
 				find_ts_bind_info(dynamic_cast<const krls_interpolation_ts*>(its.get())->ts.ts, r);
-			}
+			} else if (dynamic_cast<const qac_ts*>(its.get())) {
+                find_ts_bind_info(dynamic_cast<const qac_ts*>(its.get())->ts, r);
+                find_ts_bind_info(dynamic_cast<const qac_ts*>(its.get())->cts, r);
+            } else if (dynamic_cast<const inside_ts*>(its.get())) {
+                find_ts_bind_info(dynamic_cast<const inside_ts*>(its.get())->ts, r);
+            }
 		}
 
 		std::vector<ts_bind_info> apoint_ts::find_ts_bind_info() const {
@@ -689,7 +694,11 @@ namespace shyft{
 		apoint_ts apoint_ts::min_max_check_ts_fill(double min_x, double max_x, utctimespan max_dt, const apoint_ts& cts) const {
 			return apoint_ts(make_shared<qac_ts>(*this, qac_parameter{ max_dt,min_x,max_x }, cts));
 		}
-
+		
+		apoint_ts apoint_ts::inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const {
+			return apoint_ts(make_shared<inside_ts>(*this, inside_parameter{ min_v,max_v,nan_v,inside_v,outside_v }));
+        };
+        
 		double nash_sutcliffe(const apoint_ts& observation_ts, const apoint_ts& model_ts, const gta_t &ta) {
 			average_accessor<apoint_ts, gta_t> o(observation_ts, ta);
 			average_accessor<apoint_ts, gta_t> m(model_ts, ta);
@@ -819,6 +828,10 @@ namespace shyft{
 			ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].max(x[i]));
 			return r;
 		}
+		ats_vector ats_vector::inside(double min_v,double max_v,double nan_v, double inside_v, double outside_v) const {
+            ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].inside(min_v,max_v,nan_v,inside_v,outside_v));
+			return r;
+        }
 		ats_vector min(ats_vector const &a, double b) { return a.min(b); }
 		ats_vector min(double b, ats_vector const &a) { return a.min(b); }
 		ats_vector min(ats_vector const &a, apoint_ts const& b) { return a.min(b); }
@@ -1073,6 +1086,25 @@ namespace shyft{
 		}
 
 		vector<double> qac_ts::values() const {
+			const size_t n{ size() };
+			vector<double> r; r.reserve(n);
+			for (size_t i = 0; i < n; ++i)
+				r.emplace_back(value(i));
+			return r;
+		}
+		
+		double inside_ts::value(size_t i) const {
+            return p.inside_value(ts->value(i));
+		}
+
+		double inside_ts::value_at(utctime t) const {
+			size_t i = index_of(t);
+			if (i == string::npos)
+				return shyft::nan;
+			return value(i);
+		}
+
+		vector<double> inside_ts::values() const {
 			const size_t n{ size() };
 			vector<double> r; r.reserve(n);
 			for (size_t i = 0; i < n; ++i)

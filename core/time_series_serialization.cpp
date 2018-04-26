@@ -519,16 +519,15 @@ void shyft::time_series::dd::qac_ts::serialize(Archive & ar, const unsigned int 
 		& core_nvp("p", p)
 		;
 }
-#if 0
+
 template<class Archive>
-void shyft::time_series::dd::qac_parameter::serialize(Archive & ar, const unsigned int version) {
+void shyft::time_series::dd::inside_ts::serialize(Archive & ar, const unsigned int version) {
 	ar
-		& core_nvp("min_x", min_x)
-		& core_nvp("max_x", max_x)
-		& core_nvp("max_timespan", max_timespan)
+		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))
+		& core_nvp("ts", ts)
+		& core_nvp("p", p)
 		;
 }
-#endif
 
 template<class Archive>
 void shyft::time_series::dd::apoint_ts::serialize(Archive & ar, const unsigned int version) {
@@ -608,7 +607,7 @@ x_serialize_implement(shyft::time_series::dd::krls_interpolation_ts);
 
 x_serialize_implement(shyft::time_series::dd::ats_vector);
 x_serialize_implement(shyft::time_series::dd::qac_ts);
-
+x_serialize_implement(shyft::time_series::dd::inside_ts);
 
 //-- export predictors
 x_serialize_implement(shyft::prediction::krls_rbf_predictor);
@@ -684,7 +683,7 @@ x_arch(shyft::time_series::dd::apoint_ts);
 x_arch(shyft::time_series::dd::krls_interpolation_ts);
 x_arch(shyft::time_series::dd::ats_vector);
 x_arch(shyft::time_series::dd::qac_ts);
-//binary x_arch(shyft::time_series::dd::qac_parameter);
+x_arch(shyft::time_series::dd::inside_ts);
 
 std::string shyft::time_series::dd::apoint_ts::serialize() const {
 	using namespace std;

@@ -72,7 +72,7 @@ namespace expose {
     static string nice_str(const shared_ptr<time_series::dd::ice_packing_recession_ts>&b) { return "ice_packing_recession_ts(" + nice_str(b->flow_ts) + "," + nice_str(b->ice_packing_ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::krls_interpolation_ts>&b) { return "krls(" + nice_str(b->ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::qac_ts>&b) { return "qac_ts(" + nice_str(apoint_ts(b->ts)) + ", "+nice_str(apoint_ts(b->cts))+"..)"; }
-
+	static string nice_str(const shared_ptr<time_series::dd::inside_ts>&b) { return "inside_ts(" + nice_str(apoint_ts(b->ts)) + ", "+to_string(b->p.min_x)+", "+to_string(b->p.max_x)+", ..)"; }
 
 	static string nice_str(const apoint_ts&ats) {
 		if (!ats.ts)
@@ -268,6 +268,23 @@ namespace expose {
                   doc_notes()
                   doc_see_also("nash_sutcliffe,forecast_merge")
              )
+             .def("inside", &ats_vector::inside,
+                (py::arg("self"),py::arg("min_v"),py::arg("max_v"),py::arg("nan_v")=shyft::nan,py::arg("inside_v")=1.0,py::arg("outside_v")=0.0),
+                doc_intro(
+                    "Create an inside min-max range ts-vector, that transforms the point-values\n"
+                    "that falls into the half open range [min_v .. max_v > to \n"
+                    "the value of inside_v(default=1.0), or outside_v(default=0.0),\n"
+                    "and if the value considered is nan, then that value is represented as nan_v(default=nan)\n"
+                    "You would typically use this function to form a true/false series (inside=true, outside=false)\n"
+                )
+                doc_parameters()
+                doc_parameter("min_v","float","minimum range, values <  min_v are not inside min_v==NaN means no lower limit")
+                doc_parameter("max_v","float","maximum range, values >= max_v are not inside. max_v==NaN means no upper limit")
+                doc_parameter("nan_v","float","value to return if the value is nan")
+                doc_parameter("inside_v","float","value to return if the ts value is inside the specified range")
+                doc_parameter("outside_v","float","value to return if the ts value is outside the specified range")
+                doc_returns("inside_tsv","TsVector","New TsVector where each element is an evaluated-on-demand inside time-series")
+            )
             // defining vector math-operations goes here
             .def(-self)
             .def(self*double())
@@ -420,6 +437,7 @@ namespace expose {
         self_ts_t  min_ts_f =&pts_t::min;
         self_dbl_t max_double_f=&pts_t::max;
         self_ts_t  max_ts_f =&pts_t::max;
+        
         typedef ts_bind_info TsBindInfo;
         class_<TsBindInfo>("TsBindInfo",
             doc_intro("TsBindInfo gives information about the time-series and it's binding")
@@ -987,9 +1005,23 @@ namespace expose {
                  doc_parameter("cts","TimeSeries","time-series that keeps the values to be filled in at points that are NaN or outside min-max-limits")
                  doc_returns("min_max_check_ts_fill","TimeSeries","Evaluated on demand time-series with NaN, out of range values filled in")
             )
-
-            //.def("max",max_stat_ts_ts_f,args("ts_a","ts_b"),"create a new ts that is the max(ts_a,ts_b)").staticmethod("max")
-            //.def("min",min_stat_ts_ts_f,args("ts_a","ts_b"),"create a new ts that is the max(ts_a,ts_b)").staticmethod("min")
+            .def("inside", &apoint_ts::inside,
+                (py::arg("self"),py::arg("min_v"),py::arg("max_v"),py::arg("nan_v")=shyft::nan,py::arg("inside_v")=1.0,py::arg("outside_v")=0.0),
+                doc_intro(
+                    "Create an inside min-max range ts, that transforms the point-values\n"
+                    "that falls into the half open range [min_v .. max_v > to \n"
+                    "the value of inside_v(default=1.0), or outside_v(default=0.0),\n"
+                    "and if the value considered is nan, then that value is represented as nan_v(default=nan)\n"
+                    "You would typically use this function to form a true/false series (inside=true, outside=false)\n"
+                )
+                doc_parameters()
+                doc_parameter("min_v","float","minimum range, values <  min_v are not inside min_v==NaN means no lower limit")
+                doc_parameter("max_v","float","maximum range, values >= max_v are not inside. max_v==NaN means no upper limit")
+                doc_parameter("nan_v","float","value to return if the value is nan")
+                doc_parameter("inside_v","float","value to return if the ts value is inside the specified range")
+                doc_parameter("outside_v","float","value to return if the ts value is outside the specified range")
+                doc_returns("inside_ts","TimeSeries","Evaluated on demand inside time-series")
+            )
 			.def("partition_by",&apoint_ts::partition_by,
                 (py::arg("self"),py::arg("calendar"), py::arg("t"), py::arg("partition_interval"), py::arg("n_partitions"), py::arg("common_t0")),
 				doc_intro("from a time-series, construct a TsVector of n time-series partitions.")

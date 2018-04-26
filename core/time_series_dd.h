@@ -144,7 +144,8 @@ namespace shyft {
         struct ats_vector;  // fwd
         struct abs_ts;  // fwd
         struct ice_packing_recession_parameters;  // fwd
-
+        struct inside_parameter; // fwd
+        
 		/** \brief Enumerates fill policies for time-axis extension.
 		 */
 		enum extend_ts_fill_policy {
@@ -282,6 +283,8 @@ namespace shyft {
             apoint_ts min_max_check_linear_fill(double min_x,double max_x,utctimespan max_dt) const;
             apoint_ts min_max_check_ts_fill(double min_x,double max_x,utctimespan max_dt,const apoint_ts& cts) const;
 
+            apoint_ts inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const;
+            
             apoint_ts merge_points(const apoint_ts& o);
             //-- in case the underlying ipoint_ts is a gpoint_ts (concrete points)
             //   we would like these to be working (exception if it's not possible,i.e. an expression)
@@ -1291,6 +1294,13 @@ namespace shyft {
             x_serialize_decl();
 
         };
+
+        /** returns true if a are similar to b, including both is nan */
+        inline bool nan_equal(double a, double b, double abs_e) {
+            if(!std::isfinite(a) && !std::isfinite(b)) return true;
+            return fabs(a-b) <= abs_e;
+        }
+        
         /** \brief quality and correction parameters
          *
          *  Controls how we consider the quality of the time-series,
@@ -1313,10 +1323,6 @@ namespace shyft {
                     return false;
                 return true;
             }
-            static inline bool nan_equal(double a, double b, double abs_e) {
-                if(!std::isfinite(a) && !std::isfinite(b)) return true;
-                return fabs(a-b) <= abs_e;
-            }
 
             bool equal(const qac_parameter& o, double abs_e=1e-9) const {
                 return max_timespan==o.max_timespan && nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e);
@@ -1325,23 +1331,11 @@ namespace shyft {
             // binary serialization, so no x_serialize_decl();
         };
 
-        /** \brief The average_ts is used for providing ts average values over a time-axis
+        /** \brief The qac_ts is used for doing quality and correction to a ts using min-max criteria
          *
          * Given a source ts, apply qac criteria, and replace nan's with
          * correction values as specified by the parameters, or the
-         * intervals as provided by the specified time-axis.
-         *
-         * true average for each period in the time-axis is defined as:
-         *
-         *   integral of f(t) dt from t0 to t1 / (t1-t0)
-         *
-         * using the f(t) interpretation of the supplied ts (linear or stair case).
-         *
-         * The \ref ts_point_fx is always POINT_AVERAGE_VALUE for the result ts.
-         *
-         * \note if a nan-value intervals are excluded from the integral and time-computations.
-         *       E.g. let's say half the interval is nan, then the true average is computed for
-         *       the other half of the interval.
+         * optional supplied replacement ts.
          *
          */
         struct qac_ts:ipoint_ts {
@@ -1390,6 +1384,81 @@ namespace shyft {
 
         };
 
+        /** \brief inside ts function parameters
+         *
+         *  [ min_x .. max_x >
+         *
+         */
+        struct inside_parameter {
+            double min_x{shyft::nan};    ///< x < min_x  -> nan
+            double max_x{shyft::nan};    ///< x > max_x  -> nan
+            double nan_x{shyft::nan};    ///< if x is nan the inside is this value
+            double x_inside{1.0};        ///< result if value x is inside
+            double x_outside{0.0};       ///< result if value x is outside
+            inside_parameter()=default;
+            /** computes the inside value based on x is inside range [min_x .. max_x> agains min-max is set */
+            double inside_value(const double& x) const noexcept {
+                if(!isfinite(x))
+                    return nan_x;
+                if(isfinite(min_x) && x < min_x)
+                    return x_outside;
+                if(isfinite(max_x) && x >= max_x)
+                    return x_outside;
+                return x_inside;
+            }
+
+            bool equal(const inside_parameter& o, double abs_e=1e-9) const {
+                return nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e) 
+                && nan_equal(nan_x,o.nan_x,abs_e) && nan_equal(x_inside,o.x_inside,abs_e) 
+                && nan_equal(x_outside,o.x_outside,abs_e);
+            }
+            // binary serialization, so no x_serialize_decl();
+        };
+
+        /** \brief The inside_ts maps a value range into 1.0 and 0.0
+         * 
+         * The inside_ts provide needed function to transform the source time-series
+         * into a sequence of is_inside_value and is_outside_value 
+         * based on a range-criteria [min .. max >
+         */
+        struct inside_ts:ipoint_ts {
+            shared_ptr<ipoint_ts> ts;///< the source ts
+            inside_parameter p;///< the parameters that control how the inside is done
+
+            // useful constructors
+
+            inside_ts(const apoint_ts& ats):ts(ats.ts) {}
+            inside_ts(apoint_ts&& ats):ts(move(ats.ts)) {}
+
+            inside_ts(const apoint_ts& ats, const inside_parameter& qp):ts(ats.ts),p(qp) {}
+
+            // std copy ct and assign
+            inside_ts()=default;
+            void assert_ts() const {if(!ts) throw runtime_error("inside_ts:source ts is null");}
+            // implement ipoint_ts contract, these methods just forward to source ts
+            virtual ts_point_fx point_interpretation() const {assert_ts();return ts->point_interpretation();}
+            virtual void set_point_interpretation(ts_point_fx pfx) {assert_ts();ts->set_point_interpretation(pfx);}
+            virtual const gta_t& time_axis() const {assert_ts();return ts->time_axis();}
+            virtual utcperiod total_period() const {assert_ts();return ts->time_axis().total_period();}
+            virtual size_t index_of(utctime t) const {assert_ts();return ts->index_of(t);}
+            virtual size_t size() const {return ts?ts->size():0;}
+            virtual utctime time(size_t i) const {assert_ts();return ts->time(i);};
+
+            // methods that needs special implementation according to inside rules
+            virtual double value(size_t i) const ;
+            virtual double value_at(utctime t) const ;
+            virtual vector<double> values() const;
+
+            // methods for binding and symbolic ts
+            virtual bool needs_bind() const {
+                return ts?ts->needs_bind():false;
+            }
+            virtual void do_bind() {
+                if(ts) ts->do_bind();
+            }
+
+            x_serialize_decl();
+        };
 
         /** The iop_t represent the basic 'binary' operation,
          *   a stateless function that takes two doubles and returns the binary operation.
@@ -1784,7 +1853,8 @@ namespace shyft {
 
             apoint_ts forecast_merge(utctimespan lead_time,utctimespan fc_interval) const;
             ats_vector average_slice(utctimespan t0_offset,utctimespan dt, int n) const ;
-            double nash_sutcliffe(apoint_ts const &obs,utctimespan t0_offset,utctimespan dt, int n)const ;
+            double nash_sutcliffe(apoint_ts const &obs,utctimespan t0_offset,utctimespan dt, int n) const ;
+            ats_vector inside(double min_v,double max_v,double nan_v, double inside_v, double outside_v) const;
             x_serialize_decl();
         };
         // quantile-mapping
@@ -1871,4 +1941,6 @@ x_serialize_export_key_nt(shyft::time_series::dd::apoint_ts);
 x_serialize_export_key(shyft::time_series::dd::ats_vector);
 x_serialize_export_key(shyft::time_series::dd::abs_ts);
 x_serialize_export_key(shyft::time_series::dd::qac_ts);
+x_serialize_export_key(shyft::time_series::dd::inside_ts);
 x_serialize_binary(shyft::time_series::dd::qac_parameter);
+x_serialize_binary(shyft::time_series::dd::inside_parameter);

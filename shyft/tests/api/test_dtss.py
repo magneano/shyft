@@ -147,6 +147,7 @@ class DtssTestCase(unittest.TestCase):
         # then try something that should work
         dts.store_ts(store_tsv)
         r1 = dts.evaluate(tsv, ta.total_period())
+        r1x = dts.evaluate(tsv.inside(-0.5,0.5),ta.total_period())
         r2 = dts.percentiles(tsv, ta.total_period(), ta24, percentile_list)
         r3 = dts.find('netcdf://dummy\.nc/ts\d')
         self.rd_throws = True
@@ -167,7 +168,7 @@ class DtssTestCase(unittest.TestCase):
         dtss.clear()  # close server
         self.assertEqual(ex_count, 2)
         self.assertEqual(len(r1), len(tsv))
-        self.assertEqual(self.callback_count, 3)
+        self.assertEqual(self.callback_count, 4)
         for i in range(n_ts - 1):
             self.assertEqual(r1[i].time_axis, tsv[i].time_axis)
             assert_array_almost_equal(r1[i].values.to_numpy(), tsv[i].values.to_numpy(), decimal=4)
@@ -185,7 +186,7 @@ class DtssTestCase(unittest.TestCase):
         self.assertEqual(len(r3), 10)  # 0..9
         for i in range(len(r3)):
             self.assertEqual(r3[i], self.ts_infos[i])
-
+        self.assertIsNotNone(r1x)
         self.assertEqual(1, len(self.stored_tsv))
         self.assertEqual(len(store_tsv), len(self.stored_tsv[0]))
         for i in range(len(store_tsv)):
@@ -237,6 +238,7 @@ class DtssTestCase(unittest.TestCase):
             ts_qac = ts9.min_max_check_linear_fill(v_min=-10.0*n_ts, v_max=10.0*n_ts)
             tsv_krls.append(ts_qac)
             tsv_krls.append(ts9)
+            tsv_krls.append(ts9.inside(min_v=-0.5, max_v=0.5))
 
             # then start the server
             dtss = DtsServer()
@@ -457,7 +459,7 @@ class DtssTestCase(unittest.TestCase):
         """
         This test illustrates use of partition_by client and server-side.
         The main point here is to ensure that the evaluate period covers
-        both the historical and evaluation period.
+        both the historical and evaluation peri
         """
         with tempfile.TemporaryDirectory() as c_dir:
             # setup data to be calculated
@@ -500,6 +502,6 @@ class DtssTestCase(unittest.TestCase):
             c.close()  # close connection (will use context manager later)
             dtss.clear()  # close server
             self.assertIsNotNone(r)
-            diffs = r-ts_p2
+            diffs = r - ts_p2
             for d in diffs:
-                self.assertAlmostEqual(abs(d.values.to_numpy()).sum(),  0.0)
+                self.assertAlmostEqual(abs(d.values.to_numpy()).sum(), 0.0)
