@@ -9,6 +9,7 @@ from shyft.api import pt_gs_k
 from shyft.api import pt_hps_k
 from shyft.api import pt_hs_k
 from shyft.api import pt_ss_k
+from shyft.api import hbv_stack
 
 
 import numpy as np
@@ -648,4 +649,5 @@ __all__ = [] + \
         ['pt_gs_k',
          'pt_hps_k',
          'pt_hs_k',
-         'pt_ss_k']
+         'pt_ss_k',
+         'hbv_stack']
