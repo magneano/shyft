@@ -147,7 +147,10 @@ class DtssTestCase(unittest.TestCase):
         # then try something that should work
         dts.store_ts(store_tsv)
         r1 = dts.evaluate(tsv, ta.total_period())
-        r1x = dts.evaluate(tsv.inside(-0.5,0.5),ta.total_period())
+        tsv1x = tsv.inside(-0.5, 0.5)
+        tsv1x.append(tsv1x[-1].decode(start_bit=1, n_bits=1))  # just to verify serialization/bind
+
+        r1x = dts.evaluate(tsv1x, ta.total_period())
         r2 = dts.percentiles(tsv, ta.total_period(), ta24, percentile_list)
         r3 = dts.find('netcdf://dummy\.nc/ts\d')
         self.rd_throws = True

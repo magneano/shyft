@@ -6,6 +6,18 @@ See file COPYING for more details **/
 #include <utility>
 #include <tuple>
 
+// boost type variants limits needs to be extended to larger than default 20,
+// because number of time-series types that we support is larger than 20.
+//
+// once we get error make_variant_list error wrong number of variants
+// extend these numbers
+// ref. 
+// https://www.boost.org/doc/libs/1_53_0/libs/mpl/doc/refmanual/cfg-no-preprocessed-headers.html
+// https://www.boost.org/doc/libs/1_53_0/libs/mpl/doc/refmanual/limit-list-size.html
+//#define BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS 
+//#define BOOST_MPL_LIMIT_LIST_SIZE 30 
+//#define BOOST_MPL_LIMIT_VECTOR_SIZE 30 
+
 #include <boost/variant.hpp>
 
 #include "utctime_utilities.h"
@@ -108,7 +120,8 @@ namespace shyft { namespace time_series { namespace dd {
         o_index<ice_packing_recession_ts>,
         o_index<krls_interpolation_ts>,
         o_index<qac_ts>,
-        o_index<inside_ts>
+        o_index<inside_ts>,
+        o_index<decode_ts>
     >;
 
     namespace srep {
@@ -293,6 +306,13 @@ namespace shyft { namespace time_series { namespace dd {
         };
         template<> struct _type<inside_ts> { using rep_t = srep::sinside_ts; };
         
+        struct sdecode_ts {
+            using ts_t = decode_ts;
+            a_index ts;
+            bit_decoder p;
+            bool operator==(const sdecode_ts& o) const { return ts == o.ts && p==o.p; } //
+        };
+        template<> struct _type<decode_ts> { using rep_t = srep::sdecode_ts; };
 
     } // namespace srep
 
@@ -418,6 +438,9 @@ namespace shyft { namespace time_series { namespace dd {
             } else  if (auto ts = dynamic_cast<inside_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<inside_ts>{ expr.append(srep::_type<inside_ts>::rep_t{ convert(apoint_ts(ts->ts)), ts->p }) };
+            } else  if (auto ts = dynamic_cast<decode_ts*>(ats.ts.get())) {
+                _m_find_ts_map(ts);
+                return m[ts] = o_index<decode_ts>{ expr.append(srep::_type<decode_ts>::rep_t{ convert(apoint_ts(ts->ts)), ts->p }) };
             } else if (auto gts = dynamic_cast<gpoint_ts*>(ats.ts.get())) {
                 auto f = gts_map.find(gts);
                 if (f != end(gts_map))
@@ -604,6 +627,12 @@ namespace shyft { namespace time_series { namespace dd {
             apoint_ts src_ts{ boost::apply_visitor(*this,rx.ts) };
             return make_shared<inside_ts>(src_ts, rx.p);
         }
+        
+        shared_ptr<decode_ts> make(o_index<decode_ts> i) {
+            const auto& rx = expr.at(i);
+            apoint_ts src_ts{ boost::apply_visitor(*this,rx.ts) };
+            return make_shared<decode_ts>(src_ts, rx.p);
+        }
 
     public: // required for the visitor callbacks
             /** generic callback called by visitor for any type
@@ -664,7 +693,7 @@ namespace shyft { namespace time_series { namespace dd {
     /**convinient macro to use for all know types, use as parameter-pack to ts_exp_rep, etc.*/
 #define all_srep_types  srep::sbinop_op_ts, srep::sbinop_ts_scalar, srep::sbin_op_scalar_ts, srep::sabs_ts, srep::saverage_ts, srep::sintegral_ts, srep::saccumulate_ts, \
             srep::stime_shift_ts, srep::speriodic_ts, srep::sconvolve_w_ts, srep::sextend_ts, srep::srating_curve_ts, srep::sice_packing_ts, srep::sice_packing_recession_ts, \
-            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts
+            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts
 
     typedef ts_expression<all_srep_types> compressed_ts_expression;
     typedef ts_expression_compressor<all_srep_types> expression_compressor;
@@ -682,6 +711,8 @@ x_serialize_binary(shyft::time_series::dd::srep::stime_shift_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sextend_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sqac_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sinside_ts);
+x_serialize_binary(shyft::time_series::dd::srep::sdecode_ts);
+
 
 x_serialize_export_key(shyft::time_series::dd::srep::saverage_ts);
 x_serialize_export_key(shyft::time_series::dd::srep::sintegral_ts);
@@ -713,4 +744,5 @@ x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ice_p
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::krls_interpolation_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::qac_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::inside_ts>);
+x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::decode_ts>);
 x_serialize_binary(boost::blank);

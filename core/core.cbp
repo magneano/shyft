@@ -47,6 +47,9 @@
 			<Add option="-std=c++1z" />
 			<Add option="-fexceptions -fPIC -pthread -Winvalid-pch" />
 			<Add option="-DBOOST_VARIANT_MINIMIZE_SIZE" />
+			<Add option="-DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS" />
+			<Add option="-DBOOST_MPL_LIMIT_LIST_SIZE=30" />
+			<Add option="-DBOOST_MPL_LIMIT_VECTOR_SIZE=30" />
 			<Add option="-DARMA_DONT_USE_WRAPPER" />
 			<Add option="-DARMA_DONT_PRINT_ERRORS" />
 			<Add option="-DARMA_NO_DEBUG" />

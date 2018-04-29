@@ -73,7 +73,9 @@ namespace expose {
 	static string nice_str(const shared_ptr<time_series::dd::krls_interpolation_ts>&b) { return "krls(" + nice_str(b->ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::qac_ts>&b) { return "qac_ts(" + nice_str(apoint_ts(b->ts)) + ", "+nice_str(apoint_ts(b->cts))+"..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::inside_ts>&b) { return "inside_ts(" + nice_str(apoint_ts(b->ts)) + ", "+to_string(b->p.min_x)+", "+to_string(b->p.max_x)+", ..)"; }
+	static string nice_str(const shared_ptr<time_series::dd::decode_ts>&b) { return "decode_ts(" + nice_str(apoint_ts(b->ts)) + ",start_bit="+to_string(b->p.start_bit)+",n_bits="+to_string(b->p.n_bits())+")"; }
 
+	
 	static string nice_str(const apoint_ts&ats) {
 		if (!ats.ts)
 			return "null";
@@ -95,6 +97,8 @@ namespace expose {
         if (const auto& b = dynamic_pointer_cast<time_series::dd::ice_packing_recession_ts>(ats.ts)) return nice_str(b);
 		if (const auto& b = dynamic_pointer_cast<time_series::dd::krls_interpolation_ts>(ats.ts)) return nice_str(b);
 		if (const auto& b = dynamic_pointer_cast<time_series::dd::qac_ts>(ats.ts)) return nice_str(b);
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::inside_ts>(ats.ts)) return nice_str(b);
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::decode_ts>(ats.ts)) return nice_str(b);
 
 		return "not_yet_stringified_ts";
 	}
@@ -612,6 +616,7 @@ namespace expose {
 			.def("average", &apoint_ts::average, (py::arg("self"),py::arg("ta")),
                 doc_intro("create a new ts that is the true average of self")
                 doc_intro("over the specified time-axis ta.")
+                doc_intro("Notice that same definition as for integral applies; non-nan parts goes into the average")
                 doc_parameters()
                 doc_parameter("ta","TimeAxis","time-axis that specifies the periods where true-average is applied")
                 doc_returns("ts","TimeSeries","a new time-series expression, that will provide the true-average when requested")
@@ -1022,6 +1027,33 @@ namespace expose {
                 doc_parameter("outside_v","float","value to return if the ts value is outside the specified range")
                 doc_returns("inside_ts","TimeSeries","Evaluated on demand inside time-series")
             )
+            .def("decode", &apoint_ts::decode,
+                (py::arg("self"),py::arg("start_bit"),py::arg("n_bits")),
+                doc_intro(
+                    "Create an time-series that decodes the source using provided\n"
+                    "specification start_bit and n_bits.\n"
+                    "This function can typically be used to decode status-signals from sensors stored as \n"
+                    "binary encoded bits, using integer representation\n"
+                    "The floating point format allows up to 52 bits to be precisely stored as integer\n"
+                    "- thus there are restrictions to start_bit and n_bits accordingly.\n"
+                    "Practical sensors quality signals have like 32 bits of status information encoded\n"
+                    "If the value in source time-series is \n"
+                    " a) negative\n"
+                    " b) nan\n"
+                    " c) larger than 52 bits\n"
+                    "Then nan is returned for those values\n"
+                    "\n"
+                    "ts.decode(start_bit=1,n_bits=1) will return values [0,1,nan]\n"
+                    "similar:\n"
+                    "ts.decode(start_bit=1,n_bits=2) will return values [0,1,2,3,nan]\n"
+                    "etc..\n"
+                )
+                doc_parameters()
+                doc_parameter("start_bit","int","where in the n-bits integer the value is stored, range[0..51]")
+                doc_parameter("n_bits","int","how many bits are encoded, range[0..51], but start_bit +n_bits < 51")
+                doc_returns("decode_ts","TimeSeries","Evaluated on demand decoded time-series")
+            )
+
 			.def("partition_by",&apoint_ts::partition_by,
                 (py::arg("self"),py::arg("calendar"), py::arg("t"), py::arg("partition_interval"), py::arg("n_partitions"), py::arg("common_t0")),
 				doc_intro("from a time-series, construct a TsVector of n time-series partitions.")

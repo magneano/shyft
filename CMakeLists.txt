@@ -77,7 +77,7 @@ set(boost_py_link_libraries ${boost_link_libraries} ${boost_python3_lib})
 # Notice that we need MINIMIZE_SIZE to ensure g++ vs. ms c++ compat
 set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-fPIC -fexceptions -pthread -Wno-deprecated-declarations)
-add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG -DBOOST_VARIANT_MINIMIZE_SIZE")
+add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG -DBOOST_VARIANT_MINIMIZE_SIZE -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS -DBOOST_MPL_LIMIT_LIST_SIZE=30 -DBOOST_MPL_LIMIT_VECTOR_SIZE=30")
 include_directories(${CMAKE_SOURCE_DIR} ${SHYFT_DEPENDENCIES}/include) # we could add more explicit list boost,dlib,armadillo,doctest here
 
 

@@ -145,6 +145,7 @@ namespace shyft {
         struct abs_ts;  // fwd
         struct ice_packing_recession_parameters;  // fwd
         struct inside_parameter; // fwd
+        struct bit_decoder;//fwd
         
 		/** \brief Enumerates fill policies for time-axis extension.
 		 */
@@ -284,6 +285,7 @@ namespace shyft {
             apoint_ts min_max_check_ts_fill(double min_x,double max_x,utctimespan max_dt,const apoint_ts& cts) const;
 
             apoint_ts inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const;
+            apoint_ts decode(int start_bit,int n_bits) const;
             
             apoint_ts merge_points(const apoint_ts& o);
             //-- in case the underlying ipoint_ts is a gpoint_ts (concrete points)
@@ -1460,6 +1462,102 @@ namespace shyft {
             x_serialize_decl();
         };
 
+        /** fast and branch free from https://stackoverflow.com/questions/1392059/algorithm-to-generate-bit-mask */
+        template <typename R>
+        constexpr R bitmask(unsigned int const onecount) {
+            return static_cast<R>(-(onecount != 0)) & (static_cast<R>(-1) >> ((sizeof(R) * CHAR_BIT) - onecount));
+        }
+        
+        /** \brief  bit_decoder
+         *
+         *  helper class for decoding bits of integers 
+         *  into numbers that can play a mathematical/statistical
+         *  role in time-series computations.
+         *  It is typically used as building block for
+         *  extracting extra information from remote sensors/signals
+         *  that provides both a value, and some kind of bit-encoded
+         *  integer representing status-flags, like:
+         *   battery_level_low, sensor signal stale, AD-converter failure etc.
+         */
+        struct bit_decoder {
+            uint64_t start_bit{0}; ///< the start bit into the integer.
+            uint64_t bit_mask{0};  ///< the bitmask used to extract only relevant bits.
+            /** count the bits from mask */
+            unsigned int n_bits() const {
+                unsigned int n=0;
+                auto x = bit_mask;
+                while(x&1) {
+                    ++n;
+                    x >>= 1;
+                }
+                return n;
+            }
+            bit_decoder()=default;
+            bit_decoder(unsigned int start_bit,unsigned int n_bits)
+                :start_bit{start_bit},bit_mask{bitmask<uint64_t>(n_bits)} {}
+            /** return the decoded value of x, or nan if errors detected.
+             *  x==nan, -> nan
+             *  x < 0: -> nan
+             *  x > 2<<52 -> nan (ref https://en.wikipedia.org/wiki/Double-precision_floating-point_format)
+             *  else:
+             *    return bit decoded value of start-bit plus n-bits as unsigned number casted to double
+             * 
+             */
+            inline double decode(double x) const {
+                if(!isfinite(x))return shyft::nan;
+                if(x<0) return shyft::nan;
+                if(x>double(1UL<<52)) return shyft::nan;
+                return double((uint64_t(x)>>start_bit)&bit_mask);
+            }
+            bool operator==(const bit_decoder&o) const {return start_bit==o.start_bit && bit_mask==o.bit_mask;}
+            // binary serialization, so no x_serialize_decl();
+        };
+        
+        /** \brief The inside_ts maps a value range into 1.0 and 0.0
+         * 
+         * The decode_ts provide needed function to transform the source time-series
+         * into a sequence of is_inside_value and is_outside_value 
+         * based on a range-criteria [min .. max >
+         */
+        struct decode_ts:ipoint_ts {
+            shared_ptr<ipoint_ts> ts;///< the source ts
+            bit_decoder p;///< the parameters that control how the inside is done
+
+            // useful constructors
+
+            decode_ts(const apoint_ts& ats):ts(ats.ts) {}
+            decode_ts(apoint_ts&& ats):ts(move(ats.ts)) {}
+
+            decode_ts(const apoint_ts& ats, const bit_decoder& qp):ts(ats.ts),p(qp) {}
+
+            // std copy ct and assign
+            decode_ts()=default;
+            void assert_ts() const {if(!ts) throw runtime_error("decode_ts:source ts is null");}
+            // implement ipoint_ts contract, these methods just forward to source ts
+            virtual ts_point_fx point_interpretation() const {assert_ts();return ts->point_interpretation();}
+            virtual void set_point_interpretation(ts_point_fx pfx) {assert_ts();ts->set_point_interpretation(pfx);}
+            virtual const gta_t& time_axis() const {assert_ts();return ts->time_axis();}
+            virtual utcperiod total_period() const {assert_ts();return ts->time_axis().total_period();}
+            virtual size_t index_of(utctime t) const {assert_ts();return ts->index_of(t);}
+            virtual size_t size() const {return ts?ts->size():0;}
+            virtual utctime time(size_t i) const {assert_ts();return ts->time(i);};
+
+            // methods that needs special implementation according to inside rules
+            virtual double value(size_t i) const ;
+            virtual double value_at(utctime t) const ;
+            virtual vector<double> values() const;
+
+            // methods for binding and symbolic ts
+            virtual bool needs_bind() const {
+                return ts?ts->needs_bind():false;
+            }
+            virtual void do_bind() {
+                if(ts) ts->do_bind();
+            }
+
+            x_serialize_decl();
+        };
+        
         /** The iop_t represent the basic 'binary' operation,
          *   a stateless function that takes two doubles and returns the binary operation.
          *   E.g.: a+b
@@ -1942,5 +2040,7 @@ x_serialize_export_key(shyft::time_series::dd::ats_vector);
 x_serialize_export_key(shyft::time_series::dd::abs_ts);
 x_serialize_export_key(shyft::time_series::dd::qac_ts);
 x_serialize_export_key(shyft::time_series::dd::inside_ts);
+x_serialize_export_key(shyft::time_series::dd::decode_ts);
 x_serialize_binary(shyft::time_series::dd::qac_parameter);
 x_serialize_binary(shyft::time_series::dd::inside_parameter);
+x_serialize_binary(shyft::time_series::dd::bit_decoder);

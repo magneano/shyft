@@ -697,8 +697,16 @@ namespace shyft{
 		
 		apoint_ts apoint_ts::inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const {
 			return apoint_ts(make_shared<inside_ts>(*this, inside_parameter{ min_v,max_v,nan_v,inside_v,outside_v }));
-        };
-        
+        }
+
+        apoint_ts apoint_ts::decode(int start_bit,int n_bits) const {
+            if(start_bit <0 || start_bit >51)
+                throw runtime_error("start_bit must be in range [0..51], was " + to_string(start_bit));
+            if(n_bits < 1 || start_bit + n_bits > 51)
+                throw runtime_error("n_bits must be > 0 and start_bit+n_bits <= 51: n_bits =" + to_string(n_bits) + ", start_bit="+to_string(start_bit));
+			return apoint_ts(make_shared<decode_ts>(*this, bit_decoder{(unsigned int)start_bit,(unsigned int)n_bits }));
+        }
+
 		double nash_sutcliffe(const apoint_ts& observation_ts, const apoint_ts& model_ts, const gta_t &ta) {
 			average_accessor<apoint_ts, gta_t> o(observation_ts, ta);
 			average_accessor<apoint_ts, gta_t> m(model_ts, ta);
@@ -1105,6 +1113,25 @@ namespace shyft{
 		}
 
 		vector<double> inside_ts::values() const {
+			const size_t n{ size() };
+			vector<double> r; r.reserve(n);
+			for (size_t i = 0; i < n; ++i)
+				r.emplace_back(value(i));
+			return r;
+		}
+		
+		double decode_ts::value(size_t i) const {
+            return p.decode(ts->value(i));
+		}
+
+		double decode_ts::value_at(utctime t) const {
+			size_t i = index_of(t);
+			if (i == string::npos)
+				return shyft::nan;
+			return value(i);
+		}
+
+		vector<double> decode_ts::values() const {
 			const size_t n{ size() };
 			vector<double> r; r.reserve(n);
 			for (size_t i = 0; i < n; ++i)
