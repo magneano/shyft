@@ -1506,7 +1506,7 @@ namespace shyft {
             inline double decode(double x) const {
                 if(!isfinite(x))return shyft::nan;
                 if(x<0) return shyft::nan;
-                if(x>double(1UL<<52)) return shyft::nan;
+                if(x>double(uint64_t(1)<<52)) return shyft::nan;
                 return double((uint64_t(x)>>start_bit)&bit_mask);
             }
             bool operator==(const bit_decoder&o) const {return start_bit==o.start_bit && bit_mask==o.bit_mask;}

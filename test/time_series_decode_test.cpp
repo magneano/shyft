@@ -49,7 +49,7 @@ TEST_SUITE("time_series") {
         //
         // 2. some really large numbers
         //
-        double x0=(1UL<<51);
+        double x0=(uint64_t(1)<<51);
         double x1=x0+1;
         FAST_CHECK_EQ(b.decode(x0), doctest::Approx(0.0));
         FAST_CHECK_EQ(b.decode(x1), doctest::Approx(1.0));
@@ -94,7 +94,7 @@ TEST_SUITE("time_series") {
         //
         FAST_CHECK_UNARY_FALSE(isfinite(b_0_1.decode(shyft::nan))); // nan -> nan
         FAST_CHECK_UNARY_FALSE(isfinite(b_0_1.decode(-2.3))); // neg. value -> nan
-        FAST_CHECK_UNARY_FALSE(isfinite(b_0_1.decode(double(1UL<<52) +1.0))); // not precise representative value -> nan
+        FAST_CHECK_UNARY_FALSE(isfinite(b_0_1.decode(double(uint64_t(1)<<52) +1.0))); // not precise representative value -> nan
     }
 
 }
