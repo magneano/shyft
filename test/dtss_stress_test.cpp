@@ -188,7 +188,7 @@ TEST_CASE("dtss_stress") {
     using namespace dtss_stress;
     config c;
     auto tmpdir = fs::temp_directory_path()/"shyft.stress";
-    dtss::server srv{};
+    dtss::server<dtss::standard_dtss_dispatcher> srv{};
     srv.add_container(c.container,tmpdir.string());
     srv.set_listening_ip(c.host);
     srv.set_listening_port(c.port);

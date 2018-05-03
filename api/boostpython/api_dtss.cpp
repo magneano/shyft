@@ -37,188 +37,195 @@ private:
 };
 
 namespace shyft {
-    namespace dtss {
-	using time_series::dd::gta_t;
-	using time_series::dd::apoint_ts;
-	using time_series::dd::ats_vector;
-    using std::mutex;
-    using std::unique_lock;
-        struct py_server : server {
-            boost::python::object cb;///< callback for the read function
-            boost::python::object fcb;///< callback for the find function
-            boost::python::object scb;///< callback for the store function
+namespace dtss {
+using time_series::dd::gta_t;
+using time_series::dd::apoint_ts;
+using time_series::dd::ats_vector;
 
-            py_server():server(
-                [=](id_vector_t const &ts_ids,core::utcperiod p){return this->fire_cb(ts_ids,p); },
-                [=](std::string search_expression) {return this->find_cb(search_expression); },
-                [=](const ts_vector_t& tsv) {  this->store_cb(tsv);}
-            ) {
-                if (!PyEval_ThreadsInitialized()) {
-                    PyEval_InitThreads();// ensure threads-is enabled
-                }
-            }
-            ~py_server() {
-                cb = boost::python::object();
-                fcb = boost::python::object();
-				scb = boost::python::object();
-            }
+using std::mutex;
+using std::unique_lock;
 
-            void handle_pyerror() {
-                // from SO: https://stackoverflow.com/questions/1418015/how-to-get-python-exception-text
-                using namespace boost::python;
-                using namespace boost;
-                std::string msg{"unspecified error"};
-                if(PyErr_Occurred()) {
-                    PyObject *exc,*val,*tb;
-                    object formatted_list, formatted;
-                    PyErr_Fetch(&exc,&val,&tb);
-                    handle<> hexc(exc),hval(allow_null(val)),htb(allow_null(tb));
-                    object traceback(import("traceback"));
-                    if (!tb) {
-                        object format_exception_only{ traceback.attr("format_exception_only") };
-                        formatted_list = format_exception_only(hexc,hval);
-                    } else {
-                        object format_exception{traceback.attr("format_exception")};
-                        if (format_exception) {
-                            try {
-                                formatted_list = format_exception(hexc, hval, htb);
-                            } catch (...) { // any error here, and we bail out, no crash please
-                                msg = "not able to extract exception info";
-                            }
-                        } else
-                            msg="not able to extract exception info";
-                    }
-                    if (formatted_list) {
-                        formatted = str("\n").join(formatted_list);
-                        msg = extract<std::string>(formatted);
-                    }
-                }
-                handle_exception();
-                PyErr_Clear();
-                throw std::runtime_error(msg);
-            }
+struct py_server : server<standard_dtss_dispatcher> {
+        boost::python::object cb;///< callback for the read function
+        boost::python::object fcb;///< callback for the find function
+        boost::python::object scb;///< callback for the store function
 
-            static int msg_count ;
-            ts_info_vector_t find_cb(std::string search_expression) {
-                ts_info_vector_t r;
-                if (fcb.ptr() != Py_None) {
-                    scoped_gil_aquire gil;
-                    try {
-                        r = boost::python::call<ts_info_vector_t>(fcb.ptr(), search_expression);
-                    } catch  (const boost::python::error_already_set&) {
-                        handle_pyerror();
-                    }
-                }
-                return r;
+        py_server():server(
+            [=](id_vector_t const &ts_ids,core::utcperiod p){ return this->fire_cb(ts_ids,p); },
+            [=](std::string search_expression) { return this->find_cb(search_expression); },
+            [=](const ts_vector_t& tsv) { this->store_cb(tsv); }
+        ) {
+            if (!PyEval_ThreadsInitialized()) {
+                PyEval_InitThreads();// ensure threads-is enabled
             }
-            int store_cb(const ts_vector_t&tsv) {
-                int r{ 0 };
-                if (scb.ptr() != Py_None) {
-                    scoped_gil_aquire gil;
-                    try {
-                         boost::python::call<void>(scb.ptr(), tsv);
-                    } catch  (const boost::python::error_already_set&) {
-                        handle_pyerror();
-                    }
-                }
-                return r;
-            }
-            ts_vector_t fire_cb(id_vector_t const &ts_ids,core::utcperiod p) {
-                ats_vector r;
-                if (cb.ptr()!=Py_None) {
-                    scoped_gil_aquire gil;
-                    try {
-                        r = boost::python::call<ts_vector_t>(cb.ptr(), ts_ids, p);
-                    } catch  (const boost::python::error_already_set&) {
-                        handle_pyerror();
-                    }
+        }
+        ~py_server() {
+            cb = boost::python::object();
+            fcb = boost::python::object();
+            scb = boost::python::object();
+        }
+
+        void handle_pyerror() {
+            // from SO: https://stackoverflow.com/questions/1418015/how-to-get-python-exception-text
+            using namespace boost::python;
+            using namespace boost;
+            std::string msg{"unspecified error"};
+            if(PyErr_Occurred()) {
+                PyObject *exc,*val,*tb;
+                object formatted_list, formatted;
+                PyErr_Fetch(&exc,&val,&tb);
+                handle<> hexc(exc),hval(allow_null(val)),htb(allow_null(tb));
+                object traceback(import("traceback"));
+                if (!tb) {
+                    object format_exception_only{ traceback.attr("format_exception_only") };
+                    formatted_list = format_exception_only(hexc,hval);
                 } else {
-                    // for testing, just fill in constant values.
-                    gta_t ta(p.start, core::deltahours(1), p.timespan() / core::deltahours(1));
-                    for (size_t i = 0;i < ts_ids.size();++i)
-                        r.push_back(apoint_ts(ta, double(i), time_series::ts_point_fx::POINT_AVERAGE_VALUE));
+                    object format_exception{traceback.attr("format_exception")};
+                    if (format_exception) {
+                        try {
+                            formatted_list = format_exception(hexc, hval, htb);
+                        } catch (...) { // any error here, and we bail out, no crash please
+                            msg = "not able to extract exception info";
+                        }
+                    } else
+                        msg="not able to extract exception info";
                 }
-                return r;
+                if (formatted_list) {
+                    formatted = str("\n").join(formatted_list);
+                    msg = extract<std::string>(formatted);
+                }
             }
-            void process_messages(int msec) {
-                scoped_gil_release gil;
-                if(!is_running()) start_async();
-                std::this_thread::sleep_for(std::chrono::milliseconds(msec));
-            }
-        };
-        int py_server::msg_count = 0;
-        // need to wrap core client to unlock gil during processing
-        struct py_client {
-            mutex mx; ///< to enforce just one thread active on this client object at a time
-            client impl;
-            py_client(const std::string& host_port,bool ac,int timeout_ms):impl(host_port,ac,timeout_ms) {}
-            py_client(const vector<string>&host_ports, bool ac,int timeout_ms):impl(host_ports,ac,timeout_ms) {}
-            ~py_client() {
-                //std::cout << "~py_client" << std::endl;
-            }
-            py_client(py_client const&) = delete;
-            py_client(py_client &&) = delete;
-            py_client& operator=(py_client const&o) = delete;
+            handle_exception();
+            PyErr_Clear();
+            throw std::runtime_error(msg);
+        }
 
-            void close(int timeout_ms=1000) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                impl.close(timeout_ms);
+        static int msg_count ;
+        ts_info_vector_t find_cb(std::string search_expression) {
+            ts_info_vector_t r;
+            if (fcb.ptr() != Py_None) {
+                scoped_gil_aquire gil;
+                try {
+                    r = boost::python::call<ts_info_vector_t>(fcb.ptr(), search_expression);
+                } catch  (const boost::python::error_already_set&) {
+                    handle_pyerror();
+                }
             }
-            void reopen(int timeout_ms=1000) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                impl.reopen(timeout_ms);
+            return r;
+        }
+        int store_cb(const ts_vector_t&tsv) {
+            int r{ 0 };
+            if (scb.ptr() != Py_None) {
+                scoped_gil_aquire gil;
+                try {
+                     boost::python::call<void>(scb.ptr(), tsv);
+                } catch  (const boost::python::error_already_set&) {
+                    handle_pyerror();
+                }
             }
-            ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
-                return impl.percentiles(tsv,p,ta,p_spec,use_ts_cached_read,update_ts_cache);
+            return r;
+        }
+        ts_vector_t fire_cb(id_vector_t const &ts_ids,core::utcperiod p) {
+            ats_vector r;
+            if (cb.ptr()!=Py_None) {
+                scoped_gil_aquire gil;
+                try {
+                    r = boost::python::call<ts_vector_t>(cb.ptr(), ts_ids, p);
+                } catch  (const boost::python::error_already_set&) {
+                    handle_pyerror();
+                }
+            } else {
+                // for testing, just fill in constant values.
+                gta_t ta(p.start, core::deltahours(1), p.timespan() / core::deltahours(1));
+                for (size_t i = 0;i < ts_ids.size();++i)
+                    r.push_back(apoint_ts(ta, double(i), time_series::ts_point_fx::POINT_AVERAGE_VALUE));
             }
-            ts_vector_t evaluate(const ts_vector_t& tsv, core::utcperiod p,bool use_ts_cached_read,bool update_ts_cache) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                return ts_vector_t(impl.evaluate(tsv,p,use_ts_cached_read,update_ts_cache));
-            }
-            ts_info_vector_t find(const std::string& search_expression) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                return impl.find(search_expression);
-            }
-            void store_ts(const ts_vector_t&tsv, bool overwrite_on_write, bool cache_on_write) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                impl.store_ts(tsv, overwrite_on_write, cache_on_write);
-            }
-            void merge_store_ts(const ts_vector_t&tsv, bool cache_on_write) {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                impl.merge_store_ts(tsv, cache_on_write);
-            }
+            return r;
+        }
+        void process_messages(int msec) {
+            scoped_gil_release gil;
+            if(!is_running()) start_async();
+            std::this_thread::sleep_for(std::chrono::milliseconds(msec));
+        }
+    };
+    int py_server::msg_count = 0;
+    // need to wrap core client to unlock gil during processing
+    struct py_client {
+        mutex mx; ///< to enforce just one thread active on this client object at a time
+        client impl;
+        py_client(const std::string& host_port,bool ac,int timeout_ms):impl(host_port,ac,timeout_ms) {}
+        py_client(const vector<string>&host_ports, bool ac,int timeout_ms):impl(host_ports,ac,timeout_ms) {}
+        ~py_client() {
+            //std::cout << "~py_client" << std::endl;
+        }
+        py_client(py_client const&) = delete;
+        py_client(py_client &&) = delete;
+        py_client& operator=(py_client const&o) = delete;
 
-            void cache_flush() {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                return impl.cache_flush();
-            }
+        void close(int timeout_ms=1000) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            impl.close(timeout_ms);
+        }
+        void reopen(int timeout_ms=1000) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            impl.reopen(timeout_ms);
+        }
+        ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
+            return impl.percentiles(tsv,p,ta,p_spec,use_ts_cached_read,update_ts_cache);
+        }
+        ts_vector_t evaluate(const ts_vector_t& tsv, core::utcperiod p,bool use_ts_cached_read,bool update_ts_cache) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            return ts_vector_t(impl.evaluate(tsv,p,use_ts_cached_read,update_ts_cache));
+        }
+        ts_info_vector_t find(const std::string& search_expression) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            return impl.find(search_expression);
+        }
+        void store_ts(const ts_vector_t&tsv, bool overwrite_on_write, bool cache_on_write) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            impl.store_ts(tsv, overwrite_on_write, cache_on_write);
+        }
+        void merge_store_ts(const ts_vector_t&tsv, bool cache_on_write) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            impl.merge_store_ts(tsv, cache_on_write);
+        }
+        void remove(const std::string & ts_url) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            impl.remove(ts_url);
+        }
 
-            cache_stats get_cache_stats() {
-                scoped_gil_release gil;
-                unique_lock<mutex> lck(mx);
-                return impl.get_cache_stats();
-            }
-            bool get_compress_expressions() const {return impl.compress_expressions;}
-            void set_compress_expressions(bool v) {impl.compress_expressions=v;}
-        };
-    }
+        void cache_flush() {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            return impl.cache_flush();
+        }
+
+        cache_stats get_cache_stats() {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            return impl.get_cache_stats();
+        }
+        bool get_compress_expressions() const {return impl.compress_expressions;}
+        void set_compress_expressions(bool v) {impl.compress_expressions=v;}
+    };
+}
 }
 
 
 namespace expose {
 
     using namespace boost::python;
-	namespace py = boost::python;
+    namespace py = boost::python;
     void dtss_finalize() {
 #ifdef _WIN32
         WSACleanup();
@@ -231,7 +238,7 @@ namespace expose {
         class_<TsInfo>("TsInfo",
             doc_intro("Gives some information from the backend ts data-store")
             doc_intro("about the stored time-series, that could be useful in some contexts")
-			,init<>(py::arg("self"))
+            ,init<>(py::arg("self"))
             )
             .def(init<std::string, shyft::time_series::ts_point_fx, shyft::core::utctimespan, std::string, shyft::core::utcperiod, shyft::core::utctime, shyft::core::utctime>(
                 (py::arg("self"),py::arg("name"), py::arg("point_fx"), py::arg("delta_t"), py::arg("olson_tz_id"), py::arg("data_period"), py::arg("created"), py::arg("modified")),
@@ -267,7 +274,7 @@ namespace expose {
         typedef std::vector<TsInfo> TsInfoVector;
         class_<TsInfoVector>("TsInfoVector",
             doc_intro("A vector/list of TsInfo")
-			,init<>(py::arg("self"))
+            ,init<>(py::arg("self"))
             )
             .def(vector_indexing_suite<TsInfoVector>())
             .def(init<const TsInfoVector&>( (py::arg("self"),py::arg("clone_me"))))
@@ -275,7 +282,23 @@ namespace expose {
 
     }
     static void dtss_server() {
-        typedef shyft::dtss::py_server DtsServer;
+
+        using DtsServer = shyft::dtss::py_server;
+        // using shyft::dtss::server_container_type;
+        // 
+        // enum_<server_container_type>("dtss_server_container_type",
+        //     doc_intro("Enumeration of the different containers that may be added to a DtsServer.")
+        //     doc_intro("")
+        //     doc_intro("The different containers exposed are:")
+        //     doc_intro(" * `TS_DB_CONTAINER`: this is the default database container type.")
+        //     doc_intro(" * `KRLS_PRED_CONTAINER`: This is a container training a KRLS predictor on all time-seies")
+        //     doc_intro("   stored in it, and read accesses retreive interpolated values from the KRLS predictor.")
+        //     )
+        //     .value("TS_DB_CONTAINER", server_container_type::TS_DB_CONTAINER)
+        //     .value("KRLS_PRED_CONTAINER", server_container_type::KRLS_PRED_CONTAINER)
+        //     .export_values()
+        //     ;
+
         class_<DtsServer, boost::noncopyable >("DtsServer",
             doc_intro("A distributed time-series server object")
             doc_intro("Capable of processing time-series messages and responding accordingly")
@@ -283,11 +306,18 @@ namespace expose {
             doc_intro("- that typically involve reading time-series from a service or storage for the specified period")
             doc_intro("The server object will then compute the resulting time-series vector,")
             doc_intro("and respond back to clients with the results")
-			doc_intro("multi-node considerations:")
-			doc_intro("    1. firewall/routing: ensure that the port you are using are open for ip-traffic")
-			doc_intro("    2. currently we only support heterogenous client/server types(e.g. windows-windows, linux-linux)")
+            doc_intro("multi-node considerations:")
+            doc_intro("    1. firewall/routing: ensure that the port you are using are open for ip-traffic")
+            doc_intro("    2. currently we only support heterogenous client/server types(e.g. windows-windows, linux-linux)")
             doc_see_also("shyft.api.DtsClient"),
-			init<>(args("self"))
+            init<>(args("self"))
+            )
+            .def("set_can_remove", &DtsServer::set_can_remove, py::arg("can_remove"),
+                doc_intro("Set whether the DtsServer support removing time-series")
+                doc_intro("The default setting is false, su unless this method is called with true")
+                doc_intro("as argument the server will not allow removing data using `DtsClient.remove`.")
+                doc_parameters()
+                doc_parameter("can_remove", "bool", "``true`` if the server should allow removing data. ``false`` otherwise")
             )
             .def("set_listening_port", &DtsServer::set_listening_port, args("self","port_no"),
                 doc_intro("set the listening port for the service")
@@ -311,7 +341,7 @@ namespace expose {
                 doc_see_also("get_max_connections()")
             )
             .def("get_max_connections",&DtsServer::get_max_connections, (py::arg("self")),
-				doc_intro("returns the maximum number of connections to be served concurrently"))
+                doc_intro("returns the maximum number of connections to be served concurrently"))
             .def("clear",&DtsServer::clear, (py::arg("self")),
                 doc_intro("stop serving connections, gracefully.")
                 doc_see_also("cb, process_messages(msec),start_async()")
@@ -321,8 +351,8 @@ namespace expose {
                 doc_see_also("start_async(),process_messages(msec)")
             )
             .def("get_listening_port",&DtsServer::get_listening_port, (py::arg("self")),
-				"returns the port number it's listening at for serving incoming request"
-			)
+                "returns the port number it's listening at for serving incoming request"
+            )
             .def_readwrite("cb",&DtsServer::cb,
                 doc_intro("callback for binding unresolved time-series references to concrete time-series.")
                 doc_intro("Called *if* the incoming messages contains unbound time-series.")
@@ -400,13 +430,15 @@ namespace expose {
                     "dtss-threads perform the callback ")
                 doc_see_also("cb,start_async(),is_running,clear()")
             )
-            .def("set_container",&DtsServer::add_container,(py::arg("self"),py::arg("name"),py::arg("root_dir")),
+            .def("set_container", &DtsServer::add_container, (py::arg("self"), py::arg("name"), py::arg("root_dir"),
+                                                              py::arg("container_type") = std::string{}),
                  doc_intro("set ( or replaces) an internal shyft store container to the dtss-server.")
                  doc_intro("All ts-urls with shyft://<container>/ will resolve")
                  doc_intro("to this internal time-series storage for find/read/store operations")
                  doc_parameters()
                  doc_parameter("name","str","Name of the container as pr. url definition above")
                  doc_parameter("root_dir","str","A valid directory root for the container")
+                 doc_parameter("container_type", "str", "Container type to add.")  // TODO: document properly
                  doc_notes()
                  doc_note("currently this call should only be used when the server is not processing messages\n"
                           "- before starting, or after stopping listening operations\n"
@@ -453,41 +485,41 @@ namespace expose {
                 doc_intro("time-series from cache in the least recently used order.")
             )
             ;
-
     }
+
     static void dtss_client() {
         typedef shyft::dtss::py_client  DtsClient;
-		class_<DtsClient, boost::noncopyable >("DtsClient",
-			doc_intro("The client part of the DtsServer")
-			doc_intro("Capable of processing time-series messages and responding accordingly")
-			doc_intro("The user can setup callback to python to handle unbound symbolic time-series references")
-			doc_intro("- that typically involve reading time-series from a service or storage for the specified period")
-			doc_intro("The server object will then compute the resulting time-series vector,")
-			doc_intro("and respond back to clients with the results")
-			doc_see_also("DtsServer"), no_init
-			)
-			.def(init<const std::string&,bool,int>( (py::arg("self"),py::arg("host_port"),py::arg("auto_connect")=true,py::arg("timeout_ms")=1000),
-				doc_intro("constructs a dts-client with the specifed host_port parameter")
-				doc_intro("a connection is immediately done to the server at specified port.")
-				doc_intro("If no such connection can be made, it raises a RuntimeError.")
-				doc_parameter("host_port", "string", "a string of the format 'host:portnumber', e.g. 'localhost:20000'")
+        class_<DtsClient, boost::noncopyable >("DtsClient",
+            doc_intro("The client part of the DtsServer")
+            doc_intro("Capable of processing time-series messages and responding accordingly")
+            doc_intro("The user can setup callback to python to handle unbound symbolic time-series references")
+            doc_intro("- that typically involve reading time-series from a service or storage for the specified period")
+            doc_intro("The server object will then compute the resulting time-series vector,")
+            doc_intro("and respond back to clients with the results")
+            doc_see_also("DtsServer"), no_init
+            )
+            .def(init<const std::string&,bool,int>( (py::arg("self"),py::arg("host_port"),py::arg("auto_connect")=true,py::arg("timeout_ms")=1000),
+                doc_intro("constructs a dts-client with the specifed host_port parameter")
+                doc_intro("a connection is immediately done to the server at specified port.")
+                doc_intro("If no such connection can be made, it raises a RuntimeError.")
+                doc_parameter("host_port", "string", "a string of the format 'host:portnumber', e.g. 'localhost:20000'")
                 doc_parameter("auto_connect","bool","default True, connection pr. call. if false, connection last lifetime of object unless explicitely closed/reopened")
                 doc_parameter("timeout_ms","int","defalt 1000ms, used for timeout connect/reconnect/close operations" )
-				)
-			)
+                )
+            )
             .def(init<const std::vector<std::string>&,bool,int>((py::arg("self"), py::arg("host_ports"),py::arg("auto_connect"),py::arg("timeout_ms")),
-				doc_intro("constructs a dts-client with the specifed host_ports parameters")
-				doc_intro("a connection is immediately done to the server at specified port.")
-				doc_intro("If no such connection can be made, it raises a RuntimeError.")
+                doc_intro("constructs a dts-client with the specifed host_ports parameters")
+                doc_intro("a connection is immediately done to the server at specified port.")
+                doc_intro("If no such connection can be made, it raises a RuntimeError.")
                 doc_intro("If several servers are passed, the .evaluate and .percentile function will partition the ts-vector between the")
                 doc_intro("provided servers and scale out the computation")
-				doc_parameter("host_ports", "StringVector", "a a list of string of the format 'host:portnumber', e.g. 'localhost:20000'")
+                doc_parameter("host_ports", "StringVector", "a a list of string of the format 'host:portnumber', e.g. 'localhost:20000'")
                 doc_parameter("auto_connect","bool","default True, connection pr. call. if false, connection last lifetime of object unless explicitely closed/reopened")
                 doc_parameter("timeout_ms","int","defalt 1000ms, used for timeout connect/reconnect/close operations" )
-				)
-			)
+                )
+            )
 
-			.def("close", &DtsClient::close, (py::arg("self"), py::arg("timeout_ms") = 1000),
+            .def("close", &DtsClient::close, (py::arg("self"), py::arg("timeout_ms") = 1000),
                 doc_intro("close the connection")
             )
             .def("reopen",&DtsClient::reopen,(py::arg("self"),py::arg("timeout_ms")=1000),
@@ -537,7 +569,7 @@ namespace expose {
                 doc_intro("Store the time-series in the ts-vector in the dtss backend.")
                 doc_intro("The current internal shyft-container implementation overwrite the data by default, but can")
                 doc_intro("update existing data if called with `overwrite_on_write = False`.")
-				doc_intro("The intention is that the backend should overwrite the time-period they cover with")
+                doc_intro("The intention is that the backend should overwrite the time-period they cover with")
                 doc_intro("the new time-points unless asked explisitly to update it.")
                 doc_intro("The time-series should be created like this, with url and a concrete point-ts:")
                 doc_intro("")
@@ -562,7 +594,7 @@ namespace expose {
                 doc_intro("  1. read ts.total_period() from ts point store ")
                 doc_intro("  2. run the TimeSeries.merge_points(ts) on the read-ts")
                 doc_intro("  3. write the resulting merge-result back to the ts-store")
-				doc_intro("This function is suitable for typical data-collection tasks")
+                doc_intro("This function is suitable for typical data-collection tasks")
                 doc_intro("where the points collected is from an external source, appears as batches,")
                 doc_intro("that should just be added to the existing point-set")
                 doc_parameters()
@@ -570,6 +602,13 @@ namespace expose {
                 doc_parameter("cache_on_write", "bool", "if set True, the written contents is also put into the read-cache of the dtss, defaults to False")
                 doc_returns("None","","")
                 doc_see_also("TsVector")
+            )
+            .def("remove", &DtsClient::remove, py::arg("ts_url"),
+                doc_intro("Remove a time-series from the dtss backend")
+                doc_intro("The time-series referenced by ``ts_url```is removed from the backend DtsServer.")
+                doc_intro("Note that the DtsServer may prohibit removing time-series.")
+                doc_parameters()
+                doc_parameter("ts_url", "str", "shyft url referencing a time series")
             )
             .def("cache_flush",&DtsClient::cache_flush,(py::arg("self")),
                  doc_intro("flush the cache (including statistics) on the server.")
@@ -590,7 +629,7 @@ namespace expose {
         using CacheStats = shyft::dtss::cache_stats;
         class_<CacheStats>("CacheStats",
             doc_intro("Cache statistics for the DtsServer."),
-			init<>(py::arg("self"))
+            init<>(py::arg("self"))
             )
             .def_readwrite("hits", &CacheStats::hits,
                 doc_intro("number of hits by time-series id")

@@ -95,6 +95,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <ProgramDataBaseFileName>$(IntDir)shyft_$(ProjectName).pdb</ProgramDataBaseFileName>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -107,7 +108,6 @@
   <ItemGroup>
     <ClCompile Include="core_serialization.cpp" />
     <ClCompile Include="dream_optimizer.cpp" />
-    <ClCompile Include="dtss.cpp" />
     <ClCompile Include="dtss_client.cpp" />
     <ClCompile Include="experimental.cpp" />
     <ClCompile Include="expression_serialization.cpp" />
@@ -125,6 +125,7 @@
     <ClInclude Include="dtss_cache.h" />
     <ClInclude Include="dtss_client.h" />
     <ClInclude Include="dtss_db.h" />
+    <ClInclude Include="dtss_krls.h" />
     <ClInclude Include="dtss_msg.h" />
     <ClInclude Include="dtss_mutex.h" />
     <ClInclude Include="dtss_url.h" />

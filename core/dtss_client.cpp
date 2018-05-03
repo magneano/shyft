@@ -333,6 +333,24 @@ client::find(const std::string& search_expression) {
 }
 
 void
+client::remove(const string & ts_url) {
+    scoped_connect ac(*this);
+    auto& io = *(srv_con[0].io);
+    msg::write_type(message_type::REMOVE_TS, io);
+    {
+        msg::write_string(ts_url, io);
+    }
+    auto response_type = msg::read_type(io);
+    if (response_type == message_type::SERVER_EXCEPTION) {
+        auto re = msg::read_exception(io);
+        throw re;
+    } else if (response_type == message_type::REMOVE_TS) {
+        return;
+    }
+    throw std::runtime_error(std::string("Got unexpected response:") + std::to_string((int)response_type));
+}
+
+void
 client::cache_flush() {
     scoped_connect ac(*this);
     for(auto& sc:srv_con) {
