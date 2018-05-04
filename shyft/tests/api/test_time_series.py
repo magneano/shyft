@@ -1281,6 +1281,20 @@ class TimeSeries(unittest.TestCase):
         except RuntimeError as re:
             pass
 
+    def test_time_series_constructor_resolution_order(self):
+        ta = api.TimeAxis(0, 60, 60)
+
+        # time-series can be constructed with a fill value
+        ts_fill = api.TimeSeries(ta, 15., api.POINT_AVERAGE_VALUE)
+
+        # time-series can be constructed with a double vector
+        double_vec = api.DoubleVector([0.]*len(ta))
+        ts_dvec = api.TimeSeries(ta, double_vec, api.POINT_AVERAGE_VALUE)
+
+        # time-series can be constructed with a python list with numbers
+        number_list =[0.]*len(ta)
+        ts_dvec = api.TimeSeries(ta, number_list, api.POINT_AVERAGE_VALUE)
+
 
 if __name__ == "__main__":
     unittest.main()

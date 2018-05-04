@@ -502,25 +502,31 @@ namespace expose {
 			    init<>( (py::arg("self")), doc_intro("constructs and empty time-series"))
             )
 
-			.def(init<const time_axis::generic_dt&, double, time_series::ts_point_fx >(
-				(py::arg("self"),py::arg("ta"), py::arg("fill_value"), py::arg("point_fx")),
-				doc_intro("construct a time-series with time-axis ta, specified fill-value, and point interpretation policy point_fx")
-				)
-			)
 			.def(init<const time_axis::generic_dt&, const std::vector<double>&, time_series::ts_point_fx >(
 				(py::arg("self"),py::arg("ta"), py::arg("values"), py::arg("point_fx")),
 				doc_intro("construct a timeseries time-axis ta, corresponding values and point interpretation policy point_fx")
 				)
 			)
+			.def(init<const time_axis::generic_dt&, double, time_series::ts_point_fx >(
+				(py::arg("self"),py::arg("ta"), py::arg("fill_value"), py::arg("point_fx")),
+				doc_intro("construct a time-series with time-axis ta, specified fill-value, and point interpretation policy point_fx")
+				)
+			)
 
+			.def(init<const time_axis::fixed_dt&, const std::vector<double>&, time_series::ts_point_fx >(
+				(py::arg("self"),py::arg("ta"),py::arg("values"), py::arg("point_fx")),
+				doc_intro("construct a timeseries timeaxis ta with corresponding values, and point interpretation policy point_fx")
+				)
+			)
 			.def(init<const time_axis::fixed_dt&, double, time_series::ts_point_fx >(
 				(py::arg("self"),py::arg("ta"),py::arg("fill_value"),py::arg("point_fx")),
 				doc_intro("construct a timeseries with fixed-delta-t time-axis ta, specified fill-value, and point interpretation policy point_fx")
 				)
 			)
-			.def(init<const time_axis::fixed_dt&, const std::vector<double>&, time_series::ts_point_fx >(
-				(py::arg("self"),py::arg("ta"),py::arg("values"), py::arg("point_fx")),
-				doc_intro("construct a timeseries timeaxis ta with corresponding values, and point interpretation policy point_fx")
+
+			.def(init<const time_axis::point_dt&, const std::vector<double>&, time_series::ts_point_fx >(
+				(py::arg("self"),py::arg("ta"), py::arg("values"), py::arg("point_fx")),
+				doc_intro("construct a time-series with a point-type time-axis ta, corresponding values, and point-interpretation point_fx")
 				)
 			)
 			.def(init<const time_axis::point_dt&, double, time_series::ts_point_fx>(
@@ -528,11 +534,7 @@ namespace expose {
 				doc_intro("construct a time-series with a point-type time-axis ta, specified fill-value, and point-interpretation point_fx")
 				)
 			)
-			.def(init<const time_axis::point_dt&, const std::vector<double>&, time_series::ts_point_fx >(
-				(py::arg("self"),py::arg("ta"), py::arg("values"), py::arg("point_fx")),
-				doc_intro("construct a time-series with a point-type time-axis ta, corresponding values, and point-interpretation point_fx")
-				)
-			)
+
             .def(init<const rts_t &>(
 				(py::arg("self"),py::arg("core_result_ts")),
 				doc_intro("construct a time-series from a shyft core time-series, to ease working with core-time-series in user-interface/scripting")
