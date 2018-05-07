@@ -662,7 +662,7 @@ public:
 
             } else if (  // overlapping before
                 period.start < trained_period.start  // start before
-                && trained_period.start < period.end && period.end < trained_period.end  // end inside
+                && trained_period.start < period.end && period.end <= trained_period.end  // end inside
             ) {
 
                 this->train_on_period(predictor, core::utcperiod{ period.start, trained_period.start }, source_url);
@@ -670,13 +670,13 @@ public:
 
             } else if (  // overlapping after
                 trained_period.end < period.end  // end after
-                && trained_period.start < period.start && period.start < trained_period.end  // start inside
+                && trained_period.start <= period.start && period.start < trained_period.end  // start inside
             ) {
 
-                this->train_on_period(predictor, core::utcperiod{ trained_period.start, period.start }, source_url);
+                this->train_on_period(predictor, core::utcperiod{ trained_period.end, period.end }, source_url);
                 header.t_end = period.end;
 
-            } else if ( trained_period.start < period.start && period.end < trained_period.end ) {  // overlapping inside
+            } else if ( trained_period.start <= period.start && period.end <= trained_period.end ) {  // overlapping inside
                 /*
                  * TODO possibly in a future version only train on values where we previously trained on a NaN
                  */
