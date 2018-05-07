@@ -83,9 +83,6 @@
 		<Unit filename="dream_optimizer.h">
 			<Option virtualFolder="optimizers/" />
 		</Unit>
-		<Unit filename="dtss.cpp">
-			<Option virtualFolder="dtss/" />
-		</Unit>
 		<Unit filename="dtss.h">
 			<Option virtualFolder="dtss/" />
 		</Unit>
