@@ -74,12 +74,12 @@ git clone https://github.com/statkraft/shyft-doc.git
 
 For compiling and running Shyft, you will need:
 
-* A C++1y compiler (gcc-5 or higher)
+* A C++1y compiler (gcc-7 or higher)
 * The BLAS and LAPACK libraries (development packages)
-* A Python3 (3.4 or higher) interpreter
+* A Python3 (3.6 or higher) interpreter
 * The NumPy package (>= 1.8.0)
 * The netCDF4 package (>= 1.2.1)
-* The CMake building tool (2.8.7 or higher)
+* The CMake building tool (3.9 or higher)
 
 In addition, a series of Python packages are needed mainly for running the tests. These can be easily installed via:
 
@@ -137,12 +137,12 @@ python -c "from shyft import api"
 ```
 
 If this raises:
-`ImportError: libboost_python3.so.1.61.0: cannot open shared object file: No such file or directory`
+`ImportError: libboost_python3.so.1.66.0: cannot open shared object file: No such file or directory`
 
 Then you don't have your `LD_LIBRARY_PATH` set correctly. This should point to:
 
 ```bash
-export LD_LIBRARY_PATH=$SHYFT_DEPENDENCIES_DIR/local/lib
+export LD_LIBRARY_PATH=$SHYFT_DEPENDENCIES_DIR/lib
 ```
 
 To run further tests, see the TESTING section below. 
