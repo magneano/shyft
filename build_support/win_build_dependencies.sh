@@ -5,7 +5,7 @@ export SHYFT_DEPENDENCIES_DIR=${WORKSPACE}/shyft_dependencies
 armadillo_name=armadillo-8.400.0
 dlib_name=dlib-19.10
 boost_ver=1_66_0
-numpy_ver=1.13
+numpy_ver=1.14
 cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
 echo ---------------
 echo Windows Update/build shyft-dependencies

@@ -300,15 +300,15 @@ class RegionModel(unittest.TestCase):
         q_1 = model.cells[0].state.kirchner.q
         self.assertAlmostEqual(q_0*2.0, q_1)
         model.revert_to_initial_state()  # ensure we have a known state
-        model.run_cells(0, 10, 1)  # just run step 10
-        q_avg = model.statistics.discharge_value(cids, 10)  # get out the discharge for step 10
+        model.run_cells(0, 10, 2)  # just run step 10 and 11
+        q_avg = (model.statistics.discharge_value(cids, 10) + model.statistics.discharge_value(cids, 11))/2.0  # get out the discharge for step 10 and 11
         x = 0.7  # we want x*q_avg as target
         model.revert_to_initial_state()  # important, need start state for the test here
         adjust_result = model.adjust_state_to_target_flow(x*q_avg, cids, start_step=10, scale_range=3.0, scale_eps=1e-3,
-                                                          max_iter=350)  # This is how to adjust state to observed average flow for cids for tstep 10
+                                                          max_iter=350, n_steps=2)  # This is how to adjust state to observed average flow for cids for tstep 10
         self.assertEqual(len(adjust_result.diagnostics), 0)  # diag should be len(0) if ok.
-        self.assertAlmostEqual(adjust_result.q_r, q_avg*x, 3)  # verify we reached target
-        self.assertAlmostEqual(adjust_result.q_0, q_avg, 3)  # .q_0,
+        self.assertAlmostEqual(adjust_result.q_r, q_avg*x, 2)  # verify we reached target
+        self.assertAlmostEqual(adjust_result.q_0, q_avg, 2)  # .q_0,
 
     def test_optimization_model(self):
         num_cells = 20

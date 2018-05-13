@@ -627,9 +627,9 @@ namespace shyft {
 			 * \param start_step, specifies the time_axis start-step/period to use during adjustment
 			 * \return obtained flow in m3/s units. This can deviate from wanted flow due to model and state constraints
 			 */
-			q_adjust_result adjust_state_to_target_flow(double wanted_flow_m3s,const std::vector<int>& cids,size_t start_step=0,double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300) {
+			q_adjust_result adjust_state_to_target_flow(double wanted_flow_m3s,const std::vector<int>& cids,size_t start_step=0,double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300,size_t n_steps=1) {
 			    auto old_catchment_filter=catchment_filter;
-                adjust_state_model<region_model> a(*this,cids, start_step);
+                adjust_state_model<region_model> a(*this,cids, start_step,n_steps);
                 q_adjust_result r;
                 try {
                     r=a.tune_flow(wanted_flow_m3s,scale_range,scale_eps,max_iter);

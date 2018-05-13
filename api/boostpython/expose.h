@@ -358,13 +358,13 @@ namespace expose {
         )
 
         .def("adjust_state_to_target_flow",&M::adjust_state_to_target_flow,(py::arg("self"),py::arg("wanted_flow_m3s"),py::arg("cids"),py::arg("start_step")=0,
-            py::arg("scale_range")=3.0,py::arg("scale_eps")=1.0e-3,py::arg("max_iter")=300
+            py::arg("scale_range")=10.0,py::arg("scale_eps")=1.0e-3,py::arg("max_iter")=300,py::arg("n_steps")=1
         ),
              doc_intro("state adjustment to achieve wanted/observed flow")
 			 doc_intro("")
 			 doc_intro("This function provides an easy and consistent way to adjust the")
 			 doc_intro("state of the cells(kirchner, or hbv-tank-levels) so that the average output")
-			 doc_intro("from next time-step matches the wanted flow.")
+			 doc_intro("from next n_steps time-steps matches the wanted flow for the same period.")
 			 doc_intro("")
 			 doc_intro("This is quite complex, since the amount of adjustment needed is dependent of the")
 			 doc_intro("cell-state, temperature/precipitation in time-step, glacier-melt, length of the time-step,")
@@ -389,9 +389,10 @@ namespace expose {
 			 doc_parameter("wanted_flow_m3s","float","the average flow first time-step we want to achieve")
 			 doc_parameter("cids","IntVector"," catchments, represented by catchment-ids that should be adjusted")
              doc_parameter("start_step","int","what time-step number in the time-axis to use, default 0")
-             doc_parameter("scale_range","float","optimizer boundaries is s_0/scale_range .. s_0*scale_range, s_0=wanted_flow_m3s/q_0 , default =3.0")
+             doc_parameter("scale_range","float","optimizer boundaries is s_0/scale_range .. s_0*scale_range, s_0=wanted_flow_m3s/q_0 , default =10.0")
              doc_parameter("scale_eps","float","optimizer eps, stop criteria (ref. dlib), eps=s_0*scale_eps , default =1-e3")
              doc_parameter("max_iter","int","optimizer max evaluations before giving up to find optimal solution")
+             doc_parameter("n_steps","int","number of time-steps in the time-axis to average the to the wanted_flow_m3s, default=1")
 			 doc_returns("obtained flow in m3/s units.","FlowAdjustResult","note: this can deviate from wanted flow due to model and state constraints")
         )
         .def("get_cells",&M::get_cells, (py::arg("self")),"cells as shared_ptr<vector<cell_t>>")
