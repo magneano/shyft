@@ -81,8 +81,8 @@ class WRFDataRepositoryTestCase(unittest.TestCase):
                 m = (x == x_ts) & (y == y_ts)
                 idxs = np.where(m > 0)
                 x_idx, y_idx = idxs[0][0], idxs[1][0]  # assumung geo-location is unique in dataset
-                self.assertTrue(all(ts_values == wrf_d[:n_hours + 1, x_idx, y_idx]),
-                                "wrf and shyft-TS of {} are not the same.".format(name))
+                self.assertTrue(np.allclose(ts_values, wrf_d[:n_hours + 1, x_idx, y_idx],rtol=1e-4,atol=1e-4),
+                                f"wrf and shyft-TS of {name} are not the same.")
                 # if i ==0:
                 #    plt.figure()
                 #    plt.plot(ts_values)
