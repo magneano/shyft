@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
-
 import os
 from os import path
 
@@ -24,13 +21,11 @@ shyftdata_dir = path.normpath(shyftdata_dir)
 def print_versions():
     """Print all the versions for packages that Shyft relies on."""
     import numpy
-    import netCDF4
     import sys
 
     print("-=" * 38)
     print("Shyft version:     %s" % __version__)
     print("NumPy version:     %s" % numpy.__version__)
-    print("netCDF4 version:   %s" % netCDF4.__version__)
     print("Python version:    %s" % sys.version)
     if os.name == "posix":
         (sysname, nodename, release, version_, machine) = os.uname()

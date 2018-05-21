@@ -18,9 +18,9 @@ HbvModel.hbv_actual_evaptranspiration_response=property(lambda self: HbvCellHbvA
 HbvModel.soil_state = property(lambda self: HbvCellSoilStateStatistics(self.get_cells()))
 HbvModel.tank_state = property(lambda self: HbvCellTankStateStatistics(self.get_cells()))
 HbvModel.create_opt_model_clone = lambda self: create_opt_model_clone(self)
-HbvModel.create_opt_model_clone.__doc__ = create_opt_model_clone.__doc__
+#HbvModel.create_opt_model_clone.__doc__ = create_opt_model_clone.__doc__
 HbvOptModel.create_full_model_clone = lambda self: create_full_model_clone(self)
-HbvOptModel.create_full_model_clone.__doc__ = create_full_model_clone.__doc__
+#HbvOptModel.create_full_model_clone.__doc__ = create_full_model_clone.__doc__
 
 HbvOptModel.cell_t = HbvCellOpt
 HbvOptModel.parameter_t = HbvParameter
@@ -50,7 +50,7 @@ def __deserialize_from_str(s:str)->HbvStateWithIdVector:
 
 HbvStateWithIdVector.serialize_to_bytes = lambda self: serialize_to_bytes(self)
 HbvStateWithIdVector.serialize_to_str = lambda self: __serialize_to_str(self)
-HbvStateWithIdVector.state_vector = property(lambda self: extract_state_vector(self),doc=extract_state_vector.__doc__)
+HbvStateWithIdVector.state_vector = property(lambda self: extract_state_vector(self),doc="extract_state_vector.__doc__")
 HbvStateWithIdVector.deserialize_from_str = __deserialize_from_str
 HbvStateWithId.vector_t = HbvStateWithIdVector
 

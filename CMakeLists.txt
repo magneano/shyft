@@ -68,7 +68,7 @@ get_filename_component(arma_libs  ${ARMADILLO_LIBRARIES} REALPATH CACHE)
 # with:
 set(boost_system_lib ${SHYFT_DEPENDENCIES}/lib/libboost_system.so)
 set(boost_filesystem_lib ${SHYFT_DEPENDENCIES}/lib/libboost_filesystem.so)
-set(boost_python3_lib ${SHYFT_DEPENDENCIES}/lib/libboost_python3.so)
+set(boost_python3_lib ${SHYFT_DEPENDENCIES}/lib/libboost_python36.so)
 set(boost_serialization_lib ${SHYFT_DEPENDENCIES}/lib/libboost_serialization.so)
 set(boost_link_libraries ${boost_system_lib} ${boost_filesystem_lib} ${boost_serialization_lib})
 set(boost_py_link_libraries ${boost_link_libraries} ${boost_python3_lib})

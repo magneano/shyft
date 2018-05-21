@@ -5,7 +5,7 @@ import unittest
 from contextlib import closing
 
 import numpy as np
-from time import clock as time_now
+from time import sleep
 from numpy.testing import assert_array_almost_equal
 
 from shyft.api import Calendar
@@ -545,3 +545,44 @@ class DtssTestCase(unittest.TestCase):
 
             # now it should work
             client.remove("shyft://test/foo")
+
+    def test_failures(self):
+        """
+        Verify that dtss client server connections are auto-magically
+        restored and fixed
+        """
+        with tempfile.TemporaryDirectory() as c_dir:
+
+            # start the server
+            dtss = DtsServer()
+            port_no = find_free_port()
+            host_port = 'localhost:{0}'.format(port_no)
+            dtss.set_listening_port(port_no)
+            dtss.set_container("test", c_dir)  # notice we set container 'test' to point to c_dir directory
+            dtss.start_async()  # the internal shyft time-series will be stored to that container
+
+            # setup some data
+            utc = Calendar()
+            d = deltahours(1)
+            n = 365*24//3
+            t = utc.time(2016, 1, 1)
+            ta = TimeAxis(t, d, n)
+            tsv = TsVector()
+            pts = TimeSeries(ta, np.linspace(start=0, stop=1.0, num=ta.size()), point_fx.POINT_AVERAGE_VALUE)
+            tsv.append(TimeSeries("cache://test/foo", pts))
+
+            # get a client
+            client = DtsClient(host_port, auto_connect=False)
+            client.store_ts(tsv)
+            client.close()
+            client.store_ts(tsv)  # should just work, it re-open automagically
+            dtss.clear()  # the server is out and away, no chance this would work
+            try:
+                client.store_ts(tsv)
+                self.assertTrue(False, 'This should throw, because there is no dtss server to help you')
+            except Exception as ee:
+                self.assertFalse(False, f'expected {ee} here')
+
+            dtss.set_listening_port(port_no)
+            dtss.start_async()
+            client.store_ts(tsv)  # this should just work, automagically reconnect

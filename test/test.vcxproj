@@ -42,14 +42,14 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-1_66;</IncludePath>
+    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-$(SHYFT_BOOST_VERSION);</IncludePath>
     <LibraryPath>$(LibraryPath);$(SHYFT_DEPENDENCIES)\lib;</LibraryPath>
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-1_66;</IncludePath>
+    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-$(SHYFT_BOOST_VERSION);</IncludePath>
     <LibraryPath>$(LibraryPath);$(SHYFT_DEPENDENCIES)\lib;</LibraryPath>
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
@@ -74,7 +74,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>dlib19.10.0_debug_64bit_msvc1913.lib;blas_win64_MT.lib;lapack_win64_MT.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dlib$(SHYFT_DLIB_VERSION).0_$(Configuration)_64bit_msvc$(SHYFT_DLIB_MSC_VERSION).lib;blas_win64_MT.lib;lapack_win64_MT.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <StackReserveSize>10000000</StackReserveSize>
       <StackCommitSize>4096</StackCommitSize>
@@ -112,7 +112,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>dlib19.10.0_release_64bit_msvc1913.lib;blas_win64_MT.lib;lapack_win64_MT.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dlib$(SHYFT_DLIB_VERSION).0_$(Configuration)_64bit_msvc$(SHYFT_DLIB_MSC_VERSION).lib;blas_win64_MT.lib;lapack_win64_MT.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>

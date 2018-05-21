@@ -378,10 +378,10 @@ def ts_vector_values_at_time(tsv:TsVector, t:int):
             tsv.append(ts)
     return tsv.values_at(t).to_numpy()
 
-ts_vector_values_at_time.__doc__ = TsVector.values_at.__doc__.replace('DoubleVector','ndarray').replace('TsVector','TsVector or list(TimeSeries)')
+#ts_vector_values_at_time.__doc__ = TsVector.values_at.__doc__.replace('DoubleVector','ndarray').replace('TsVector','TsVector or list(TimeSeries)')
 
 TsVector.values_at_time = ts_vector_values_at_time
-TsVector.values_at_time.__doc__ = TsVector.values_at.__doc__.replace('DoubleVector','ndarray')
+#TsVector.values_at_time.__doc__ = TsVector.values_at.__doc__.replace('DoubleVector','ndarray')
 
 
 
@@ -391,7 +391,7 @@ def geo_point_source_vector_values_at_time(gtsv:GeoPointSourceVector, t:int):
     return compute_geo_ts_values_at_time(gtsv, t).to_numpy()
 
 GeoPointSourceVector.values_at_time = geo_point_source_vector_values_at_time
-GeoPointSourceVector.values_at_time.__doc__ = compute_geo_ts_values_at_time.__doc__.replace('DoubleVector','ndarray')
+#GeoPointSourceVector.values_at_time.__doc__ = compute_geo_ts_values_at_time.__doc__.replace('DoubleVector','ndarray')
 RadiationSourceVector.values_at_time = GeoPointSourceVector.values_at_time
 PrecipitationSourceVector.values_at_time = GeoPointSourceVector.values_at_time
 TemperatureSourceVector.values_at_time = GeoPointSourceVector.values_at_time

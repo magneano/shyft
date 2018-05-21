@@ -100,7 +100,6 @@ struct py_server : server<standard_dtss_dispatcher> {
             throw std::runtime_error(msg);
         }
 
-        static int msg_count ;
         ts_info_vector_t find_cb(std::string search_expression) {
             ts_info_vector_t r;
             if (fcb.ptr() != Py_None) {
@@ -148,7 +147,7 @@ struct py_server : server<standard_dtss_dispatcher> {
             std::this_thread::sleep_for(std::chrono::milliseconds(msec));
         }
     };
-    int py_server::msg_count = 0;
+    
     // need to wrap core client to unlock gil during processing
     struct py_client {
         mutex mx; ///< to enforce just one thread active on this client object at a time
@@ -483,6 +482,11 @@ namespace expose {
                 doc_intro("kept in memory. Elements exceeding this capacity is elided using the least-recently-used")
                 doc_intro("algorithm. Notice that assigning a lower value than the existing value will also flush out")
                 doc_intro("time-series from cache in the least recently used order.")
+            )
+            .add_property("graceful_close_timeout_ms",&DtsServer::get_graceful_close_timeout,&DtsServer::set_graceful_close_timeout,
+                doc_intro("how long to let a connection linger after message is processed to allow for")
+                doc_intro("flushing out reply to client.")
+                doc_intro("Ref to dlib.net dlib.net/dlib/server/server_kernel_abstract.h.html ")
             )
             ;
     }

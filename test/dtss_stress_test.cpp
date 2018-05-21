@@ -192,6 +192,7 @@ TEST_CASE("dtss_stress") {
     srv.add_container(c.container,tmpdir.string());
     srv.set_listening_ip(c.host);
     srv.set_listening_port(c.port);
+    srv.set_graceful_close_timeout(10);//just 10 ms ?
     srv.start_async();
     bool rr=srv.is_running();
     FAST_REQUIRE_EQ(rr,true);
@@ -209,4 +210,63 @@ TEST_CASE("dtss_stress") {
     srv.clear();
     FAST_CHECK_GT(x.size(),0);
 }
+#define DTSS_MANUAL_SPLIT_TEST 0
+#if DTSS_MANUAL_SPLIT_TEST
+TEST_CASE("dtss_connection_stress_server") {
+	using namespace dtss_stress;
+	config c; c.port = 20004;
+	auto tmpdir = fs::temp_directory_path() / "shyft.stress";
+	dtss::server<dtss::standard_dtss_dispatcher> srv{};
+	srv.add_container(c.container, tmpdir.string());
+	srv.set_listening_ip(c.host);
+	srv.set_listening_port(c.port);
+	srv.start_async();
+	bool rr = srv.is_running();
+	FAST_REQUIRE_EQ(rr, true);
+	std::cout << "Press enter to quit" << endl;
+	string xx;
+	std::cin >> xx;
+	srv.clear();
+}
+#endif
+TEST_CASE("dtss_connection_stress") {
+    using namespace dtss_stress;
+    config c;c.port=20004;
+#if !DTSS_MANUAL_SPLIT_TEST
+    auto tmpdir = fs::temp_directory_path()/"shyft.stress";
+    dtss::server<dtss::standard_dtss_dispatcher> srv{};
+    srv.add_container(c.container,tmpdir.string());
+    srv.set_listening_ip(c.host);
+    srv.set_listening_port(c.port);
+    srv.start_async();
+    bool rr=srv.is_running();
+    FAST_REQUIRE_EQ(rr,true);
+#endif
+#ifdef _WIN32
+    const int n_connects=300;
+#else
+    const int n_connects=100;
+#endif
+    dtss::client client{server_addr(c.host,c.port),true,1000};// just one client...
+    dtss::cache_stats cs;
+    for(size_t i=0;i<n_connects;++i) { // this will exhaust local ports due to linger/TIME_WAIT sockets, and fail the test unless we use smart connect/reuse
+		cs = client.get_cache_stats();
+    }
+    srv.clear();
+    srv.set_listening_ip(c.host);
+    srv.set_listening_port(c.port);
+    srv.start_async();
+    bool ok=true;
+    try {
+        cs=client.get_cache_stats(); // should work! with retry
+    } catch(const runtime_error &re) {
+        ok=false;
+    }
+    FAST_CHECK_EQ(ok,true);
+#if !DTSS_MANUAL_SPLIT_TEST
+    cs =srv.get_cache_stats();
+    srv.clear();
+#endif
+}
+
 }

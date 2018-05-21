@@ -50,7 +50,8 @@ using id_vector_t = vector<string>;
 struct srv_connection {
     unique_ptr<dlib::iosockstream> io;
     string host_port;
-    int timeout_ms;
+    int timeout_ms{1000};
+    bool is_open{false};
     void open(int timeout_ms=1000);
     void close(int timeout_ms=1000);
     void reopen(int timeout_ms=1000);
