@@ -4,13 +4,11 @@
 import os
 import yaml
 from datetime import datetime
-#import copy
 
 from shyft import api
 from shyft.repository.interpolation_parameter_repository import (
     InterpolationParameterRepository)
 from shyft.repository import geo_ts_repository_collection
-from .yaml_constructors import (region_model_repo_constructor, geo_ts_repo_constructor, target_repo_constructor)
 from . import config_interfaces
 
 def utctime_from_datetime(dt):
@@ -148,15 +146,16 @@ class YAMLSimConfig(object):
             if epsg is not None:
                 source['params'].update({'epsg': epsg})
             # geo_ts_repos.append(geo_ts_repo_constructor(source['repository'], source['params'], self.region_config))
-            geo_ts_repos.append(geo_ts_repo_constructor(source['repository'], source['params']))
+            geo_ts_repos.append(source['repository'](**source['params']))
             src_types_to_extract.append(source['types'])
         return geo_ts_repository_collection.GeoTsRepositoryCollection(geo_ts_repos,
                                                                       src_types_per_repo=src_types_to_extract)
 
     @staticmethod
     def construct_region_model_repo(region_config, model_config, region_model_id):
-        return region_model_repo_constructor(region_config.repository()['class'],
-            region_config, model_config, region_model_id)
+        # return region_model_repo_constructor(region_config.repository()['class'],
+        #     region_config, model_config, region_model_id)
+        return region_config.repository()['class'](region_config, model_config)
 
     @staticmethod
     def construct_interp_repo(interp_config):
@@ -189,7 +188,7 @@ class YAMLSimConfig(object):
     def get_destination_repo(self):
         if not hasattr(self.datasets_config, 'destinations'):
             return []
-        dst_repo = [{'repository': target_repo_constructor(repo['repository'], repo['params']), '1D_timeseries': [dst for dst in repo['1D_timeseries']]} for repo in self.datasets_config.destinations]
+        dst_repo = [{'repository': repo['repository'](**repo['params']), '1D_timeseries': [dst for dst in repo['1D_timeseries']]} for repo in self.datasets_config.destinations]
         [dst.update({'time_axis': self.time_axis}) if dst['time_axis'] is None
          else dst.update({'time_axis': api.TimeAxisFixedDeltaT(utctime_from_datetime(dst['time_axis']['start_datetime']),
                                                     dst['time_axis']['time_step_length'],
@@ -199,7 +198,7 @@ class YAMLSimConfig(object):
     def get_reference_repo(self):
         if not hasattr(self, 'references'):
             return []
-        return [{'repository': target_repo_constructor(repo['repository'], repo['params']), '1D_timeseries': [ref for ref in repo['1D_timeseries']]} for repo in self.references]
+        return [{'repository': repo['repository'](**repo['params']), '1D_timeseries': [ref for ref in repo['1D_timeseries']]} for repo in self.references]
 
     def get_initial_state_repo(self):
         if hasattr(self, 'initial_state'):
@@ -263,7 +262,7 @@ class YAMLCalibConfig(object):
         assert hasattr(self, "target")
 
     def get_target_repo(self):
-        target_repo = [{'repository': target_repo_constructor(repo['repository'], repo['params']), '1D_timeseries': [target_ts for target_ts in repo['1D_timeseries']]} for repo in self.target]
+        target_repo = [{'repository': repo['repository'](**repo['params']), '1D_timeseries': [target_ts for target_ts in repo['1D_timeseries']]} for repo in self.target]
         [target_ts.update({'start_datetime': utctime_from_datetime(target_ts['start_datetime'])}) for repo in target_repo for target_ts in repo['1D_timeseries']]
         return target_repo
 

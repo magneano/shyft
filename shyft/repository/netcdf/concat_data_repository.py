@@ -7,7 +7,7 @@ from shyft import api
 from shyft import shyftdata_dir
 from .. import interfaces
 from .time_conversion import convert_netcdf_time
-from .utils  import calc_P, calc_RH, _limit_1D, _numpy_to_geo_ts_vec
+from .utils  import calc_P, calc_RH, _limit_1D, _numpy_to_geo_ts_vec, _clip_ensemble_of_geo_timeseries, series_type
 import warnings
 from shyft.repository.interfaces import ForecastSelectionCriteria
 
@@ -51,8 +51,8 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
 
     _G = 9.80665  # WMO-defined gravity constant to calculate the height in metres from geopotential
 
-    def __init__(self, epsg, filename, nb_pads=0, nb_lead_intervals_to_drop=0, nb_lead_intervals=None, fc_periodicity=1,
-                 ensemble_member=0, padding=5000., use_filled_values=False):
+    def __init__(self, epsg, filename, nb_lead_intervals_to_drop=0, nb_lead_intervals=None, fc_periodicity=1,
+                 fc_delay=0, ensemble_member=0, padding=5000., use_filled_values=False):
         """
         Construct the netCDF4 dataset reader for concatenated gridded forecasts and initialize data retrieval.
 
@@ -62,14 +62,14 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
             Unique coordinate system id for result coordinates. Currently "32632" and "32633" are supported.
         filename: string
             Path to netcdf file containing concatenated forecasts
-        nb_pads: int, optional
-            Extend forecast horizon with nb_pads lead times by replicating last values
         nb_lead_intervals_to_drop: int, optional
             Index of first lead time to read
         nb_lead_intervals: int, optional
             Number of lead time intervals to read
         fc_periodicity: int, optional
             Periodicity of forecast to read (i.e. if fc_periodicity=2 only reads values from every second forecast)
+        fc_delay: int, optional
+            Delay in seconds between start of forecast and time of availability in database
         ensemble_member: int, optional
             Ensemble member returned by get_timeseries, get_forecast and get_forecast_collection if dataset is of
             ensemble type (has dimension 'ensemble_member'). Must be non-negative integer less than dimension size of
@@ -87,10 +87,10 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         if not path.isfile(filename):
             raise ConcatDataRepositoryError("No such file '{}'".format(filename))
         self._filename = filename
-        self.nb_pads = nb_pads
         self.nb_lead_intervals_to_drop = nb_lead_intervals_to_drop  # index of first lead time: starts from 0
         self.nb_lead_intervals = nb_lead_intervals
         self.fc_periodicity = fc_periodicity
+        self.fc_delay = fc_delay
         if ensemble_member is None:
             self.ensemble_member = 0
         else:
@@ -131,20 +131,6 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         # Fields that need an additional lead_time to de-accumulate
         self._shift_fields = ("precipitation_amount_acc",
                               "integral_of_surface_downwelling_shortwave_flux_in_air_wrt_time")
-
-        # geo-ts creation method
-        self.create_geo_ts_type_map = {"relative_humidity": api.create_rel_hum_source_vector_from_np_array,
-                                      "temperature": api.create_temperature_source_vector_from_np_array,
-                                      "precipitation": api.create_precipitation_source_vector_from_np_array,
-                                      "radiation": api.create_radiation_source_vector_from_np_array,
-                                      "wind_speed": api.create_wind_speed_source_vector_from_np_array}
-
-        # ts point interpretation policy
-        self.series_type = {"relative_humidity": api.POINT_INSTANT_VALUE,
-                            "temperature": api.POINT_INSTANT_VALUE,
-                            "precipitation": api.POINT_AVERAGE_VALUE,
-                            "radiation": api.POINT_AVERAGE_VALUE,
-                            "wind_speed": api.POINT_INSTANT_VALUE}
 
     def _get_time_structure_from_dataset(self, dataset):
         """
@@ -226,13 +212,12 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                                                                   geo_location_criteria,
                                                                   nb_lead_intervals=self.fc_len_to_concat, concat=True)
             # check if extra_intervals are required
-            ta = list(extracted_data.values())[0][1] # time axis of first item
-            ta_end = ta.total_period().end
-            if ta_end <= utc_period.end: # try to extend extracted data with remainder of last forecast
-                if ta_end == utc_period.end:
-                    sec_to_extend = 1 # enough with one ekstra second if equality
-                else:
-                    sec_to_extend = utc_period.end - ta_end
+            type_map = {k: series_type[k] == api.POINT_INSTANT_VALUE for k in extracted_data}
+            key = list(extracted_data.keys())[0] # Pick any src_type, but beware of point_type
+            point_type = type_map[key]
+            ta_end = extracted_data[key][1].total_period().end
+            if ta_end - point_type < utc_period.end: # try to extend extracted data with remainder of last forecast
+                sec_to_extend = utc_period.end - ta_end + point_type
                 drop = self.nb_lead_intervals_to_drop + self.fc_len_to_concat
                 idx = np.argmax(self.lead_times_in_sec[drop:] - self.lead_times_in_sec[drop] >= sec_to_extend)
                 if idx == 0:
@@ -241,14 +226,22 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                 fc_selection_criteria = ForecastSelectionCriteria(latest_available_forecasts=
                                                              {'number_of_forecasts': 1, 'forecasts_older_than': ta_end})
                 extra_data, _,_,_ = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
-                                    geo_location_criteria, nb_lead_intervals_to_drop=drop, nb_lead_intervals=idx,
-                                    concat=False) # note: no concat here
-                ta_extra = list(extra_data.values())[0][1][0]
-                ta = api.TimeAxis(api.UtcTimeVector.from_numpy(np.append(ta.time_points, ta_extra.time_points[1:])))
-                extracted_data = {k: (np.concatenate((extracted_data[k][0], np.squeeze(extra_data[k][0], axis=0))), ta)
-                                                                                for k in list(extracted_data.keys())}
+                                    geo_location_criteria, fc_delay=0, nb_lead_intervals_to_drop=drop,
+                                    nb_lead_intervals=idx, concat=False) # note: no concat here
+                # Concatenate extra data to end of original data
+                for key in list(extracted_data.keys()):
+                    org_data = extracted_data[key][0][:-1 - type_map[key], :, :]
+                    org_time_points = extracted_data[key][1].time_points[:-1 - type_map[key]]
+                    new_data = np.squeeze(extra_data[key][0], axis=0)
+                    new_time_points = extra_data[key][1][0].time_points[1:]
+                    val = np.concatenate((org_data, new_data))
+                    tax = api.TimeAxis(api.UtcTimeVector.from_numpy(np.append(org_time_points, new_time_points)))
+                    extracted_data[key] = (val, tax)
+
             # return self._convert_to_geo_timeseries(extracted_data, geo_pts, concat=True)
-            return _numpy_to_geo_ts_vec(extracted_data, x, y, z, ConcatDataRepositoryError)
+            return _clip_ensemble_of_geo_timeseries(
+                _numpy_to_geo_ts_vec(extracted_data, x, y, z, ConcatDataRepositoryError), utc_period,
+                ConcatDataRepositoryError)
 
     def get_timeseries(self, input_source_types, utc_period, geo_location_criteria=None):
         """
@@ -283,13 +276,12 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                                                                   nb_lead_intervals=self.fc_len_to_concat, concat=True,
                                                                   ensemble_member=self.ensemble_member)
             # check if extra_intervals are required
-            ta = list(extracted_data.values())[0][1] # time axis of first item
-            ta_end = ta.total_period().end
-            if ta_end <= utc_period.end: # try to extend extracted data with remainder of last forecast
-                if ta_end == utc_period.end:
-                    sec_to_extend = 1  # enough with one ekstra second if equality
-                else:
-                    sec_to_extend = utc_period.end - ta_end
+            type_map = {k: series_type[k] == api.POINT_INSTANT_VALUE for k in extracted_data}
+            key = list(extracted_data.keys())[0]  # Pick any src_type, but beware of point_type
+            point_type = type_map[key]
+            ta_end = extracted_data[key][1].total_period().end
+            if ta_end - point_type < utc_period.end: # try to extend extracted data with remainder of last forecast
+                sec_to_extend = utc_period.end - ta_end + point_type
                 drop = self.nb_lead_intervals_to_drop + self.fc_len_to_concat
                 idx = np.argmax(self.lead_times_in_sec[drop:] - self.lead_times_in_sec[drop] >= sec_to_extend)
                 if idx == 0:
@@ -298,14 +290,21 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                 fc_selection_criteria = ForecastSelectionCriteria(latest_available_forecasts=
                                                              {'number_of_forecasts': 1, 'forecasts_older_than': ta_end})
                 extra_data, _, _,_ = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
-                                    geo_location_criteria, nb_lead_intervals_to_drop=drop, nb_lead_intervals=idx,
-                                    concat=False, ensemble_member=self.ensemble_member) # note: no concat here
-                ta_extra = list(extra_data.values())[0][1][0]
-                ta = api.TimeAxis(api.UtcTimeVector.from_numpy(np.append(ta.time_points, ta_extra.time_points[1:])))
-                extracted_data = {k: (np.concatenate((extracted_data[k][0], np.squeeze(extra_data[k][0], axis=0))), ta)
-                                                                                for k in list(extracted_data.keys())}
-            #return self._convert_to_geo_timeseries(extracted_data, geo_pts, concat=True)[0]
-            return _numpy_to_geo_ts_vec(extracted_data, x, y, z, ConcatDataRepositoryError)[0]
+                                    geo_location_criteria, fc_delay=0, nb_lead_intervals_to_drop=drop,
+                                    nb_lead_intervals=idx, concat=False, ensemble_member=self.ensemble_member) # note: no concat here
+                # Concatenate extra data to end of original data
+                for key in list(extracted_data.keys()):
+                    org_data = extracted_data[key][0][:-1 - type_map[key], :, :]
+                    org_time_points = extracted_data[key][1].time_points[:-1 - type_map[key]]
+                    new_data = np.squeeze(extra_data[key][0], axis=0)
+                    new_time_points = extra_data[key][1][0].time_points[1:]
+                    val = np.concatenate((org_data, new_data))
+                    tax = api.TimeAxis(api.UtcTimeVector.from_numpy(np.append(org_time_points, new_time_points)))
+                    extracted_data[key] = (val, tax)
+            # return self._convert_to_geo_timeseries(extracted_data, geo_pts, concat=True)[0]
+            return _clip_ensemble_of_geo_timeseries(
+                _numpy_to_geo_ts_vec(extracted_data, x, y, z, ConcatDataRepositoryError), utc_period,
+                ConcatDataRepositoryError) [0]
 
     def get_forecast_ensemble_collection(self, input_source_types, fc_selection_criteria, geo_location_criteria=None):
         """
@@ -393,7 +392,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                             format(UTC.to_string(t_c), utc_period.to_string()))
                 fsc = ForecastSelectionCriteria(forecasts_that_cover_period=utc_period)
                 time_slice, lead_time_slice, m_t = self._make_time_slice(self.nb_lead_intervals_to_drop,
-                                                                         self.nb_lead_intervals, fsc)
+                                                                         self.nb_lead_intervals, fsc, self.fc_delay)
                 time = self.time[time_slice][m_t[time_slice]]
                 ref_time = time[np.argmin(time <= t_c) - 1]
                 if ref_time.size == 0:
@@ -430,7 +429,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                             format(UTC.to_string(t_c), utc_period.to_string()))
                 fsc = ForecastSelectionCriteria(forecasts_that_cover_period=utc_period)
                 time_slice, lead_time_slice, m_t = self._make_time_slice(self.nb_lead_intervals_to_drop,
-                                                                         self.nb_lead_intervals, fsc)
+                                                                         self.nb_lead_intervals, fsc, self.fc_delay)
                 time = self.time[time_slice][m_t[time_slice]]
                 ref_time = time[np.argmin(time <= t_c) - 1]
                 if ref_time.size == 0:
@@ -441,7 +440,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                 fsc = ForecastSelectionCriteria(forecasts_at_reference_times=[int(ref_time)])
             return self.get_forecast_collection(input_source_types, fsc, geo_location_criteria)[0]
 
-    def _get_data_from_dataset(self, dataset, input_source_types, fc_selection_criteria, geo_location_criteria,
+    def _get_data_from_dataset(self, dataset, input_source_types, fc_selection_criteria, geo_location_criteria, fc_delay=None,
                                nb_lead_intervals_to_drop=None, nb_lead_intervals=None, concat=False, ensemble_member=None):
         """
         Get data from NetCDF4 dataset.
@@ -449,7 +448,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         Parameters
         ----------
         See _init and get_forecast_ensemble_collection for description of dataset, input_source_types,
-        fc_selection_criteria, geo_location_criteria, nb_lead_intervals_to_drop, nb_lead_intervals
+        fc_selection_criteria, geo_location_criteria, fc_delay, nb_lead_intervals_to_drop, nb_lead_intervals
         concat: bool, optional
             Determines transformation method (see _transform_raw)
         ensemble_member: int, optional
@@ -488,8 +487,10 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                 nb_lead_intervals = self.nb_lead_intervals
         if nb_lead_intervals_to_drop + nb_lead_intervals > len(lead_times_in_sec) - 1:
             raise  ConcatDataRepositoryError("'nb_lead_intervals_to_drop' + 'nb_lead_intervals' is too large")
+        if fc_delay is None:
+            fc_delay = self.fc_delay
         time_slice, lead_time_slice, m_t = \
-            self._make_time_slice(nb_lead_intervals_to_drop, nb_lead_intervals, fc_selection_criteria)
+            self._make_time_slice(nb_lead_intervals_to_drop, nb_lead_intervals, fc_selection_criteria, fc_delay)
         time = self.time[time_slice][m_t[time_slice]]
         forecast_is_complete = self.forecast_is_complete[time_slice][m_t[time_slice]]
         if np.size(time)==0:
@@ -633,10 +634,10 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
 
         return x, y, z, m_xy, xy_slice, dim_grid
 
-    def _make_time_slice(self, nb_lead_intervals_to_drop, nb_lead_intervals, fc_selection_criteria):
+    def _make_time_slice(self, nb_lead_intervals_to_drop, nb_lead_intervals, fc_selection_criteria, fc_delay):
         """
         Find limiting slices in dimensions 'time' and 'lead_time'
-        for filters as defined by fc_selection_criteria,
+        for filters as defined by fc_selection_criteria, fc_delay,
         nb_lead_intervals_to_drop, nb_lead_intervals and nb_periodicity
 
         Returns
@@ -654,9 +655,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         m_t = np.zeros(time.shape, dtype=bool)
         m_t[::-fc_periodicity] = True # newest forecast last
 
-        # k, v = list(fc_selection_criteria.items())[0]
         k, v = fc_selection_criteria.criterion
-        nb_extra_intervals = 0
         if k == 'forecasts_created_within_period':
             time_slice = ((time >= v.start) & (time <= v.end))
             if not any(time_slice):
@@ -688,7 +687,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                     "No forecasts found that cover period {} with restrictions 'nb_lead_intervals_to_drop'={} "
                     "and 'nb_lead_intervals'={}.".format(v.to_string(), nb_lead_intervals_to_drop, nb_lead_intervals))
         elif k == 'latest_available_forecasts':
-            t = v['forecasts_older_than']
+            t = v['forecasts_older_than'] - fc_delay
             n = v['number_of_forecasts']
             idx = np.argmin(time <= t) - 1
             if idx < 0:
@@ -727,35 +726,13 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
 
         # time axis for forecast output
         def forecast_t(t, daccumulated_var=False):
+            dt_last = lead_time[-1] - lead_time[-2]
             nb_ext_lead_times = len(lead_time) - 1 if daccumulated_var else len(lead_time)
-            t_all = np.repeat(t, nb_ext_lead_times).reshape(len(t), nb_ext_lead_times) + lead_time[0:nb_ext_lead_times]
-            return t_all.astype(int)
-
-        # padding extra points to forecast
-        def pad(v, t):
-            if not concat: # Extend forecast by duplicating last nb_pad values
-                if self.nb_pads > 0:
-                    nb_pads = self.nb_pads
-                    t_padded = np.zeros((t.shape[0], t.shape[1] + nb_pads), dtype=t.dtype)
-                    t_padded[:, :-nb_pads] = t[:, :]
-                    t_add = t[0, -1] - t[0, -nb_pads - 1]
-                    # print('t_add:',t_add)
-                    t_padded[:, -nb_pads:] = t[:, -nb_pads:] + t_add
-
-                    v_padded = np.zeros((v.shape[0], t.shape[1] + nb_pads, v.shape[2], v.shape[3]), dtype=v.dtype)
-                    v_padded[:, :-nb_pads, :, :] = v[:, :, :, :]
-                    v_padded[:, -nb_pads:, :, :] = v[:, -nb_pads:, :, :]
-                else:
-                    t_padded = t
-                    v_padded = v
-                dt_last = t_padded[0, -1] - t_padded[0, -2]
-                if np.all(t_padded[:,1:] - t_padded[:,:-1] == dt_last): # fixed_dt time axis
-                    return (v_padded, [api.TimeAxis(int(tp[0]), int(dt_last), len(tp)) for tp in t_padded])
-                else: # point_type time axis
-                    return (v_padded,
-                            [api.TimeAxis(api.UtcTimeVector.from_numpy(tp), int(tp[-1] + dt_last)) for tp in t_padded])
-            else:
-                return (v, t)
+            t_all = (np.repeat(t, nb_ext_lead_times).reshape(len(t), nb_ext_lead_times) + lead_time[0:nb_ext_lead_times]).astype(int)
+            if np.all(t_all[:, 1:] - t_all[:, :-1] == dt_last):  # fixed_dt time axis
+                return [api.TimeAxis(int(tp[0]), int(dt_last), len(tp)) for tp in t_all]
+            else:  # point_type time axis
+                return [api.TimeAxis(api.UtcTimeVector.from_numpy(tp), int(tp[-1] + dt_last)) for tp in t_all]
 
         # reshape for data concatenated output
         def concat_v(x, is_average=True):
@@ -780,7 +757,8 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                 res = fcn(np.clip((p[:, 1:, :, :] - p[:, :-1, :, :]) * f[np.newaxis, :, np.newaxis, np.newaxis], 0.0, 1000.0))
             elif ak == "precipitation_amount":
                 # TODO: check with Yisak that this is understood correctly
-                f = api.deltahours(1) / lead_time[1:]  # conversion from mm/delta_t to mm/1hour
+                # f = api.deltahours(1) / lead_time[1:]  # conversion from mm/delta_t to mm/1hour
+                f = api.deltahours(1) / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
                 res = fcn(np.clip(p[:, 1:, :, :] * f[np.newaxis, :, np.newaxis, np.newaxis], 0.0, 1000.0))
             return res
 
@@ -806,27 +784,5 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
 
         res = {}
         for k, (v, ak) in data.items():
-            res[k] = pad(*convert_map[k](v, ak, time))
+            res[k] = convert_map[k](v, ak, time)
         return res
-
-    # def _convert_to_geo_timeseries(self, data, geo_pts, concat):
-    #     """
-    #     Convert timeseries from numpy structures to shyft.api geo-timeseries.
-    #
-    #     Returns
-    #     -------
-    #     timeseries: dict
-    #         Time series arrays keyed by type
-    #     """
-    #     nb_ensemble_members = list(data.values())[0][0].shape[-2]
-    #     if concat:
-    #         geo_ts = [{key: self.create_geo_ts_type_map[key](ta, geo_pts, arr[:, j, :].transpose(), self.series_type[key])
-    #                    for key, (arr, ta) in data.items()}
-    #                    for j in range(nb_ensemble_members)]
-    #     else:
-    #         nb_forecasts = list(data.values())[0][0].shape[0]
-    #         geo_ts = [[{key:
-    #                     self.create_geo_ts_type_map[key](ta[i], geo_pts, arr[i,:,j,:].transpose(), self.series_type[key])
-    #                    for key, (arr, ta) in data.items()}
-    #                    for j in range(nb_ensemble_members)] for i in range(nb_forecasts)]
-    #     return geo_ts

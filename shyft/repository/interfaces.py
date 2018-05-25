@@ -247,6 +247,8 @@ class ForecastSelectionCriteria(object):
             get forecast with nb_to_drop-horizon within period
         * forecasts_that_cover_period=UtcPeriod
             get forecast that cover period
+        * forecast_that_intersect_period
+            get forecast that intersects period
         * latest_available_forecasts={'number_of_forecast': int, 'forecasts_older_than': int}
             get latest number_of_forecast older than time_stamp
         * 'forecasts_at_reference_times': list(int)

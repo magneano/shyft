@@ -60,11 +60,12 @@ def _numpy_to_geo_ts_vec(data, x, y, z, err):
     Convert timeseries from numpy structures to shyft.api geo-timeseries vector.
     Parameters
     ----------
-    data: dict of np.ndarray
+    data: dict of tuples (np.ndarray, (list of)api.Time Axis)
         array with shape
         (nb_forecasts, nb_lead_times, nb_ensemble_members, nb_points) or
         (nb_lead_times, nb_ensemble_members, nb_points) or
         (nb_lead_times, nb_points)
+        one time axis of size nb_lead_times for each forecast
     x: np.ndarray
         X coordinates in meters in cartesian coordinate system, with array shape = (nb_points)
     y: np.ndarray
@@ -465,23 +466,35 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
     """
     if utc_period is None:
         return ensemble
-    else:
-        # TODO; fix so it treats INSTNAT TYPE separetly from AVERAGE
-        ta = ensemble[0][list(ensemble[0].keys())[0]][0].ts.time_axis
-        if ta.total_period().start > utc_period.start or ta.total_period().end < utc_period.end:
-            raise err("Time axis does not cover utc_period.")
+
+    # Check time axis of first ensemble member/geo_point and if required create new time axis to use for clipping
+    member = ensemble[0]
+    time_axis = {}
+    is_optimal = {}
+    for key, geo_ts in member.items():
+        is_optimal[key] = False
+        point_type = geo_ts[0].ts.point_interpretation() == api.POINT_INSTANT_VALUE
+        ta = geo_ts[0].ts.time_axis
+        if ta.total_period().start > utc_period.start or ta.time_points[-1] - point_type < utc_period.end:
+            raise err("Found time axis that does not cover utc_period.")
         idx_start = np.argmax(ta.time_points > utc_period.start) - 1
-        idx_end = np.argmin(ta.time_points < utc_period.end)
+        idx_end = np.argmin(ta.time_points < utc_period.end + point_type)
         if idx_start > 0 or idx_end < len(ta.time_points) - 1:
             if ta.timeaxis_type == api.TimeAxisType.FIXED:
                 dt = ta.time(1) - ta.time(0)
                 n = int(idx_end - idx_start)
-                ta = api.TimeAxis(int(ta.time_points[idx_start]), dt, n)
+                time_axis[key] = api.TimeAxis(int(ta.time_points[idx_start]), dt, n)
             else:
                 time_points = api.UtcTimeVector(ta.time_points[idx_start:idx_end].tolist())
                 t_end = ta.time_points[idx_end]
-                ta = api.TimeAxis(time_points, int(t_end))
-            return [{key: source_vector_map[key]([source_type_map[key](s.mid_point(), s.ts.average(ta))
-                                                  for s in geo_ts]) for key, geo_ts in f.items()} for f in ensemble]
+                time_axis[key] = api.TimeAxis(time_points, int(t_end))
         else:
-            return ensemble
+            is_optimal[key] = True
+            time_axis[key] = ta
+
+    if all(list(is_optimal.values())):  # No need to clip if all are optimal
+        return ensemble
+
+    return [{key: source_vector_map[key]([source_type_map[key](s.mid_point(), s.ts.average(time_axis[key]))
+                                              for s in geo_ts]) for key, geo_ts in f.items()} for f in ensemble]
+
