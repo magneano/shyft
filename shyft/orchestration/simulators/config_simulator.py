@@ -124,7 +124,7 @@ class ConfigCalibrator(simulator.DefaultSimulator):
                             ','.join([str(val) for val in [i for i in ts_info['catch_id'] if i not in cid_map]]), ts_info['uid']))
                 period = api.UtcPeriod(ts_info['start_datetime'],
                                        ts_info['start_datetime'] + ts_info['number_of_steps'] * ts_info['run_time_step'])
-                if not self.time_axis.total_period().overlaps(period):
+                if not self.time_axis.total_period().contains(period):
                     raise ConfigSimulatorError(
                         "Period {} for target series {} is not within the calibration period {}.".format(
                             period.to_string(), ts_info['uid'], self.time_axis.total_period().to_string()))
