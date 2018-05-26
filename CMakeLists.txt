@@ -12,7 +12,7 @@
 #
 # The next environment variables are honored:
 #
-#   SHYFT_DEPENDENCIES_DIR: default ${PROJECT_SOURCE_DIR}/shyft-dependencies
+#   SHYFT_DEPENDENCIES_DIR: default ${PROJECT_SOURCE_DIR}/../shyft_dependencies
 #
 cmake_minimum_required(VERSION 3.9.0)
 project(shyft C CXX)
@@ -62,14 +62,22 @@ find_package(dlib REQUIRED)
 find_package(Armadillo REQUIRED)
 #
 get_filename_component(arma_libs  ${ARMADILLO_LIBRARIES} REALPATH CACHE)
-# unfortunately, .travis does not have updated cmake, so find_package won't work as we need.
-# until then we replace
-#find_package(Boost 1.66 COMPONENTS python3 serialization filesystem system REQUIRED)
-# with:
-set(boost_system_lib ${SHYFT_DEPENDENCIES}/lib/libboost_system.so)
-set(boost_filesystem_lib ${SHYFT_DEPENDENCIES}/lib/libboost_filesystem.so)
-set(boost_python3_lib ${SHYFT_DEPENDENCIES}/lib/libboost_python36.so)
-set(boost_serialization_lib ${SHYFT_DEPENDENCIES}/lib/libboost_serialization.so)
+if(${CMAKE_VERSION} VERSION_LESS "3.10.0") 
+    # unfortunately, .travis does not have updated cmake, so find_package won't work as we need.
+    message("old cmake, using workaround for boost libraries")
+    set(boost_system_lib ${SHYFT_DEPENDENCIES}/lib/libboost_system.so)
+    set(boost_filesystem_lib ${SHYFT_DEPENDENCIES}/lib/libboost_filesystem.so)
+    set(boost_python3_lib ${SHYFT_DEPENDENCIES}/lib/libboost_python36.so)
+    set(boost_serialization_lib ${SHYFT_DEPENDENCIES}/lib/libboost_serialization.so)
+else()
+    find_package(Boost COMPONENTS python3 serialization filesystem system REQUIRED)
+    get_property(boost_system_lib TARGET Boost::system PROPERTY IMPORTED_LOCATION_RELEASE)
+    get_property(boost_filesystem_lib TARGET Boost::filesystem PROPERTY IMPORTED_LOCATION_RELEASE)
+    get_property(boost_serialization_lib  TARGET Boost::serialization PROPERTY IMPORTED_LOCATION_RELEASE)
+    get_property(boost_python3_lib TARGET Boost::python3 PROPERTY IMPORTED_LOCATION_RELEASE)
+
+endif()
+
 set(boost_link_libraries ${boost_system_lib} ${boost_filesystem_lib} ${boost_serialization_lib})
 set(boost_py_link_libraries ${boost_link_libraries} ${boost_python3_lib})
 

@@ -42,8 +42,7 @@ Contributors and current project participants include:
  * Yisak Sultan Abdella <YisakSultan.Abdella@statkraft.com>
  * Felix Matt <f.n.matt@geo.uio.no>
  * Francesc Alted <faltet@gmail.com>
-
-
+ 
 
 # COPYING / LICENSE
 
@@ -80,6 +79,8 @@ For compiling and running Shyft, you will need:
 * The NumPy package (>= 1.8.0)
 * The netCDF4 package (>= 1.2.1)
 * The CMake building tool (3.9 or higher)
+* 3rd party dependencies for c++ extensions and tests
+  boost, dlib, armadillo, doctest
 
 In addition, a series of Python packages are needed mainly for running the tests. These can be easily installed via:
 
@@ -105,7 +106,33 @@ NOTE: the build/compile instructions below have been mainly tested on Linux plat
 
 NOTE: the dependency regarding a modern compiler generally means gcc-7 is required to build Shyft.
 
-You can compile Shyft by using the typical procedure for Python packages. We use environment variables to control the build. The `SHYFT_DEPENDENCIES_DIR` defines where the dependencies will be built (or exist). When you call `setup.py` the script will call cmake. If the dependencies exist in the aforementioned directory, they will be used. Otherwise, they will be downloaded and built into that directory as part of the build process. If not set, cmake will create a directory `shyft-dependencies` in the `shyft` repository directory. A suggestion is to set the `shyft-dependencies` directory to your `shyft-workspace`. If you have set these as part of your `conda environment` per the instructions above, and assuming you are active in that environment, then simply:
+You can compile Shyft by using the typical procedure for Python packages. 
+
+Shyft currently uses boost, dlib, armadillo and doctest to build the python-extensions.
+
+The dependencies can be provided as pr. standard on your linux-system, 
+or 
+built from source following standard build-recipe from those above mentioned libraries.
+
+We supply scripts to automate the build-from source strategy: 
+
+shyft/build_support/build_dependencies.sh  (linux)
+shyft/build_support/win_build_dependencies.sh (windows)
+
+You should execute the build_dependencies.sh script just after initial checkout or refresh,
+prior to building the python extensions. The scripts will download and build required
+packages in `shyft_dependencies` directory in parallel with shyft directory.
+
+The linux build will also download miniconda with required packages for the shyft_env
+in parallel with the shyft directory, effectively giving a complete sandboxed shyft
+development setup.
+
+You should then prepend to miniconda/bin to PATH prior to working with shyft
+to ensure that the correct python interpreter is picked up.
+
+When you call `setup.py` the script will call cmake. If the dependencies exist in the aforementioned directory, they will be used.
+Otherwise cmake will attempt to locate the libraries from the system.
+
  
  ```bash
  pip install -r requirements.txt
@@ -118,9 +145,9 @@ NOTE: If you haven't set `env_vars` as part of your conda environment, then you 
 ```bash
 # assumes you are still in the shyft_workspace directory containing
 # the git repositories
-export SHYFT_WORKSPACE=`pwd`
-mkdir shyft-dependencies
-export SHYFT_DEPENDENCIES_DIR=$SHYFT_WORKSPACE/shyft-dependencies
+bash shyft/build_support/build_dependencies.sh
+export PATH=$SHYFT_WORKSPACE/miniconda/bin:$PATH
+export LD_LIBRARY_PATH=$SHYFT_WORKSPACE/shyft_dependencies/lib
 cd shyft #the shyft repository
 python setup.py build_ext --inplace
 ```
@@ -136,15 +163,6 @@ The quickest and easiest test to run is:
 python -c "from shyft import api"
 ```
 
-If this raises:
-`ImportError: libboost_python3.so.1.66.0: cannot open shared object file: No such file or directory`
-
-Then you don't have your `LD_LIBRARY_PATH` set correctly. This should point to:
-
-```bash
-export LD_LIBRARY_PATH=$SHYFT_DEPENDENCIES_DIR/lib
-```
-
 To run further tests, see the TESTING section below. 
 
 ### INSTALLING
@@ -155,8 +173,6 @@ If the tests above run, then you can simply install Shyft using:
 cd $SHYFT_WORKSPACE/shyft
 python setup.py install
 ```
-
-Just be aware of the dependency of the LD_LIBRARY_PATH so that the libboost libraries are found.
 
 Now, you should be set to start working with the [shyft documentation](https://shyft.readthedocs.org) and 
 ideally clone the [shyft-doc](https://github.com/statkraft/shyft-doc) repositories to work through the 
@@ -172,22 +188,20 @@ manually (in fact, if you plan to develop Shyft, this may be recommended because
 the integrated C++ tests).  The steps are the usual ones:
 
 ```bash
-$ export SHYFT_SOURCES=$SHYFT_WORKSPACE  # absolute path required!
-$ cd $SHYFT_SOURCES
+$ cd $SHYFT_WORKSPACE/shyft
 $ mkdir build
 $ cd build
-$ export SHYFT_DEPENDENCIES_DIR=$SHYFT_SOURCES/.. # directory_to_keep_dependencies,  absolute path
 $ cmake ..      # configuration step; or "ccmake .." for curses interface
 $ make -j 4     # do the actual compilation of C++ sources (using 4 processes)
-$ make install  # copy Python extensions somewhere in $SHYFT_SOURCES
+$ make install  # install python extensions into the shyft python source tree
 ```
 
 We have the beast compiled by now.  For testing:
 
 ```bash
-$ export LD_LIBRARY_PATH=$SHYFT_DEPENDENCIES_DIR/local/lib
+$ export LD_LIBRARY_PATH=$SHYFT_WORKSPACE/shyft_dependencies/lib
 $ make test     # run the C++ tests
-$ export PYTHONPATH=$SHYFT_SOURCES
+$ export PYTHONPATH=$SHYFT_WORKSPACE/shyft
 $ nosetests ..  # run the Python tests
 ```
 
@@ -227,5 +241,3 @@ To run some of the C++ core tests you can try the following:
 cd $SHYFT_WORKSPACE/shyft/build/test
 make test
 ```
-
-
