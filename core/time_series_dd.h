@@ -1859,7 +1859,8 @@ namespace shyft {
                 return *this;
             }
             //-- minimal iterator support in order to expose it as vector
-            ats_vector(ats_vec::iterator b,ats_vec::iterator e):ats_vec(b,e) {}
+            template <class vec_iter>
+            ats_vector(vec_iter&&  b,vec_iter&&  e):ats_vec(std::forward<vec_iter>(b),std::forward<vec_iter>(e)) {}
             auto begin() {return ats_vec::begin();}
             auto begin() const {return ats_vec::begin();}
             auto end() {return ats_vec::end();}

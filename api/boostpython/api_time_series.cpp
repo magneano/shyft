@@ -111,7 +111,32 @@ namespace expose {
 			)
 			.def(vector_indexing_suite<core_ts_vector>());
 	}
-
+	
+    /** ats_vector python expose helper for constructor variants so that
+     * it's easy for to use. We can't use py_convertible since
+     * python get confused by 3*tsv etc. (trying to convert 3 -> tsvector) 
+     */
+	struct ats_vector_ext {
+        static ats_vector *create_default() {return new ats_vector{};}
+        static ats_vector *create_from_clone(const ats_vector& c) {return new ats_vector(c);}
+        static ats_vector *create_from_ts_list(py::list tsl) {
+            size_t n = py::len(tsl);
+            if(n==0) return new ats_vector{};
+            auto r= new ats_vector();
+            r->reserve(n);
+            for(size_t i=0;i<n;++i) {
+                py::object ts= tsl[i];
+                py::extract<apoint_ts> xts(ts);
+                if(xts.check()) {
+                    r->push_back(xts());
+                } else {
+                    throw runtime_error("Failed to convert "+ to_string(i)+" element to TimeSeries");
+                }
+            }
+            return r;
+        }
+    };
+    
     static void expose_ats_vector() {
         using namespace shyft::api;
         typedef ats_vector(ats_vector::*m_double)(double)const;
@@ -130,10 +155,23 @@ namespace expose {
                 doc_intro("In addition, .average(..),.integral(..),.accumulate(..),.time_shift(..), .percentiles(..)")
                 doc_intro("  is also supported")
                 doc_intro("")
-                doc_intro("All operation returns a *new* ts-vector, containing the resulting expressions")
+                doc_intro("All operation returns a *new* ts-vector, containing the resulting expressions"),
+                no_init
             )
             .def(vector_indexing_suite<ats_vector>())
-            .def(init<ats_vector const&>(args("clone_me")))
+            .def("__init__",make_constructor(&ats_vector_ext::create_default,default_call_policies()),
+                doc_intro("Create an empty TsVector")
+            )
+            .def("__init__",make_constructor(&ats_vector_ext::create_from_clone,default_call_policies(),(py::arg("cloneme"))),
+                doc_intro("Create a shallow clone of  the TsVector")
+                doc_parameters()
+                doc_parameter("cloneme","TsVector","The TsVector to be cloned")
+            )
+            .def("__init__",make_constructor(&ats_vector_ext::create_from_ts_list,default_call_policies(),(py::arg("ts_list"))),
+                doc_intro("Create a TsVector from a python list of TimeSeries")
+                doc_parameters()
+                doc_parameter("ts_list","List[TimeSeries]","A list of TimeSeries")
+            )
             .def("values_at",&ats_vector::values_at_time,args("t"),
                  doc_intro("Computes the value at specified time t for all time-series")
                  doc_parameters()
@@ -333,7 +371,7 @@ namespace expose {
             def("max", (f_atsv_double)max, args("ts_vector", "number"), "return max of ts_vector and number");
             def("max", (f_double_atsv)max, args("number", "ts_vector"), "return max of number and ts_vector");
             def("max", (f_atsv_atsv)max, args("a", "b"), "return max of ts_vectors a and b (requires equal size!)");
-
+            
             // we also need a vector of ats_vector for quantile_map_forecast function
             typedef std::vector<ats_vector> TsVectorSet;
             class_<TsVectorSet>("TsVectorSet",
@@ -464,7 +502,7 @@ namespace expose {
 			)
             .def(vector_indexing_suite<TsBindInfoVector>())
             ;
-
+        py_api::iterable_converter().from_python<TsBindInfoVector>();
 		class_<apoint_ts>("TimeSeries",
                 doc_intro("A time-series providing mathematical and statistical operations and functionality.")
                 doc_intro("")

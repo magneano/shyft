@@ -82,3 +82,12 @@ class VectorCreate(unittest.TestCase):
         self.assertEqual(len(tsv), 1)
         self.assertEqual(len(TemperatureSourceVector([])), 0)
         self.assertEqual(len(TemperatureSourceVector([ts, ts])), 2)
+
+    def test_create_tsvector_from_ts_list(self):
+        ts_list = [TimeSeries(TimeAxis(0, 3600, 10), fill_value=float(i), point_fx=ts_point_fx.POINT_AVERAGE_VALUE) for i in range(3)]
+        tsv = TsVector(ts_list)
+        assert tsv
+        assert len(tsv) == 3
+        assert tsv[0].value(0) == 0.0
+        assert tsv[1].value(0) == 1.0
+        assert tsv[2].value(0) == 2.0
