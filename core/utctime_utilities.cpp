@@ -830,5 +830,25 @@ namespace shyft {
             return r;
         }
 
+        utcperiod utcperiod::trim(const calendar &c, utctimespan deltaT, trim_policy tp=trim_policy::TRIM_IN) const {
+            utcperiod trimmed_utcperiod;
+            if (tp==trim_policy::TRIM_IN) {
+                trimmed_utcperiod.start = c.trim(c.add(start, deltaT, 1) - 1, deltaT);
+                trimmed_utcperiod.end = c.trim(end, deltaT);
+            }
+            else {
+                trimmed_utcperiod.start = c.trim(start, deltaT);
+                trimmed_utcperiod.end = c.trim(c.add(end, deltaT, 1) - 1, deltaT);
+            }
+            return trimmed_utcperiod;
+        }
+
+        utctimespan utcperiod::diff_units(const calendar &c, utctimespan deltaT) const {
+            return c.diff_units(start, end, deltaT);
+        }
+        utctimespan utcperiod::diff_units(const calendar &c, utctimespan deltaT, utctimespan &remainder) const {
+            return c.diff_units(start, end, deltaT, remainder);
+        }
+
     } // core
 } // shyft
