@@ -1,6 +1,7 @@
 # This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
 # See file COPYING for more details **/
 # -*- coding: utf-8 -*-
+from typing import Union
 import os
 import yaml
 from datetime import datetime
@@ -11,9 +12,15 @@ from shyft.repository.interpolation_parameter_repository import (
 from shyft.repository import geo_ts_repository_collection
 from . import config_interfaces
 
-def utctime_from_datetime(dt):
+
+def utctime_from_datetime(dt: Union[datetime, int]) -> int:
+    """ converts input datetime to 1970s utc based time"""
+    if isinstance(dt, int):
+        return dt
+    if not isinstance(dt, datetime):
+        raise RuntimeError(f"Invalid type passed for argument,'dt' was '{dt.__class__}' expected int or datetime.")
     utc_calendar = api.Calendar()
-    return utc_calendar.time(api.YMDhms(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second))
+    return utc_calendar.time(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
 
 
 class YamlContent(object):
@@ -23,15 +30,15 @@ class YamlContent(object):
 
     def __init__(self, config_file):
         self._config_file = config_file
-        with open(config_file,encoding='utf8') as cfg_file:
+        with open(config_file, encoding='utf8') as cfg_file:
             config = yaml.load(cfg_file)
         # Expose all keys in yaml file as attributes
         self.__dict__.update(config)
 
     def __repr__(self):
-        srepr = "%s(" % self.__class__.__name__
+        srepr = "%s("%self.__class__.__name__
         for key in self.__dict__:
-            srepr += "%s=%r, " % (key, self.__dict__[key])
+            srepr += "%s=%r, "%(key, self.__dict__[key])
         srepr = srepr[:-2]
         return srepr + ")"
 
@@ -53,7 +60,7 @@ class RegionConfig(config_interfaces.RegionConfig):
 
     def repository(self):
         return self._config.repository
-        
+
     def catchments(self):
         return getattr(self._config, "catchment_indices", None)
 
@@ -123,7 +130,7 @@ class YAMLSimConfig(object):
         self._config_section = config_section
 
         # Load main configuration file
-        with open(self._config_file,encoding='utf8') as cfg:
+        with open(self._config_file, encoding='utf8') as cfg:
             config = yaml.load(cfg)[config_section]
         # Expose all keys in yaml file as attributes
         self.__dict__.update(config)
@@ -135,7 +142,7 @@ class YAMLSimConfig(object):
         # If region and interpolation ids are not present, just use fake ones
         self.region_model_id = str(self.region_model_id)
         self.interpolation_id = 0 if not hasattr(self, "interpolation_id") \
-                           else int(self.interpolation_id)
+            else int(self.interpolation_id)
         self.construct_configs(overrides)
 
     @staticmethod
@@ -191,8 +198,8 @@ class YAMLSimConfig(object):
         dst_repo = [{'repository': repo['repository'](**repo['params']), '1D_timeseries': [dst for dst in repo['1D_timeseries']]} for repo in self.datasets_config.destinations]
         [dst.update({'time_axis': self.time_axis}) if dst['time_axis'] is None
          else dst.update({'time_axis': api.TimeAxisFixedDeltaT(utctime_from_datetime(dst['time_axis']['start_datetime']),
-                                                    dst['time_axis']['time_step_length'],
-                                                    dst['time_axis']['number_of_steps'])}) for repo in dst_repo for dst in repo['1D_timeseries']]
+                                                               dst['time_axis']['time_step_length'],
+                                                               dst['time_axis']['number_of_steps'])}) for repo in dst_repo for dst in repo['1D_timeseries']]
         return dst_repo
 
     def get_reference_repo(self):
@@ -227,9 +234,9 @@ class YAMLSimConfig(object):
         self.interpolation_config = InterpolationConfig(self.interpolation_config_file)
 
     def __repr__(self):
-        srepr = "%s::%s(" % (self.__class__.__name__, self._config_section)
+        srepr = "%s::%s("%(self.__class__.__name__, self._config_section)
         for key in self.__dict__:
-            srepr += "%s=%r, " % (key, self.__dict__[key])
+            srepr += "%s=%r, "%(key, self.__dict__[key])
         srepr = srepr[:-2]
         return srepr + ")"
 
@@ -238,7 +245,7 @@ class YAMLCalibConfig(object):
 
     def __init__(self, config_file, config_section):
         self._config_file = config_file
-        config = yaml.load(open(config_file,encoding='utf8'))[config_section]
+        config = yaml.load(open(config_file, encoding='utf8'))[config_section]
         self.__dict__.update(config)
         self.validate()
         # Get the location of the model_config_file relative to the calibration config file
@@ -296,7 +303,7 @@ class YAMLForecastConfig(object):
         self.forecast_names = forecast_names
 
         # Load main configuration file
-        with open(self._config_file,encoding='utf8') as cfg:
+        with open(self._config_file, encoding='utf8') as cfg:
             cfg_m = yaml.load(cfg)[self._config_section]
         configs = cfg_m['forecast_runs']
         for name in self.forecast_names:
@@ -304,10 +311,10 @@ class YAMLForecastConfig(object):
 
         start, n, dt = utctime_from_datetime(cfg_m['start_datetime']), cfg_m['number_of_steps'], cfg_m['run_time_step']
         if forecast_time is None:
-            self.forecast_time = start + n * dt
+            self.forecast_time = start + n*dt
         else:
             self.forecast_time = forecast_time
-            t_override = {'start_datetime': datetime.utcfromtimestamp(self.forecast_time - n *dt)}
+            t_override = {'start_datetime': datetime.utcfromtimestamp(self.forecast_time - n*dt)}
 
         sim_config_overrides = {'config': t_override}
         self.sim_config = YAMLSimConfig(self._config_file, self._config_section, overrides=sim_config_overrides)
@@ -315,10 +322,10 @@ class YAMLForecastConfig(object):
         fc0 = self.forecast_names[0]
         configs[fc0].update({'start_datetime': datetime.utcfromtimestamp(self.forecast_time)})
         fc_time = self.forecast_time
-        for i in range(1,len(self.forecast_names)):
-            fc_1 = self.forecast_names[i-1]
+        for i in range(1, len(self.forecast_names)):
+            fc_1 = self.forecast_names[i - 1]
             fc_time += configs[fc_1]['number_of_steps']*configs[fc_1]['run_time_step']
             configs[self.forecast_names[i]].update({'start_datetime': datetime.utcfromtimestamp(fc_time)})
 
-        self.forecast_config = {name: YAMLSimConfig(self._config_file, self._config_section, overrides={'config':configs[name]})
+        self.forecast_config = {name: YAMLSimConfig(self._config_file, self._config_section, overrides={'config': configs[name]})
                                 for name in self.forecast_names}
