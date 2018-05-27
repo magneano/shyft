@@ -101,8 +101,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <Optimization>Full</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <Optimization>Custom</Optimization>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;ARMA_DONT_USE_WRAPPER;ARMA_USE_LAPACK;ARMA_USE_BLAS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE;BOOST_VARIANT_MINIMIZE_SIZE;BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS;BOOST_MPL_LIMIT_LIST_SIZE=30;BOOST_MPL_LIMIT_VECTOR_SIZE=30;XSHYFT_NO_PCH;ARMA_DONT_PRINT_CXX11_WARNING;ARMA_DONT_PRINT_ERRORS;ARMA_USE_CXX11;SWIG_PYTHON_INTERPRETER_NO_DEBUG;BOOSTSERIAL;BOOST_THREAD_USE_DLL;BOOST_LIB_DIAGNOSTIC=0;BOOST_ALL_DYN_LINK=1;_WINDOWS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);ARMA_DONT_PRINT_CXX11_WARNING</PreprocessorDefinitions>
       <PrecompiledHeaderFile>boostpython_pch.h</PrecompiledHeaderFile>
@@ -115,6 +115,8 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <StringPooling>false</StringPooling>
+      <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
