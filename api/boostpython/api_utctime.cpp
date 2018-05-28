@@ -291,8 +291,8 @@ namespace expose {
         .def(self != self)
         .def("timespan",&utcperiod::timespan,"returns end-start, the timespan of the period")
         .def_readwrite("start",&utcperiod::start,"Defines the start of the period, inclusive")
-        .def_readwrite("end",&utcperiod::end,"Defines the end of the period, not inclusive");
-        def("intersection",&intersection,(py::arg("a"),py::arg("b")),
+        .def_readwrite("end",&utcperiod::end,"Defines the end of the period, not inclusive")
+        .def("intersection",&intersection,(py::arg("a"),py::arg("b")),
             doc_intro("Returns the intersection of two periods")
             doc_intro("if there is an intersection, the resulting period will be .valid() and .timespan()>0")
             doc_intro("If there is no intersection, an empty not .valid() period is returned")
