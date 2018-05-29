@@ -309,6 +309,14 @@ class RegionModel(unittest.TestCase):
         self.assertEqual(len(adjust_result.diagnostics), 0)  # diag should be len(0) if ok.
         self.assertAlmostEqual(adjust_result.q_r, q_avg*x, 2)  # verify we reached target
         self.assertAlmostEqual(adjust_result.q_0, q_avg, 2)  # .q_0,
+        # now verify what happens if we put in bad values for observed value
+        adjust_result = model.adjust_state_to_target_flow(float('nan'), cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
+        assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
+        # then verify what happens if we put in bad values on simulated result
+        model.cells[0].env_ts.temperature.set(10,float('nan'))
+        adjust_result = model.adjust_state_to_target_flow(30.0, cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
+        assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
+
 
     def test_optimization_model(self):
         num_cells = 20
@@ -379,7 +387,6 @@ class RegionModel(unittest.TestCase):
         # verify the interface to the new optimize_global function
         global_opt_param = optimizer.optimize_global(p0, max_n_evaluations=1500, max_seconds=3.0, solver_eps=1e-5)
         self.assertIsNotNone(global_opt_param)  # just to ensure signature and results are covered
-
 
     def test_hbv_model_initialize_and_run(self):
         num_cells = 20
