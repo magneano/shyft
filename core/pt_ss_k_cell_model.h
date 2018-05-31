@@ -148,8 +148,8 @@ namespace shyft {
                 // State variables to collect as time series
                 double destination_area;
                 pts_t kirchner_discharge; ///< Kirchner state instant Discharge given in m^3/s
-                pts_t snow_swe;
-                pts_t snow_sca;
+                pts_t snow_swe;///< in units mm @ cell area
+                pts_t snow_sca;//< in units sca fraction
                 pts_t snow_alpha;
                 pts_t snow_nu;
                 pts_t snow_lwc;
@@ -191,10 +191,10 @@ namespace shyft {
                     if (collect_state) {
                         kirchner_discharge.set(idx, mmh_to_m3s(state.kirchner.q, destination_area));
                         snow_sca.set(idx, state.snow.sca);
-                        snow_swe.set(idx, state.snow.swe);
+                        snow_swe.set(idx, state.snow.swe_for_cell_area());
                         snow_alpha.set(idx, state.snow.alpha);
                         snow_nu.set(idx, state.snow.nu);
-                        snow_lwc.set(idx, state.snow.free_water);
+                        snow_lwc.set(idx, state.snow.free_water_for_cell_area());
                         snow_residual.set(idx, state.snow.residual);
                     }
                 }

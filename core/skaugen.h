@@ -129,9 +129,9 @@ namespace shyft {
                         && fabs(free_water - x.free_water)<eps
                         && fabs(residual - x.residual)<eps
                         && num_units==x.num_units;
-
-
                 }
+                bool swe_for_cell_area() const  { return swe*sca;}
+                bool free_water_for_cell_area() const {return free_water*sca;}
                 x_serialize_decl();
             };
 
