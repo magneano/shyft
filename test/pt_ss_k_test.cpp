@@ -29,7 +29,7 @@ namespace shyfttest {
         template<> template<>
         void ResponseCollector<ta::fixed_dt>::collect<response>(size_t idx, const response& response) {
             _snow_output.set(idx, response.snow.outflow);
-            _snow_swe.set(idx, response.snow.total_stored_water);
+            _snow_swe.set(idx, response.snow.swe);
         }
 
         template <> template <>
