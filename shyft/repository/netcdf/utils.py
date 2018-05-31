@@ -4,6 +4,7 @@ import os
 import re
 import numpy as np
 import pyproj
+from netCDF4 import Dataset
 from shapely.ops import transform
 from shapely.prepared import prep
 from functools import partial
@@ -498,3 +499,42 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
     return [{key: source_vector_map[key]([source_type_map[key](s.mid_point(), s.ts.average(time_axis[key]))
                                               for s in geo_ts]) for key, geo_ts in f.items()} for f in ensemble]
 
+
+
+
+def create_ncfile(data_file, variables, dimensions, ncattrs=None):
+    """
+    Create a ncfile ready for accepting shyft geo data.
+
+    Parameters
+    -----------
+
+    data_file: netcdf filename to create **will be overwritten**
+
+    dimensions: a dictionary keyed by 'dimensions'
+
+    variables: a dictionary keyed by 'variable_name' with a list
+        containing: [datatype, dimension tuple, and a dict of attributes]
+
+    ncattrs: a dictionary keyed by nc file attributes
+
+    Returns
+    -------
+    a netcdf file object handle to be filled with data
+
+    """
+
+    with Dataset(data_file, 'w') as dset:
+
+        if ncattrs:
+            dset.setncatts(ncattrs)
+
+        for dimension, size in dimensions.items():
+            dset.createDimension(dimension, size)
+
+        for name, content in variables.items():
+            dtype, dims, attrs = content
+            dset.createVariable(name, dtype, dims)
+            dset[name].setncatts(attrs)
+
+        # dset.close()
