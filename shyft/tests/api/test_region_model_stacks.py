@@ -129,8 +129,14 @@ class RegionModel(unittest.TestCase):
         unspecified_area = model.statistics.unspecified_area(cids)
         self.assertAlmostEqual(total_area, forest_area + glacier_area + lake_area + reservoir_area + unspecified_area)
         cids.append(3)
-        total_area_no_match = model.statistics.total_area(cids)  # now, cids contains 3, that matches no cells
-        self.assertAlmostEqual(total_area_no_match, 0.0)
+        try:
+            model.statistics.total_area(cids)  # now, cids contains 3, that matches no cells
+            ok = False
+        except RuntimeError as re:
+            ok = True
+            assert re
+
+        self.assertTrue(ok)
 
     def test_model_initialize_and_run(self):
         num_cells = 20
@@ -211,6 +217,11 @@ class RegionModel(unittest.TestCase):
         sum_discharge_value = model.statistics.discharge_value(cids, 0)  # at the first timestep
         sum_charge = model.statistics.charge(cids)
         sum_charge_value = model.statistics.charge_value(cids, 0)
+        self.assertAlmostEqual(sum_charge_value, -111.75,places=2)
+        cell_charge=model.statistics.charge_value(api.IntVector([0,1,3]), 0,ix_type=api.stat_scope.cell)
+        self.assertAlmostEqual(cell_charge, -16.86330,places=2)
+        charge_sum_1_2_6 = model.statistics.charge(api.IntVector([1,2, 6]), ix_type=api.stat_scope.cell).values.to_numpy().sum()
+        self.assertAlmostEqual(charge_sum_1_2_6,-39.0524,places=2)
         ae_output = model.actual_evaptranspiration_response.output(cids)
         ae_pot_ratio = model.actual_evaptranspiration_response.pot_ratio(cids)
         self.assertIsNotNone(ae_output)
