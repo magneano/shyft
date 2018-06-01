@@ -317,6 +317,9 @@ def _limit_1D(x, y, data_cs, target_cs, geo_location_criteria, padding, err, cli
     return xx, yy, xy_mask, slice(xy_inds[0], xy_inds[-1] + 1)
 
 def _make_time_slice(time, utc_period, err):
+    if utc_period is None:
+        # If period is None set period to be from start to end of dataset time dimension
+        utc_period = api.UtcPeriod(int(time[0]), int(time[-1]))
     idx_min = np.argmin(time <= utc_period.start) - 1  # raise error if result is -1
     idx_max = np.argmax(time >= utc_period.end)  # raise error if result is 0
     if idx_min < 0:
