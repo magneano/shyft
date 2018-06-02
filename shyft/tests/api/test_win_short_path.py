@@ -1,5 +1,5 @@
 import unittest
-from shyft.api import win_short_path
+from shyft.api import win_short_path,win_set_priority
 import os
 
 
@@ -13,3 +13,7 @@ class TestWinShortPath(unittest.TestCase):
             self.assertFalse(s2)
         else:
             self.assertEqual(s, long_path)
+
+    def test_win_set_priority(self):
+        win_set_priority(-1)  # below normal and no io/mem performance
+        win_set_priority(0)  # normal, hopefully a sane setting
