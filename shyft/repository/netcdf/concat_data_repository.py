@@ -325,18 +325,6 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
             data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
                                                         geo_location_criteria, concat=False)
             return _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)
-        # k, v = fc_selection_criteria.criterion
-        # if k == 'forecasts_at_reference_times':
-        #     fsc = lambda x: ForecastSelectionCriteria(latest_available_forecasts=
-        #                                       {'number_of_forecasts': 1, 'forecasts_older_than':x})
-        #     return [self.get_forecast_ensemble_collection(input_source_types, fsc(t_c), geo_location_criteria)[0]
-        #             for t_c in v]
-        # else:
-        #     with Dataset(self._filename) as dataset:
-        #         data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
-        #                                                               geo_location_criteria, concat=False)
-        #         #return self._convert_to_geo_timeseries(data, geo_pts, concat=False)
-        #         return _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)
 
     def get_forecast_collection(self, input_source_types, fc_selection_criteria, geo_location_criteria=None):
         """
@@ -702,8 +690,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
             time_slice = ((time >= min(v)) & (time <= max(v)))
             mask = np.zeros(time.shape, dtype=bool)
             mask[np.searchsorted(self.time, np.array(v) - fc_delay, side='right') - 1] = True
-            # filter periodicity mask
-            m_t = m_t * mask
+            m_t = m_t * mask # filter periodicity mask
             if not any(time_slice):
                 raise ConcatDataRepositoryError(
                     "No forecasts found with creation time within period {}.".format(
