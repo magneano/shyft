@@ -1,5 +1,8 @@
-import os
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
+# questions: sven.decker@geo.uio.no
 import re
+import os
 import numpy as np
 from netCDF4 import Dataset
 from shyft import api
