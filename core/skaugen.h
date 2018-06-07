@@ -92,12 +92,12 @@ namespace shyft {
                 ///<note that the initialization is not the most elegant yet, due to diffs swig-python/ms-win/gcc
                 double alpha_0=40.77;
                 double d_range=113.0;
-                double unit_size=0.1;
-                double max_water_fraction=0.1;
-                double tx=0.16;
-                double cx=2.5;
-                double ts=0.14;
-                double cfr=0.01;
+                double unit_size=0.1; ///< [mm] @ cell area level
+                double max_water_fraction=0.1;///< fraction that snow can keep as free water
+                double tx=0.16; ///< snow/rain threshold[deg.C]
+                double cx=2.5;  ///< melt process = cx*n_days(Temperature - ts) [mm/(8400s*degCs]
+                double ts=0.14; ///< melt process ts [degC]
+                double cfr=0.01;///< refreeze
 
                 parameter(double alpha_0, double d_range, double unit_size,
                           double max_water_fraction, double tx, double cx, double ts, double cfr)
@@ -112,10 +112,10 @@ namespace shyft {
                 double nu;        ///< shape for the gamma-distributed snow
                 double alpha;     ///< shape for the gamma-distributed snow
                 double sca;       ///< snow covered area fraction
-                double swe;       ///< mm, snow water equivalent in the snow covered area of the cell (num_units*unit_size)..redundant!?
-                double free_water;///< mm, free water in the snow covered area of the cell
-                double residual;  ///< mm , residual, that keeps track of mass that does not fit into unit size
-                size_t num_units; ///< number of units in the snow-covered part of the cell, each of unit_size mm thickness
+                double swe;       ///< mm, snow water equivalent in the snow covered area of the cell, @ sca
+                double free_water;///< mm, free water in snow,(lwc, in addtion to swe!) @ sca
+                double residual;  ///< mm, residual, that keeps track of mass that does not fit into unit size @ cell_area
+                size_t num_units; ///< number of snow-units in cell, each of unit_size mm thickness @ sca, == swe/unit_size, redundant!
                 state(double nu=4.077, double alpha=40.77, double sca=0.0,
                       double swe=0.0, double free_water=0.0, double residual=0.0, size_t num_units=0)
                  : nu(nu), alpha(alpha), sca(sca), swe(swe), free_water(free_water),
@@ -130,15 +130,15 @@ namespace shyft {
                         && fabs(residual - x.residual)<eps
                         && num_units==x.num_units;
                 }
-                bool swe_for_cell_area() const  { return swe*sca;}
-                bool free_water_for_cell_area() const {return free_water*sca;}
+                double swe_for_cell_area() const  { return (free_water+swe)*sca;}
+                double free_water_for_cell_area() const {return free_water*sca;}
                 x_serialize_decl();
             };
 
 
             struct response {
                 double outflow = 0.0;///< mm/h over cell area equivalent
-                double sca = 0.0;///< snow covered fraction of cell area 
+                double sca = 0.0;///< snow covered fraction of cell area
                 double swe = 0.0;///< mm snow water equivalent over total cell area
             };
 
@@ -188,9 +188,10 @@ namespace shyft {
                         return;
                     }
 
+                    // pick out the current state into local variables that will be updated 
+                    // to form the response and new state at end of the function
                     const double alpha_0 = p.alpha_0;
-                    double swe = s.swe; // Conditional value!
-
+                    double swe = s.swe;
                     unsigned long nnn = s.num_units;
                     double sca = s.sca;
                     double nu = s.nu;
@@ -203,13 +204,18 @@ namespace shyft {
                         alpha = alpha_0;
                     }
 
-                    double total_new_snow = snow;
+                    // 0. handling (new) snow, refreeze and potmelt this time-step.
+                    //   total_new_snow = snow + refreeze - pot_melt    
+                    //                     lwc   -= refreeze  .. adjust the lwc according to refreeze
+                    //               pot_melt = left after reducing snow+refreeze mass that is new to this time-step
+                    //                                 so that it can melt the remaining snowpack
+                    double total_new_snow = snow; /// binds to @ cell_area 
                     double lwc = s.free_water;  // Conditional value
                     const double total_storage = swe + lwc; // Conditional value
 
                     double pot_melt = p.cx*step_in_days*(T - p.ts);
                     const double refreeze = std::min(std::max(0.0, -pot_melt*p.cfr), lwc);
-                    total_new_snow += sca*refreeze;
+                    total_new_snow += sca*refreeze; // sca* because refreeze is @ sca, where total_new_snow is at @cell-area
                     lwc -= refreeze;
                     pot_melt = std::max(0.0, pot_melt);
                     const double new_snow_reduction = std::min(pot_melt, total_new_snow);
@@ -218,22 +224,26 @@ namespace shyft {
 
                     statistics stat(alpha_0, p.d_range, unit_size);
 
-                    unsigned long n = 0;
-                    //xx unsigned long u = 0;
+                    unsigned long n = 0; ///< number of units new snow
+                    // notice that at this point the pot_melt and total_new_snow is the residual left after doing the algorithm above.
 
-                    // Accumulation
-                    if (total_new_snow > unit_size) {
-                        n = lrint(total_new_snow/unit_size);
-                        compute_shape_vars(stat, nnn, n, 0, sca, 0.0, alpha, nu);
-                        nnn = lrint(nnn*sca) + n;
-                        sca = 1.0;
-                        swe = nnn*unit_size;
+                    // 1. Accumulation
+                    if (total_new_snow > unit_size) { // a snow event, that is sca goes to 1.0, and we have to reshape snowpack
+                        n = lrint(total_new_snow/unit_size); // this amount of units falls at the entire cell-area
+                        compute_shape_vars(stat, nnn, n, 0, sca, 0.0, alpha, nu);// compute the new shape variables
+                        // then try to compute the new snow mass based on the new shape, and the fact that new sca is 1.0
+                        nnn = lrint(nnn*sca) + n; // nnn*sca (the old sca that nnn refers to) gives mass at cell-area, and then add n that also is at cell-area
+                        sca = 1.0; // now this is the new sca
+                        swe = nnn*unit_size; // this is the new swe
                     }
-
-                    // Melting
+                    
+                    //
+                    // 2. Melting
+                    //
                     if (pot_melt > unit_size) {
-                        unsigned long u = lrint(pot_melt/unit_size);
-                        if (nnn < u + 2) {
+                        unsigned long u = lrint(pot_melt/unit_size); // pot-melt for snow-package sca 
+                        if (nnn < u + 2) { // sih: this should most likely be nnn <= u
+                            // the entire snowpack melts
                             nnn = 0;
                             alpha = alpha_0;
                             nu = alpha_0*unit_size;
@@ -241,11 +251,15 @@ namespace shyft {
                             lwc = 0.0;
                             sca = 0.0;
                         } else {
+                            // only parts of the snowpack melts
+                            // and the sca is reduced.
+                            //  as a consequence we need to recompute the shape 
+                            //  and reduce the volume.
                             const double rel_red_sca = stat.sca_rel_red(u, nnn, nu, alpha);
                             const double sca_scale_factor = 1.0 - rel_red_sca;
                             sca = s.sca*sca_scale_factor;
                             swe = (nnn - u)/sca_scale_factor*unit_size;
-
+                            // sih: the next lines are at best confusing, and needs rewrite or explaination
                             if (swe >= nnn*unit_size) {
                                 u = long( nnn*rel_red_sca) + 1;
                                 swe = (nnn - u)/sca_scale_factor*unit_size;
@@ -267,44 +281,28 @@ namespace shyft {
                         }
                     }
 
-                    // Eli and Ola, TODO:
-                    // This section is quite hackish, but makes sure that we have control on the local mass balance that is constantly
-                    // violated due to discrete melting/accumulation events. A trained person should rethink the logic and have a goal of
-                    // minimizing the number of if-branches below. Its embarrasingly many of them...
-                    // The good news is that the residual is in the interval [-0.1, 0.1] for the cases we've investigated, and that 15
-                    // years of simulation on real data gives a O(1.0e-11) accumulated mass balance violation (in mm).
+                    //
+                    // 3. compute lwc based on swe*sca changes above
+                    //
 
                     if (s.sca*s.swe > sca*swe) { // (Unconditional) melt
+                        // sih to preserve mass when sca changes: lwc += std::max(0.0, s.swe*s.sca - swe*sca)/sca 
                         lwc += std::max(0.0, s.swe - swe); // Add melted water to free water in snow
                     }
                     lwc *= std::min(1.0, s.sca/sca); // Scale lwc (preserve total free water when sca increases)
                     lwc = std::min(lwc, swe*p.max_water_fraction); // Limit by parameter
-                    double discharge = s.sca*total_storage + snow - sca*(swe + lwc); // We consider rain later
+                    double discharge = s.sca*total_storage + snow - sca*(swe + lwc); // discharge =  (snow_pack_volume@s0 + snow )- snow_pack_volume@now
 
-                    // If discharge is negative, recalculate new lwc to take the slack
+                    // If discharge is negative, insert it to residual
                     if (discharge < 0.0) {
-                        lwc = (s.sca*total_storage + snow)/sca - swe;
-                        discharge = 0.0;
-                        // Not enough water in the snow for the negative outflow
-                        if (lwc < 0.0) {
-                            lwc = 0.0;
-                            discharge = s.sca*total_storage + snow - sca*swe;
-                            // Giving up and adding to residual. TODO: SHOULD BE CHECKED, and preferably REWRITTEN!!
-                            if (discharge < 0.0) {
-                                s.residual += discharge;
-                                discharge = 0.0;
-                            }
-                        }
-                    }
-
-                    // If no runoff, discharge is numerical noise and should go into residual.
-                    if (snow > 0.0 && rain == 0.0 && pot_melt <= 0.0) {
                         s.residual += discharge;
                         discharge = 0.0;
                     }
 
-                    // Add rain
-                    if (rain > swe*p.max_water_fraction - lwc) {
+                    //
+                    // 4. Add rain, that goes into lwc (and|or) discharge
+                    //
+                    if (rain > swe*p.max_water_fraction - lwc) { // more rain that we can take into free water, -> discharge and lwc at max
                         discharge += sca*(rain - (swe*p.max_water_fraction - lwc)) + rain*(1.0 - sca); // exess water in snowpack + uncovered
                         lwc = swe*p.max_water_fraction; // No more room for water
                     } else {
@@ -312,29 +310,23 @@ namespace shyft {
                         discharge += rain*(1.0 - sca); // Only uncovered area gives rain discharge
                     }
 
-                    // Negative discharge may come from roundoff due to discrete model, add to residual and get rid of it later
-                    if (discharge <= 0.0) {
-                        s.residual += discharge;
-                        discharge = 0.0;
-                    } else { // Discharge is positive
-                        // We have runoff, so get rid of as much residual as possible (without mass balance violation)
-                        if (discharge >= -s.residual) {
-                            discharge += s.residual;
-                            s.residual = 0.0;
-                        // More residual than discharge - get rid of as much as possible and zero out the runoff
-                        } else {
-                            s.residual += discharge;
-                            discharge = 0.0;
-                        }
+                    // We have runoff, so get rid of as much residual as possible (without mass balance violation)
+                    if (discharge >= -s.residual) {
+                        discharge += s.residual;
+                        s.residual = 0.0;
+                    // More residual than discharge - get rid of as much as possible and zero out the runoff
                     }
-
+                    
+                    //
+                    // 5. finale, set state to updated state, fill in response
+                    //
                     if (nnn > 0)
                         nu /= nnn;
 
-                    r.outflow = discharge;
+                    r.outflow = discharge;// fill in response, incl. cell-area swe, sca
                     r.swe = sca*(swe + lwc);
-                    r.sca=sca; //sih: needed for calibration on snow sca
-                    s.nu = nu;
+                    r.sca=sca; 
+                    s.nu = nu;        // fill in new state at the end of timestep here
                     s.alpha = alpha;
                     s.sca = sca;
                     s.swe = swe;
