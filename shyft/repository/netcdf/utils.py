@@ -541,3 +541,68 @@ def create_ncfile(data_file, variables, dimensions, ncattrs=None):
             dset[name].setncatts(attrs)
 
         # dset.close()
+
+def dummy_var(input_src_types, utc_period, geo_location_criteria):
+    """
+    A copy of utils._numpy_to_geo_ts_vec in order to dummy radiation, humidity and wind_speed
+    Convert timeseries from numpy structures to shyft.api geo-timeseries vector.
+    Parameters
+    ----------
+    data: dict of np.ndarray
+        array with shape
+        (nb_forecasts, nb_lead_times, nb_ensemble_members, nb_points) or
+        (nb_lead_times, nb_ensemble_members, nb_points) or
+        (nb_lead_times, nb_points)
+    x: np.ndarray
+        X coordinates in meters in cartesian coordinate system, with array shape = (nb_points)
+    y: np.ndarray
+        Y coordinates in meters in cartesian coordinate system, with array shape = (nb_points)
+    z: np.ndarray
+        elevation in meters, with array shape = (nb_points)
+    Returns
+    -------
+    timeseries: dict
+        Time series arrays keyed by type
+    """
+
+    ndays = (utc_period.end - utc_period.start) / 86400
+
+    def _ta(t):
+        t0 = int(t[0])
+        t1 = int(t[1])
+        return api.TimeAxis(t0, t1 - t0, len(t))
+
+    times = np.linspace(utc_period.start, utc_period.end, ndays, 86400)
+
+    ta = _ta(times)
+    x, y, urx, ury = geo_location_criteria.bounds
+    x = np.array([x])
+    y = np.array([y])
+    z = np.array([1000])
+
+    geo_pts = api.GeoPointVector.create_from_x_y_z(*[api.DoubleVector_FromNdArray(arr) for arr in [x, y, z]])
+
+    data = {}
+
+    for var in input_src_types:
+        if var == 'radiation':
+            data[var] = ( np.ones((len(times), len(x))) * 1, ta)
+        if var == 'wind_speed':
+            data[var] = (np.ones((len(times), len(x))) * 2, ta)
+        if var == 'relative_humidity':
+            data[var] = (np.ones((len(times), len(x))) * 0.6, ta)
+
+
+    shape = list(data.values())[0][0].shape
+    ndim = len(shape)
+
+    if ndim == 4:
+        raise(InterfaceError("Dummy not implemented for ensembles"))
+    elif ndim == 3:
+        raise (InterfaceError("Dummy not implemented for ensembles"))
+    elif ndim == 2:
+        geo_ts = {key: create_geo_ts_type_map[key](ta, geo_pts, arr[:, :].transpose(), series_type[key])
+                  for key, (arr, ta) in data.items()}
+    else:
+        raise err("Number of dimensions, ndim, of Numpy array to be converted to shyft GeoTsVector not 2<=ndim<=4.")
+    return geo_ts
