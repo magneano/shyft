@@ -321,19 +321,22 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         -------
         see interfaces.GeoTsRepository
         """
-
-        k, v = fc_selection_criteria.criterion
-        if k == 'forecasts_at_reference_times':
-            fsc = lambda x: ForecastSelectionCriteria(latest_available_forecasts=
-                                              {'number_of_forecasts': 1, 'forecasts_older_than':x})
-            return [self.get_forecast_ensemble_collection(input_source_types, fsc(t_c), geo_location_criteria)[0]
-                    for t_c in v]
-        else:
-            with Dataset(self._filename) as dataset:
-                data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
-                                                                      geo_location_criteria, concat=False)
-                #return self._convert_to_geo_timeseries(data, geo_pts, concat=False)
-                return _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)
+        with Dataset(self._filename) as dataset:
+            data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
+                                                        geo_location_criteria, concat=False)
+            return _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)
+        # k, v = fc_selection_criteria.criterion
+        # if k == 'forecasts_at_reference_times':
+        #     fsc = lambda x: ForecastSelectionCriteria(latest_available_forecasts=
+        #                                       {'number_of_forecasts': 1, 'forecasts_older_than':x})
+        #     return [self.get_forecast_ensemble_collection(input_source_types, fsc(t_c), geo_location_criteria)[0]
+        #             for t_c in v]
+        # else:
+        #     with Dataset(self._filename) as dataset:
+        #         data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
+        #                                                               geo_location_criteria, concat=False)
+        #         #return self._convert_to_geo_timeseries(data, geo_pts, concat=False)
+        #         return _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)
 
     def get_forecast_collection(self, input_source_types, fc_selection_criteria, geo_location_criteria=None):
         """
@@ -348,20 +351,11 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         -------
         see interfaces.GeoTsRepository.
         """
-        # return [fcst[self.ensemble_member] for fcst in
-        #      self.get_forecast_ensemble_collection(input_source_types, fc_selection_criteria, geo_location_criteria)]
-        k, v = fc_selection_criteria.criterion
-        if k == 'forecasts_at_reference_times':
-            fsc = lambda x: ForecastSelectionCriteria(latest_available_forecasts=
-                                              {'number_of_forecasts': 1, 'forecasts_older_than':x})
-            return [self.get_forecast_collection(input_source_types, fsc(t_c), geo_location_criteria)[0] for t_c in v]
-        else:
-            with Dataset(self._filename) as dataset:
-                data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
-                                                            geo_location_criteria, concat=False,
-                                                            ensemble_member=self.ensemble_member)
-                #return [fcst[0] for fcst in self._convert_to_geo_timeseries(data, geo_pts, concat=False)]
-                return [fcst[0] for fcst in _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)]
+        with Dataset(self._filename) as dataset:
+            data, x, y, z = self._get_data_from_dataset(dataset, input_source_types, fc_selection_criteria,
+                                                        geo_location_criteria, concat=False,
+                                                        ensemble_member=self.ensemble_member)
+            return [fcst[0] for fcst in _numpy_to_geo_ts_vec(data, x, y, z, ConcatDataRepositoryError)]
 
     def get_forecast_ensemble(self, input_source_types, utc_period,
                               t_c, geo_location_criteria=None):
@@ -644,7 +638,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         -------
         * time_slice: limiting slice in dim 'time'
         * lead_time_slice: limiting slice in dim 'lead_time'
-        * m_t: periodicity mask in dim 'time'
+        * m_t: periodicity/@ref_times mask in dim 'time'
         """
         time = self.time
         lead_times_in_sec = self.lead_times_in_sec
@@ -705,8 +699,15 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                     "for the specified periodicity ({})".format(idx + 1, UTC.to_string(t), n, fc_periodicity))
             time_slice = slice(idx - n * fc_periodicity + 1, idx + 1)
         elif k == 'forecasts_at_reference_times':
-            raise ConcatDataRepositoryError(
-                "'forecasts_at_reference_times' selection criteria not supported yet.")
+            time_slice = ((time >= min(v)) & (time <= max(v)))
+            mask = np.zeros(time.shape, dtype=bool)
+            mask[np.searchsorted(self.time, np.array(v) - fc_delay, side='right') - 1] = True
+            # filter periodicity mask
+            m_t = m_t * mask
+            if not any(time_slice):
+                raise ConcatDataRepositoryError(
+                    "No forecasts found with creation time within period {}.".format(
+                        api.UtcPeriod(min(v), max(v)).to_string()))
         lead_time_slice = slice(nb_lead_intervals_to_drop, nb_lead_intervals_to_drop + nb_lead_intervals + 1)
         return time_slice, lead_time_slice, m_t
 
