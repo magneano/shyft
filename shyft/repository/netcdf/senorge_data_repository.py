@@ -5,7 +5,7 @@ from netCDF4 import Dataset
 from shyft import api
 from .. import interfaces
 from .time_conversion import convert_netcdf_time
-from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, _make_time_slice, _get_files
+from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, _make_time_slice, _get_files, dummy_var
 
 class SeNorgeDataRepositoryError(Exception):
     pass
@@ -77,7 +77,9 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         # Field names and mappings
         self.senorge_shyft_map = {
             "mean_temperature": "temperature",
-            "precipitation_amount": "precipitation"
+            "precipitation_amount": "precipitation",
+            "radiation": "radiation",
+            "wind_speed": "wind_speed"
             }
 
         self.var_units = {"mean_temperature": ['C'],
@@ -117,8 +119,12 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                 filename = _get_files(self._directory, self._filename, utc_period.start, SeNorgeDataRepositoryError)
             else:
                 raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
-        with Dataset(filename) as dataset:
-            return self._get_data_from_dataset(dataset, input_source_types, utc_period, geo_location_criteria)
+
+        if any(a in input_source_types for a in ('radiation', 'wind_speed', 'relative_hum')):
+            return dummy_var(input_source_types, utc_period, geo_location_criteria)
+        else:
+            with Dataset(filename) as dataset:
+                return self._get_data_from_dataset(dataset, input_source_types, utc_period, geo_location_criteria)
 
 
 
@@ -190,7 +196,8 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
 
     def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria, ensemble_member=None):
 
-        #x_var = dataset.variables.get("X", None)
+
+         #x_var = dataset.variables.get("X", None)
         #y_var = dataset.variables.get("Y", None)
         #time = dataset.variables.get("time", None)
         #if not all([x_var, y_var, time]):
@@ -218,6 +225,8 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:] * coord_conv, y_var[:] * coord_conv,
                                                                data_cs.proj4, self.shyft_cs, geo_location_criteria,
                                                                self._padding, SeNorgeDataRepositoryError)
+
+
         # Make temporal slilce
         time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
 
@@ -375,3 +384,5 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         for k, (v, ak, unit) in data.items():
             res[k] = convert_map[ak](v, time, unit)
         return res
+
+

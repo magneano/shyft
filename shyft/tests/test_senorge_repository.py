@@ -9,6 +9,7 @@ from shyft import shyftdata_dir
 from shyft import api
 from shyft.repository.netcdf.senorge_data_repository import SeNorgeDataRepository
 from shyft.repository.netcdf.senorge_data_repository import SeNorgeDataRepositoryError
+
 from shapely.geometry import box
 
 
@@ -82,6 +83,34 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
                 #    plt.plot(ts_values)
                 #    plt.title([name])
                 #    plt.show()
+
+    def test_get_dummy(self):
+        """
+        #Simple regression test of WRF data repository.
+        """
+        EPSG, bbox, bpoly = self.senorge_epsg_bbox
+
+        # Period start
+        n_days = 5
+        t0 = api.YMDhms(2015, 2)
+        date_str = "{}-{:02}".format(t0.year, t0.month)
+        utc = api.Calendar()  # No offset gives Utc
+        period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_days * 24))
+
+        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository", "senorge2")
+        f1 = "seNorge2_PREC1d_grid_2015.nc"
+
+        senorge1 = SeNorgeDataRepository(EPSG, base_dir, filename=f1, allow_subset=True)
+        senorge1_data_names = ("radiation",)
+        sources = senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
+        self.assertTrue(len(sources) > 0)
+
+        self.assertTrue(set(sources) == set(senorge1_data_names))
+        p0 = sources["radiation"][0].ts
+        self.assertTrue(p0.size() == n_days)
+        self.assertTrue(p0.time(0), period.start)
+
+
 
     @property
     def senorge_epsg_bbox(self):
