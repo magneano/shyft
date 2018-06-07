@@ -1,18 +1,20 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 ///	Copyright 2012 Statkraft Energi A/S
 ///
-///	This file is part of SHyFT.
+///	This file is part of Shyft.
 ///
-///	SHyFT is free software: you can redistribute it and/or modify it under the terms of
+///	Shyft is free software: you can redistribute it and/or modify it under the terms of
 /// the GNU Lesser General Public License as published by the Free Software Foundation,
 /// either version 3 of the License, or (at your option) any later version.
 ///
-///	SHyFT is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+///	Shyft is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 /// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 /// PURPOSE. See the GNU Lesser General Public License for more details.
 ///
 ///	You should have received a copy of the GNU Lesser General Public License along with
-/// SHyFT, usually located under the SHyFT root directory in two files named COPYING.txt
+/// Shyft, usually located under the Shyft root directory in two files named COPYING.txt
 /// and COPYING_LESSER.txt.	If not, see <http://www.gnu.org/licenses/>.
 ///
 /// This implementation is a slightly improved and ported version of Skaugen's snow routine
@@ -107,13 +109,13 @@ namespace shyft {
 
 
             struct state {
-                double nu;
-                double alpha;
-                double sca;
-                double swe;
-                double free_water;
-                double residual;
-                size_t num_units;
+                double nu;        ///< shape for the gamma-distributed snow
+                double alpha;     ///< shape for the gamma-distributed snow
+                double sca;       ///< snow covered area fraction
+                double swe;       ///< mm, snow water equivalent in the snow covered area of the cell (num_units*unit_size)..redundant!?
+                double free_water;///< mm, free water in the snow covered area of the cell
+                double residual;  ///< mm , residual, that keeps track of mass that does not fit into unit size
+                size_t num_units; ///< number of units in the snow-covered part of the cell, each of unit_size mm thickness
                 state(double nu=4.077, double alpha=40.77, double sca=0.0,
                       double swe=0.0, double free_water=0.0, double residual=0.0, size_t num_units=0)
                  : nu(nu), alpha(alpha), sca(sca), swe(swe), free_water(free_water),
@@ -127,18 +129,17 @@ namespace shyft {
                         && fabs(free_water - x.free_water)<eps
                         && fabs(residual - x.residual)<eps
                         && num_units==x.num_units;
-
-
                 }
+                bool swe_for_cell_area() const  { return swe*sca;}
+                bool free_water_for_cell_area() const {return free_water*sca;}
                 x_serialize_decl();
             };
 
 
             struct response {
-                double outflow = 0.0;///< m^3/s
-                double total_stored_water = 0.0;// def. as sca*(swe+lwc)
-                double sca =0.0;// fraction, sih-note: we need it for snow calibration collection
-                double swe= 0.0;// mm, as noted above, for calibration, def. as (swe+lwc)
+                double outflow = 0.0;///< mm/h over cell area equivalent
+                double sca = 0.0;///< snow covered fraction of cell area 
+                double swe = 0.0;///< mm snow water equivalent over total cell area
             };
 
             template<class P, class S, class R>
@@ -151,8 +152,8 @@ namespace shyft {
                           const P& p,
                           const double T,
                           const double prec,
-                          const double rad,
-                          const double wind_speed,
+                          const double /*rad*/,
+                          const double /*wind_speed*/,
                           S& s,
                           R& r) const {
                     const double unit_size = p.unit_size;
@@ -169,7 +170,7 @@ namespace shyft {
                     if (s.sca*s.swe < unit_size && snow < snow_tol) {
                         // Set state and response and return
                         r.outflow = rain + s.sca*(s.swe + s.free_water) + s.residual;
-                        r.total_stored_water = 0.0;
+                        r.swe = 0.0;
 
                         s.residual = 0.0;
                         if (r.outflow < 0.0) {
@@ -331,8 +332,7 @@ namespace shyft {
                         nu /= nnn;
 
                     r.outflow = discharge;
-                    r.total_stored_water = sca*(swe + lwc);
-                    r.swe=(swe+lwc);//sih: needed for calibration, and most likely what other routines consider as swe
+                    r.swe = sca*(swe + lwc);
                     r.sca=sca; //sih: needed for calibration on snow sca
                     s.nu = nu;
                     s.alpha = alpha;

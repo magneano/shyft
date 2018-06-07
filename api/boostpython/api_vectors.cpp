@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -120,6 +122,7 @@ namespace expose {
             .def("create_from_x_y_z",create_from_x_y_z_vectors,args("x","y","z"),"Create a GeoPointVector from x,y and z DoubleVectors of equal length")
             .staticmethod("create_from_x_y_z")
             ;
+            py_api::iterable_converter().from_python<GeoPointVector>();
     }
     static void expose_geo_cell_data_vector() {
         typedef std::vector<shyft::core::geo_cell_data> GeoCellDataVector;
@@ -127,6 +130,7 @@ namespace expose {
             .def(vector_indexing_suite<GeoCellDataVector>())
             .def(init<const GeoCellDataVector&>(args("const_ref_v")))
             ;
+        py_api::iterable_converter().from_python<GeoCellDataVector>();
     }
     static void expose_ts_vector_create() {
         def("create_ts_vector_from_np_array",

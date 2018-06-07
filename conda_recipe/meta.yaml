@@ -13,7 +13,7 @@
 #
 package:
     name: shyft
-    version: {{ environ.get('SHYFT_VERSION','4.4.1') }}
+    version: {{ environ.get('SHYFT_VERSION','4.6.1') }}
     
 source:
     # where to find the source-tree

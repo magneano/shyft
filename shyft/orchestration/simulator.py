@@ -1,5 +1,7 @@
-﻿"""
-Simulator classes for running SHyFT forward simulations.
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
+"""
+Simulator classes for running Shyft forward simulations.
 """
 import numpy as np
 import math

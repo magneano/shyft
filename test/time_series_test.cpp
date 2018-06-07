@@ -10,6 +10,8 @@
 
 using shyft::time_series::dd::gta_t;
 
+
+
 namespace shyfttest {
 const double EPS = 1.0e-8;
 using namespace std;
@@ -1855,5 +1857,5 @@ TEST_SUITE("time_series") {
 
     }
 
-
+ 
 }

@@ -121,6 +121,10 @@
 			<Add option="-I$(#numpy.include)" />
 			<Add option="-DARMA_DONT_USE_WRAPPER" />
 			<Add option="-DARMA_DONT_PRINT_ERRORS" />
+			<Add option="-DBOOST_VARIANT_MINIMIZE_SIZE" />
+            <Add option="-DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS" />
+			<Add option="-DBOOST_MPL_LIMIT_LIST_SIZE=30" />
+			<Add option="-DBOOST_MPL_LIMIT_VECTOR_SIZE=30" />
 			<Add directory=".." />
 			<Add directory="../../../dlib" />
 			<Add directory="../.." />

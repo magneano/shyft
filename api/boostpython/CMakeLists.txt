@@ -77,18 +77,16 @@
     # step 1: pull out abs-paths from imported targets
     get_property(dlib_lib TARGET dlib::dlib PROPERTY IMPORTED_LOCATION_RELEASE) 
     # not yet supported on cmake 3.9.x:
-    #get_property(boost_system_lib TARGET Boost::system PROPERTY IMPORTED_LOCATION_RELEASE)
-    #get_property(boost_filesystem_lib TARGET Boost::filesystem PROPERTY IMPORTED_LOCATION_RELEASE)
-    #get_property(boost_serialization_lib  TARGET Boost::serialization PROPERTY IMPORTED_LOCATION_RELEASE)
-    #get_property(boost_python3_lib TARGET Boost::python3 PROPERTY IMPORTED_LOCATION_RELEASE)
-    #get_target_property(arma_lib armadillo IMPORTED_LOCATION_NOCONFIG)
-    # step 2: get the real-name (we want libboost_system.so.1.66.0, not the symlink libboost_system.so)
-    get_filename_component(a_lib ${ARMADILLO_LIBRARIES} REALPATH CACHE)
-    get_filename_component(d_lib ${dlib_lib} REALPATH CACHE)
+
     get_filename_component(b_filesystem ${boost_filesystem_lib} REALPATH CACHE)
     get_filename_component(b_system ${boost_system_lib} REALPATH CACHE)
     get_filename_component(b_serialization ${boost_serialization_lib} REALPATH CACHE)
     get_filename_component(b_python3 ${boost_python3_lib} REALPATH CACHE)
+
+    #get_target_property(arma_lib armadillo IMPORTED_LOCATION_NOCONFIG)
+    # step 2: get the real-name (we want libboost_system.so.1.66.0, not the symlink libboost_system.so)
+    get_filename_component(a_lib ${ARMADILLO_LIBRARIES} REALPATH CACHE)
+    get_filename_component(d_lib ${dlib_lib} REALPATH CACHE)
     string(REPLACE ".400.0" ""   a_lib_major ${a_lib})  # fixup for armadillo that references major version
 
     # step 3: install to the shyft/lib (that is referenced by the RPATH relative to the extensions libraries on linux)

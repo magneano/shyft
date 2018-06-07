@@ -51,6 +51,9 @@
 			<Add option="-D__UNIT_TEST__" />
 			<Add option="-DVERBOSE=0" />
 			<Add option="-DBOOST_VARIANT_MINIMIZE_SIZE" />
+			<Add option="-DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS" />
+			<Add option="-DBOOST_MPL_LIMIT_LIST_SIZE=30" />
+			<Add option="-DBOOST_MPL_LIMIT_VECTOR_SIZE=30" />
 			<Add option="-DARMA_DONT_USE_WRAPPER" />
 			<Add option="-DARMA_DONT_PRINT_ERRORS" />
 			<Add option="-DARMA_NO_DEBUG" />
@@ -212,6 +215,9 @@
 		<Unit filename="time_series_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_decode_test.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>	
 		<Unit filename="utctime_utilities_test.cpp">
 			<Option virtualFolder="time_and_calendar/" />
 		</Unit>

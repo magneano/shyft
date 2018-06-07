@@ -5,7 +5,7 @@ import unittest
 from contextlib import closing
 
 import numpy as np
-from time import clock as time_now
+from time import sleep
 from numpy.testing import assert_array_almost_equal
 
 from shyft.api import Calendar
@@ -147,6 +147,10 @@ class DtssTestCase(unittest.TestCase):
         # then try something that should work
         dts.store_ts(store_tsv)
         r1 = dts.evaluate(tsv, ta.total_period())
+        tsv1x = tsv.inside(-0.5, 0.5)
+        tsv1x.append(tsv1x[-1].decode(start_bit=1, n_bits=1))  # just to verify serialization/bind
+
+        r1x = dts.evaluate(tsv1x, ta.total_period())
         r2 = dts.percentiles(tsv, ta.total_period(), ta24, percentile_list)
         r3 = dts.find('netcdf://dummy\.nc/ts\d')
         self.rd_throws = True
@@ -167,7 +171,7 @@ class DtssTestCase(unittest.TestCase):
         dtss.clear()  # close server
         self.assertEqual(ex_count, 2)
         self.assertEqual(len(r1), len(tsv))
-        self.assertEqual(self.callback_count, 3)
+        self.assertEqual(self.callback_count, 4)
         for i in range(n_ts - 1):
             self.assertEqual(r1[i].time_axis, tsv[i].time_axis)
             assert_array_almost_equal(r1[i].values.to_numpy(), tsv[i].values.to_numpy(), decimal=4)
@@ -185,7 +189,7 @@ class DtssTestCase(unittest.TestCase):
         self.assertEqual(len(r3), 10)  # 0..9
         for i in range(len(r3)):
             self.assertEqual(r3[i], self.ts_infos[i])
-
+        self.assertIsNotNone(r1x)
         self.assertEqual(1, len(self.stored_tsv))
         self.assertEqual(len(store_tsv), len(self.stored_tsv[0]))
         for i in range(len(store_tsv)):
@@ -237,6 +241,7 @@ class DtssTestCase(unittest.TestCase):
             ts_qac = ts9.min_max_check_linear_fill(v_min=-10.0*n_ts, v_max=10.0*n_ts)
             tsv_krls.append(ts_qac)
             tsv_krls.append(ts9)
+            tsv_krls.append(ts9.inside(min_v=-0.5, max_v=0.5))
 
             # then start the server
             dtss = DtsServer()
@@ -457,7 +462,7 @@ class DtssTestCase(unittest.TestCase):
         """
         This test illustrates use of partition_by client and server-side.
         The main point here is to ensure that the evaluate period covers
-        both the historical and evaluation period.
+        both the historical and evaluation peri
         """
         with tempfile.TemporaryDirectory() as c_dir:
             # setup data to be calculated
@@ -495,11 +500,89 @@ class DtssTestCase(unittest.TestCase):
             ts_p1 = ts_h1.partition_by(utc, t, Calendar.YEAR, 10, t_0).average(tax)
             ts_p2 = ts_h2.partition_by(utc, t, Calendar.YEAR, 10, t_0).average(tax)
 
-            read_period = UtcPeriod(t, tax.total_period().end)  # note that we need to supply the *total* period for read & evaluation
-            r = c.evaluate(ts_p1, read_period, use_ts_cached_read=True, update_ts_cache=True)
-            c.close()  # close connection (will use context manager later)
-            dtss.clear()  # close server
-            self.assertIsNotNone(r)
-            diffs = r-ts_p2
-            for d in diffs:
-                self.assertAlmostEqual(abs(d.values.to_numpy()).sum(),  0.0)
+    def test_dtss_remove_series(self):
+        with tempfile.TemporaryDirectory() as c_dir:
+
+            # start the server
+            dtss = DtsServer()
+            port_no = find_free_port()
+            host_port = 'localhost:{0}'.format(port_no)
+            dtss.set_listening_port(port_no)
+            dtss.set_container("test", c_dir)  # notice we set container 'test' to point to c_dir directory
+            dtss.start_async()  # the internal shyft time-series will be stored to that container
+
+            # setup some data
+            utc = Calendar()
+            d = deltahours(1)
+            n = 365*24//3
+            t = utc.time(2016, 1, 1)
+            ta = TimeAxis(t, d, n)
+            tsv = TsVector()
+            pts = TimeSeries(ta, np.linspace(start=0, stop=1.0, num=ta.size()), point_fx.POINT_AVERAGE_VALUE)
+            tsv.append(TimeSeries("cache://test/foo", pts))
+
+            # get a client
+            client = DtsClient(host_port)
+            client.store_ts(tsv)
+
+            # start with no removing
+            dtss.set_can_remove(False)
+
+            # we should be disallowed to remove now
+            try:
+                client.remove("shyft://test/foo")
+            except Exception as err:
+                self.assertEqual(str(err), "dtss::server: server does not support removing")
+
+            # then try with allowing remove
+            dtss.set_can_remove(True)
+
+            # we only support removing shyft-url style data
+            try:
+                client.remove("protocol://test/foo")
+            except Exception as err:
+                self.assertEqual(str(err), "dtss::server: server does not allow removing for non shyft-url type data")
+
+            # now it should work
+            client.remove("shyft://test/foo")
+
+    def test_failures(self):
+        """
+        Verify that dtss client server connections are auto-magically
+        restored and fixed
+        """
+        with tempfile.TemporaryDirectory() as c_dir:
+
+            # start the server
+            dtss = DtsServer()
+            port_no = find_free_port()
+            host_port = 'localhost:{0}'.format(port_no)
+            dtss.set_listening_port(port_no)
+            dtss.set_container("test", c_dir)  # notice we set container 'test' to point to c_dir directory
+            dtss.start_async()  # the internal shyft time-series will be stored to that container
+
+            # setup some data
+            utc = Calendar()
+            d = deltahours(1)
+            n = 365*24//3
+            t = utc.time(2016, 1, 1)
+            ta = TimeAxis(t, d, n)
+            tsv = TsVector()
+            pts = TimeSeries(ta, np.linspace(start=0, stop=1.0, num=ta.size()), point_fx.POINT_AVERAGE_VALUE)
+            tsv.append(TimeSeries("cache://test/foo", pts))
+
+            # get a client
+            client = DtsClient(host_port, auto_connect=False)
+            client.store_ts(tsv)
+            client.close()
+            client.store_ts(tsv)  # should just work, it re-open automagically
+            dtss.clear()  # the server is out and away, no chance this would work
+            try:
+                client.store_ts(tsv)
+                self.assertTrue(False, 'This should throw, because there is no dtss server to help you')
+            except Exception as ee:
+                self.assertFalse(False, f'expected {ee} here')
+
+            dtss.set_listening_port(port_no)
+            dtss.start_async()
+            client.store_ts(tsv)  # this should just work, automagically reconnect

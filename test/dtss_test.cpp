@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #endif
 #include <fcntl.h>
+#include <string_view>
 
 namespace  fs=boost::filesystem;
 #include <armadillo>
@@ -51,69 +52,69 @@ dlib::logger dlog("dlib.log");
 TEST_SUITE("dtss") {
 
 TEST_CASE("dtss_lru_cache") {
-	using shyft::dtss::lru_cache;
-	using std::map;
-	using std::list;
-	using std::vector;
-	using std::string;
-	using std::back_inserter;
-	using shyft::time_series::dd::apoint_ts;
-	using shyft::time_series::dd::gta_t;
-	const auto stair_case=shyft::time_series::POINT_AVERAGE_VALUE;
-	lru_cache<string, apoint_ts, map > c(2);
+    using shyft::dtss::lru_cache;
+    using std::map;
+    using std::list;
+    using std::vector;
+    using std::string;
+    using std::back_inserter;
+    using shyft::time_series::dd::apoint_ts;
+    using shyft::time_series::dd::gta_t;
+    const auto stair_case=shyft::time_series::POINT_AVERAGE_VALUE;
+    lru_cache<string, apoint_ts, map > c(2);
 
-	apoint_ts r;
-	vector<string> mru;
-	gta_t ta(0, 1, 10);
+    apoint_ts r;
+    vector<string> mru;
+    gta_t ta(0, 1, 10);
 
-	TEST_SECTION("empty_cache") {
-		FAST_CHECK_UNARY_FALSE(c.try_get_item("a", r));
-	}
-	TEST_SECTION("add_one_item") {
-		c.add_item("a", apoint_ts(ta, 1.0, stair_case));
-		FAST_CHECK_UNARY(c.try_get_item("a", r));
-		FAST_CHECK_EQ(ta.size(), r.time_axis().size());
-		FAST_CHECK_UNARY_FALSE(c.try_get_item("b", r));
-	}
-	TEST_SECTION("add_second_item") {
-		c.add_item("b", apoint_ts(ta, 2.0, stair_case));
-		FAST_CHECK_UNARY(c.try_get_item("a", r));
-		FAST_CHECK_UNARY(c.try_get_item("b", r));
-		c.get_mru_keys(back_inserter(mru));
-		FAST_CHECK_EQ(string("b"), mru[0]);
-		FAST_CHECK_EQ(string("a"), mru[1]);
-	}
-	TEST_SECTION("mru_item_in_front") {
-		c.try_get_item("a", r);
-		mru.clear(); c.get_mru_keys(back_inserter(mru));
-		FAST_CHECK_EQ(string("a"), mru[0]);
-		FAST_CHECK_EQ(string("b"), mru[1]);
-	}
-	TEST_SECTION("excessive_lru_item_evicted_when_adding") {
-		c.add_item("c", apoint_ts(ta, 3.0, stair_case));
-		FAST_CHECK_UNARY_FALSE(c.try_get_item("b", r));
-		FAST_CHECK_UNARY(c.try_get_item("c", r));
-		FAST_CHECK_UNARY(c.try_get_item("a", r));
-	}
-	TEST_SECTION("remove_item") {
-		c.remove_item("a");
-		FAST_CHECK_UNARY_FALSE(c.try_get_item("a", r));
-	}
-	TEST_SECTION("ensure_items_added_are_first") {
-		c.add_item("d", apoint_ts(ta, 4.0, stair_case));
-		mru.clear(); c.get_mru_keys(back_inserter(mru));
-		FAST_CHECK_EQ(string("d"), mru[0]);
-		FAST_CHECK_EQ(string("c"), mru[1]);
-	}
-	TEST_SECTION("update_existing") {
-		c.try_get_item("c", r);//just to ensure "c" is in first position
-		c.add_item("d", apoint_ts(ta, 4.2, stair_case)); //update "d"
-		c.try_get_item("d", r);
-		FAST_CHECK_GT(r.value(0), 4.1);
-		mru.clear(); c.get_mru_keys(back_inserter(mru));
-		FAST_CHECK_EQ(string("d"), mru[0]);
-		FAST_CHECK_EQ(string("c"), mru[1]);
-	}
+    TEST_SECTION("empty_cache") {
+        FAST_CHECK_UNARY_FALSE(c.try_get_item("a", r));
+    }
+    TEST_SECTION("add_one_item") {
+        c.add_item("a", apoint_ts(ta, 1.0, stair_case));
+        FAST_CHECK_UNARY(c.try_get_item("a", r));
+        FAST_CHECK_EQ(ta.size(), r.time_axis().size());
+        FAST_CHECK_UNARY_FALSE(c.try_get_item("b", r));
+    }
+    TEST_SECTION("add_second_item") {
+        c.add_item("b", apoint_ts(ta, 2.0, stair_case));
+        FAST_CHECK_UNARY(c.try_get_item("a", r));
+        FAST_CHECK_UNARY(c.try_get_item("b", r));
+        c.get_mru_keys(back_inserter(mru));
+        FAST_CHECK_EQ(string("b"), mru[0]);
+        FAST_CHECK_EQ(string("a"), mru[1]);
+    }
+    TEST_SECTION("mru_item_in_front") {
+        c.try_get_item("a", r);
+        mru.clear(); c.get_mru_keys(back_inserter(mru));
+        FAST_CHECK_EQ(string("a"), mru[0]);
+        FAST_CHECK_EQ(string("b"), mru[1]);
+    }
+    TEST_SECTION("excessive_lru_item_evicted_when_adding") {
+        c.add_item("c", apoint_ts(ta, 3.0, stair_case));
+        FAST_CHECK_UNARY_FALSE(c.try_get_item("b", r));
+        FAST_CHECK_UNARY(c.try_get_item("c", r));
+        FAST_CHECK_UNARY(c.try_get_item("a", r));
+    }
+    TEST_SECTION("remove_item") {
+        c.remove_item("a");
+        FAST_CHECK_UNARY_FALSE(c.try_get_item("a", r));
+    }
+    TEST_SECTION("ensure_items_added_are_first") {
+        c.add_item("d", apoint_ts(ta, 4.0, stair_case));
+        mru.clear(); c.get_mru_keys(back_inserter(mru));
+        FAST_CHECK_EQ(string("d"), mru[0]);
+        FAST_CHECK_EQ(string("c"), mru[1]);
+    }
+    TEST_SECTION("update_existing") {
+        c.try_get_item("c", r);//just to ensure "c" is in first position
+        c.add_item("d", apoint_ts(ta, 4.2, stair_case)); //update "d"
+        c.try_get_item("d", r);
+        FAST_CHECK_GT(r.value(0), 4.1);
+        mru.clear(); c.get_mru_keys(back_inserter(mru));
+        FAST_CHECK_EQ(string("d"), mru[0]);
+        FAST_CHECK_EQ(string("c"), mru[1]);
+    }
 }
 TEST_CASE("dtss_ts_cache") {
     using std::vector;
@@ -197,7 +198,7 @@ TEST_CASE("dtss_ts_cache") {
     auto mts2 = c.get(ids2, mta.total_period());
     FAST_REQUIRE_EQ(n_ts, mts.size());
     for (size_t i = 0; i<n_ts; ++i) {
-        FAST_REQUIRE_UNARY(mts2.find(ids[i])!=mts.end());
+        FAST_REQUIRE_UNARY(mts2.find(ids[i]) != mts2.end());
         FAST_CHECK_EQ(mts2[ids[i]].value(0), double(i)); // just check one value unique for ts.
     }
 
@@ -352,7 +353,7 @@ TEST_CASE("dlib_server_basics") {
             return r;
         };
 
-        server our_server(cb,fcb);
+        server<standard_dtss_dispatcher> our_server(cb,fcb);
 
         // set up the server object we have made
         our_server.set_listening_ip("127.0.0.1");
@@ -432,11 +433,11 @@ TEST_CASE("dlib_multi_server_basics") {
         };
 
         size_t n_servers=2;
-        vector<unique_ptr<server>> servers;
+        vector<unique_ptr<server<standard_dtss_dispatcher>>> servers;
         vector<string> host_ports;
         int base_port=21000;
         for(size_t i=0;i<n_servers;++i) {
-            auto srv = make_unique<server>(rcb);
+            auto srv = make_unique<server<standard_dtss_dispatcher>>(rcb);
             srv->set_listening_ip("127.0.0.1");
             srv->set_listening_port(base_port +i);
             srv->start_async();
@@ -495,10 +496,10 @@ TEST_CASE("dlib_server_performance") {
         gta_t ta(t, dt, n);
         gta_t ta24(t, dt24, n24);
         bool throw_exception = false;
-		ts_vector_t from_disk; from_disk.reserve(n_ts);
-		double fv = 1.0;
-		for (int i = 0; i < n_ts; ++i)
-			from_disk.emplace_back(ta, fv += 1.0,shyft::time_series::ts_point_fx::POINT_AVERAGE_VALUE);
+        ts_vector_t from_disk; from_disk.reserve(n_ts);
+        double fv = 1.0;
+        for (int i = 0; i < n_ts; ++i)
+            from_disk.emplace_back(ta, fv += 1.0,shyft::time_series::ts_point_fx::POINT_AVERAGE_VALUE);
 
         read_call_back_t cb = [&from_disk, &throw_exception](id_vector_t ts_ids, core::utcperiod p)
             ->ts_vector_t {
@@ -508,7 +509,7 @@ TEST_CASE("dlib_server_performance") {
             }
             return from_disk;
         };
-        server our_server(cb);
+        server<standard_dtss_dispatcher> our_server(cb);
 
         // set up the server object we have made
         our_server.set_listening_ip("127.0.0.1");
@@ -524,18 +525,18 @@ TEST_CASE("dlib_server_performance") {
                     string host_port = string("localhost:") + to_string(port_no);
                     dlog << dlib::LINFO << "sending an expression ts to " << host_port;
                     std::vector<apoint_ts> tsl;
-					for (int x = 1; x <= n_ts; ++x) {// just make a  very thin request, that get loads of data back
+                    for (int x = 1; x <= n_ts; ++x) {// just make a  very thin request, that get loads of data back
 #if 0
-						auto ts_expr = apoint_ts(string("netcdf://group/path/ts_") + std::to_string(x));
-						tsl.push_back(ts_expr);
+                        auto ts_expr = apoint_ts(string("netcdf://group/path/ts_") + std::to_string(x));
+                        tsl.push_back(ts_expr);
 #else
-						auto ts_expr = 10.0 + 3.0*apoint_ts(string("netcdf://group/path/ts_") + std::to_string(x));
-						if (x > 1) {
-							ts_expr = ts_expr - 3.0*apoint_ts(string("netcdf://group/path/ts_") + std::to_string(x - 1));
-						}
-						tsl.push_back(ts_expr.average(ta));
+                        auto ts_expr = 10.0 + 3.0*apoint_ts(string("netcdf://group/path/ts_") + std::to_string(x));
+                        if (x > 1) {
+                            ts_expr = ts_expr - 3.0*apoint_ts(string("netcdf://group/path/ts_") + std::to_string(x - 1));
+                        }
+                        tsl.push_back(ts_expr.average(ta));
 #endif
-					}
+                    }
 
                     client dtss(host_port);
                     auto t0 = timing::now();
@@ -573,8 +574,8 @@ TEST_CASE("dlib_server_performance") {
 }
 TEST_CASE("dtss_store_basics") {
         using namespace shyft::dtss;
-		using namespace shyft::time_series::dd;
-		using time_series::point_ts;
+        using namespace shyft::time_series::dd;
+        using time_series::point_ts;
 
         std::shared_ptr<core::calendar> utc = std::make_shared<core::calendar>();
         std::shared_ptr<core::calendar> osl = std::make_shared<core::calendar>("Europe/Oslo");
@@ -584,7 +585,7 @@ TEST_CASE("dtss_store_basics") {
         core::utctimespan dt_half = core::deltaminutes(30);
         std::size_t n = 24 * 365 * 2;//24*365*5;
 
-		// construct time-axis that we want to test.
+        // construct time-axis that we want to test.
         time_axis::fixed_dt fta(t, dt, n);
         time_axis::calendar_dt cta1(utc,t,dt,n);
         time_axis::calendar_dt cta2(osl,t,dt,n);
@@ -703,8 +704,8 @@ TEST_CASE("dtss_store_basics") {
         }
 
         TEST_SECTION("dtss_db_speed") {
-			int n_ts = 120;
-			vector<gts_t> tsv; tsv.reserve(n_ts);
+            int n_ts = 120;
+            vector<gts_t> tsv; tsv.reserve(n_ts);
             double fv = 1.0;
             for (int i = 0; i < n_ts; ++i)
                 tsv.emplace_back(gta_t(fta), fv += 1.0,shyft::time_series::ts_point_fx::POINT_AVERAGE_VALUE);
@@ -724,10 +725,10 @@ TEST_CASE("dtss_store_basics") {
             auto t2= timing::now();
             auto w_mb_s= n_ts*n/double(elapsed_ms(t0,t1))/1000.0;
             auto r_mb_s= n_ts*n/double(elapsed_ms(t1,t2))/1000.0;
-			// on windows(before workaround): ~ 6 mpts/sec write, 162 mpts/sec read (slow close->workaround with thread?)
-			// on linux: ~ 120 mpts/sec write, 180 mpts/sec read
+            // on windows(before workaround): ~ 6 mpts/sec write, 162 mpts/sec read (slow close->workaround with thread?)
+            // on linux: ~ 120 mpts/sec write, 180 mpts/sec read
             std::cout<<"write Mpts/s = "<<w_mb_s<<", read Mpts/s = "<<r_mb_s<<" pts = "<<n_ts*n<<", roundtrip ms="<< double(elapsed_ms(t0,t2)) <<"\n";
-			//std::cout << "open_ms:" << db.t_open << ", write_ms:" << db.t_write << ", t_close_ms:" << db.t_close << std::endl;
+            //std::cout << "open_ms:" << db.t_open << ", write_ms:" << db.t_write << ", t_close_ms:" << db.t_close << std::endl;
             FAST_CHECK_EQ(rv.size(),tsv.size());
             //fs::remove_all("*.db");
         }
@@ -748,11 +749,99 @@ TEST_CASE("dtss_store_basics") {
 
 }
 TEST_CASE("shyft_url") {
-    using namespace shyft::dtss;
-    FAST_CHECK_EQ(shyft_url("abc","123"),string("shyft://abc/123"));
-    FAST_CHECK_EQ(extract_shyft_url_container("shyft://abc/something/else"),string("abc"));
-    FAST_CHECK_EQ(extract_shyft_url_container("grugge"),string{});
+
+    using shyft::dtss::shyft_url;
+
+    FAST_CHECK_EQ( shyft_url("abc","123"), string("shyft://abc/123") );
+
+    std::map<std::string, std::string> m{ std::make_pair("foo", "bar"), std::make_pair("baz", "") };
+    FAST_CHECK_EQ( shyft_url("abc","123", m), string("shyft://abc/123?baz=&foo=bar") );
 }
+TEST_CASE("extract_shyft_url_container") {
+
+    using shyft::dtss::extract_shyft_url_container;
+
+    std::string extracted_1 = extract_shyft_url_container("shyft://abc/something/else");
+    std::string extracted_2 = extract_shyft_url_container("shyft://abc/something/else?query=string&here=foo");
+    FAST_CHECK_EQ( extracted_1, string("abc") );
+    FAST_CHECK_EQ( extracted_2, string("abc") );
+
+    std::string extracted_3 = extract_shyft_url_container("grugge");
+    std::string extracted_4 = extract_shyft_url_container("grugge?query");
+    FAST_CHECK_EQ( extracted_3, string{} );
+    FAST_CHECK_EQ( extracted_4, string{} );
+
+}
+TEST_CASE("extract_shyft_url_path") {
+
+    using shyft::dtss::extract_shyft_url_path;
+
+    std::string extracted_1 = extract_shyft_url_path("shyft://abc/something/else");
+    std::string extracted_2 = extract_shyft_url_path("shyft://abc/something/else?query=string&here=foo");
+    FAST_CHECK_EQ( extracted_1, string("something/else") );
+    FAST_CHECK_EQ( extracted_2, string("something/else") );
+
+    std::string extracted_3 = extract_shyft_url_path("grugge://abc/something/else");
+    std::string extracted_4 = extract_shyft_url_path("grugge?query");
+    FAST_CHECK_EQ( extracted_3, string{} );
+    FAST_CHECK_EQ( extracted_4, string{} );
+
+}
+TEST_CASE("extract_shyft_url_query") {
+
+    using shyft::dtss::extract_shyft_url_query_parameters;
+
+    auto m1 = extract_shyft_url_query_parameters("shyft://abc/something/else?query=string&here=");
+    FAST_CHECK_EQ( m1.size(), 2 );
+    FAST_REQUIRE_EQ( m1.count("query"), 1 );
+    FAST_CHECK_EQ( m1["query"], std::string{"string"} );
+    FAST_REQUIRE_EQ( m1.count("here"), 1 );
+    FAST_CHECK_EQ( m1["here"], std::string{""} );
+
+    auto m2 = extract_shyft_url_query_parameters("shyft://abc/something/else?query=string&here=foo");
+    FAST_CHECK_EQ( m2.size(), 2 );
+    FAST_REQUIRE_EQ( m2.count("query"), 1 );
+    FAST_CHECK_EQ( m2["query"], std::string{"string"} );
+    FAST_REQUIRE_EQ( m2.count("here"), 1 );
+    FAST_CHECK_EQ( m2["here"], std::string{"foo"} );
+
+    auto m3 = extract_shyft_url_query_parameters("grugge");
+    FAST_CHECK_EQ( m3.size(), 0 );
+
+    auto m4 = extract_shyft_url_query_parameters("grugge?query");
+    FAST_CHECK_EQ( m4.size(), 0 );
+}
+TEST_CASE("remove_shyft_url_queries") {
+
+    using shyft::dtss::remove_shyft_url_queries;
+
+    auto url1 = remove_shyft_url_queries("shyft://abc/something/else?query=string&here=");
+    FAST_CHECK_EQ( url1, "shyft://abc/something/else" );
+
+    auto url2 = remove_shyft_url_queries("grugge");
+    FAST_CHECK_EQ( url2, "" );
+
+    auto url3 = remove_shyft_url_queries("grugge?query");
+    FAST_CHECK_EQ( url3, "" );
+}
+TEST_CASE("filter_shyft_url_parsed_queries") {
+
+    using shyft::dtss::filter_shyft_url_parsed_queries;
+
+    std::array<std::string, 2> to_remove{{ "key02", "key06" }};
+    std::map<std::string, std::string> queries{{
+        {"key01", "value01" }, {"key02", "value02" },
+        {"key03", "value03" }, {"key04", "value04" },
+        {"key05", "value05" }, {"key06", "value06" }
+    }};
+
+    filter_shyft_url_parsed_queries(queries, to_remove);
+
+    FAST_CHECK_EQ( queries.size(), 4 );
+    FAST_CHECK_EQ( queries.find("key02"), queries.cend() );
+    FAST_CHECK_EQ( queries.find("key06"), queries.cend() );
+}
+
 TEST_CASE("dtss_store") { /*
     This test simply create and host a dtss on port 20000,
     then uses shyft:// prefix to test
@@ -761,7 +850,7 @@ TEST_CASE("dtss_store") { /*
     */
     using namespace shyft::dtss;
     using namespace shyft::time_series::dd;
-	using time_series::point_ts;
+    using time_series::point_ts;
     using time_series::ts_point_fx;
 
     auto utc=make_shared<calendar>();
@@ -771,7 +860,7 @@ TEST_CASE("dtss_store") { /*
 
     // make dtss server
     auto tmpdir = fs::temp_directory_path()/"shyft.c.test";
-    server our_server{};
+    server<standard_dtss_dispatcher> our_server{};
     string tc{"tc"};
     our_server.add_container(tc,tmpdir.string());
     our_server.set_listening_ip("127.0.0.1");
@@ -867,7 +956,7 @@ TEST_CASE("dtss_store_merge_write") {
     namespace dtss = shyft::dtss;
     namespace ta = shyft::time_axis;
     namespace ts = shyft::time_series;
-	using shyft::time_series::dd::gta_t;
+    using shyft::time_series::dd::gta_t;
     // setup db
     auto dirname = "ts.db.test." + std::to_string(core::utctime_now());
     auto tmpdir = (fs::temp_directory_path()/dirname);
@@ -2107,7 +2196,7 @@ TEST_CASE("dtss_store_merge_write") {
 TEST_CASE("dtss_baseline") {
     using namespace shyft::dtss;
     using namespace shyft::time_series::dd;
-	using time_series::point_ts;
+    using time_series::point_ts;
     using time_series::ts_point_fx;
     using std::cout;
     auto utc=make_shared<calendar>();
@@ -2180,7 +2269,7 @@ TEST_CASE("dtss_ltm") {
     // for api type of ts-expressions,
     using namespace shyft::dtss;
     using namespace shyft::time_series::dd;
-	using shyft::time_series::point_ts;
+    using shyft::time_series::point_ts;
     using time_series::ts_point_fx;
     using std::cout;
     auto utc=make_shared<calendar>();
@@ -2248,4 +2337,696 @@ TEST_CASE("dtss_ltm") {
     << double(n*n_ts*(2+1))/(elapsed_us(t1,t2)/1e6)/1e6<<" mops/s \n";
 
 }
+
+TEST_CASE("dtss_container_wrapping") {
+    auto tmpdir = (fs::temp_directory_path()/fs::unique_path());
+
+    shyft::core::calendar utc;
+
+    using shyft::time_axis::generic_dt;
+    using shyft::time_series::point_ts;
+    using shyft::time_series::ts_point_fx;
+    // -----
+    using shyft::dtss::ts_db;
+    using cwrp_t = shyft::dtss::container_wrapper<ts_db>;
+    
+    SUBCASE("dispatch save through container") {
+        std::string ts_name{ "test" };
+
+        generic_dt ta{ utc.time(2002, 2, 2), calendar::HOUR, 24 };
+        point_ts<generic_dt> ts{ ta, 15., shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE };
+
+        cwrp_t container{ std::make_unique<ts_db>(tmpdir.string()) };
+
+        container.save(ts_name, ts);
+        FAST_REQUIRE_UNARY( fs::is_regular_file(tmpdir/ts_name) );
+    }
+
+    SUBCASE("dispatch read through container") {
+        std::string ts_name{ "test" };
+
+        generic_dt ta{ utc.time(2002, 2, 2), calendar::HOUR, 24 };
+        point_ts<generic_dt> ts{ ta, 15., shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE };
+
+        cwrp_t container{ std::make_unique<ts_db>(tmpdir.string()) };
+        
+        container.save(ts_name, ts);
+        FAST_CHECK_UNARY( fs::is_regular_file(tmpdir/ts_name) );
+
+        auto ts_new = container.read(ts_name, ta.total_period());
+        TS_ASSERT_EQUALS( ts_new, ts );
+    }
+
+    SUBCASE("dispatch remove through container") {
+        std::string ts_name{ "test" };
+
+        generic_dt ta{ utc.time(2002, 2, 2), calendar::HOUR, 24 };
+        point_ts<generic_dt> ts{ ta, 15., shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE };
+
+        cwrp_t container{ std::make_unique<ts_db>(tmpdir.string()) };
+
+        container.save(ts_name, ts);
+        FAST_CHECK_UNARY( fs::is_regular_file(tmpdir/ts_name) );
+
+        container.remove(ts_name);
+        FAST_REQUIRE_UNARY_FALSE( fs::exists(tmpdir/ts_name) );
+    }
+
+    SUBCASE("dispatch get_ts_info through container") {
+        std::string ts_name{ "test" };
+
+        generic_dt ta{ utc.time(2002, 2, 2), calendar::HOUR, 24 };
+        point_ts<generic_dt> ts{ ta, 15., shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE };
+
+        cwrp_t container{ std::make_unique<ts_db>(tmpdir.string()) };
+
+        container.save(ts_name, ts);
+        FAST_CHECK_UNARY( fs::is_regular_file(tmpdir/ts_name) );
+
+        auto info = container.get_ts_info(ts_name);
+        FAST_REQUIRE_EQ( info.name, ts_name );
+    }
+
+    SUBCASE("dispatch find through container") {
+        std::string ts_name{ "test" };
+
+        generic_dt ta{ utc.time(2002, 2, 2), calendar::HOUR, 24 };
+        point_ts<generic_dt> ts{ ta, 15., shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE };
+
+        cwrp_t container{ std::make_unique<ts_db>(tmpdir.string()) };
+
+        container.save(ts_name, ts);
+        FAST_CHECK_UNARY( fs::is_regular_file(tmpdir/ts_name) );
+
+        auto info = container.find(ts_name);
+        FAST_REQUIRE_EQ( info.size(), 1 );
+        FAST_REQUIRE_EQ( info[0].name, ts_name );
+    }
+}
+
+
+namespace {
+
+struct query_test_dtss_container {
+
+    using ts_info = shyft::dtss::ts_info;
+    using gta_t = shyft::time_axis::generic_dt;
+    using gts_t = shyft::time_series::point_ts<gta_t>;
+    using queries_t = std::map<std::string, std::string>;
+
+    std::string root;
+
+    query_test_dtss_container() = default;
+    ~query_test_dtss_container() = default;
+
+    query_test_dtss_container(const std::string & root_dir) : root{ root_dir } {}
+
+    query_test_dtss_container(const query_test_dtss_container &) = default;
+    query_test_dtss_container & operator=(const query_test_dtss_container &) = default;
+
+    query_test_dtss_container(query_test_dtss_container &&) = default;
+    query_test_dtss_container & operator=(query_test_dtss_container &&) = default;
+
+    /*  Container API
+     * =============== */
+
+    void save(const std::string & fn, const gts_t & ts, bool overwrite = true, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("my_query");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"my_query"} );
+        FAST_CHECK_EQ( q->second, std::string{"some_value"} );
+
+        FAST_CHECK_EQ( queries.find("removed"), queries.cend() );
+    }
+
+    gts_t read(const std::string & fn, core::utcperiod p, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("my_query");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"my_query"} );
+        FAST_CHECK_EQ( q->second, std::string{"some_value"} );
+
+        FAST_CHECK_EQ( queries.find("removed"), queries.cend() );
+        return gts_t{};
+    }
+
+    void remove(const std::string & fn, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("my_query");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"my_query"} );
+        FAST_CHECK_EQ( q->second, std::string{"some_value"} );
+
+        FAST_CHECK_EQ( queries.find("removed"), queries.cend() );
+    }
+
+    ts_info get_ts_info(const std::string & fn, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("my_query");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"my_query"} );
+        FAST_CHECK_EQ( q->second, std::string{"some_value"} );
+
+        FAST_CHECK_EQ( queries.find("removed"), queries.cend() );
+
+        return ts_info{};
+    }
+
+    std::vector<ts_info> find(const std::string & match, const queries_t & queries = queries_t{}) const {
+        auto q = queries.find("my_query");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"my_query"} );
+        FAST_CHECK_EQ( q->second, std::string{"some_value"} );
+
+        FAST_CHECK_EQ( queries.find("removed"), queries.cend() );
+
+        return std::vector<ts_info>{};
+    };
+};
+
+struct query_test_dtss_dispatcher {
+
+    using queries_t = std::map<std::string, std::string>;
+    using container_wrapper_t = dtss::container_wrapper<query_test_dtss_container>;
+
+    inline static const std::string container_query{ "container" };
+    inline static const std::array<std::string, 2> remove_queries{{ "removed", container_query }};
+
+    static void create_container(
+        const std::string & container_name,
+        const std::string & container_type,
+        const std::string & root_path,
+        shyft::dtss::server<query_test_dtss_dispatcher> & dtss_server
+    ) {
+        if ( container_type.empty() || container_type == "test" ) {
+            dtss_server.container[std::string{"TEST_"} + container_name] = container_wrapper_t{ std::make_unique<query_test_dtss_container>(root_path) };
+        } else {
+            throw std::runtime_error{ std::string{"Cannot construct unknown container type: "} + container_type };
+        }
+    }
+
+    static container_wrapper_t & get_container(
+        const std::string & container_name, const std::string & container_query,
+        dtss::server<query_test_dtss_dispatcher> & dtss_server
+    ) {
+        decltype(dtss_server.container)::iterator f;
+        if ( container_query.empty() || container_query == "test" ) {
+            f = dtss_server.container.find(std::string{"TEST_"} + container_name);
+        } else {
+            throw std::runtime_error{ std::string{"Cannot construct unknown container type: "} + container_query };
+        }
+
+        if( f == std::end(dtss_server.container) )
+            throw runtime_error(std::string{"Failed to find shyft container: "} + container_name);
+
+        return f->second;
+    }
+};
+
+}
+
+TEST_CASE("dtss_server_query_to_containers") {
+
+    shyft::core::calendar utc;
+
+    using shyft::time_axis::generic_dt;
+    using shyft::time_series::dd::apoint_ts;
+    using shyft::time_series::ts_point_fx;
+    using ts_vector_t = shyft::time_series::dd::ats_vector;
+    using test_server_t = shyft::dtss::server<query_test_dtss_dispatcher>;
+    using queries_t = std::map<std::string, std::string>;
+
+    const int port = 40336;
+    const std::string container{"container"};
+
+    test_server_t srv{};
+    srv.set_listening_port(port);
+    srv.add_container(container, "foo/bar/00");  // same as "first"
+    srv.start_async();
+
+    shyft::dtss::client cli{ std::string{"localhost:"} + std::to_string(port) };
+
+    /* NOTE: `remove` and `get_ts_info` are not called from the server...
+     */
+
+    SUBCASE("Save using url's with queries") {
+        core::utctime t = utc.time(2016, 1, 1);
+        core::utctimespan dt = core::deltahours(1);
+        size_t n = 10;
+        generic_dt ta{ t, dt, n };
+
+        ts_vector_t vec{};
+        for( std::size_t i = 0; i < 10; ++i ) {
+            vec.emplace_back(
+                shyft::dtss::shyft_url(container, to_string(i), queries_t{ {"my_query", "some_value"}, {"removed", "value"} }),
+                apoint_ts{ ta, i*10.0, ts_point_fx::POINT_INSTANT_VALUE }
+            );
+        }
+        
+        cli.store_ts(vec, false, false);
+    }
+    
+    SUBCASE("Read using url's with queries") {
+        utcperiod period{ utc.time(2016, 1, 1), utc.time(2017, 1, 1) };
+
+        ts_vector_t vec{};
+        for( std::size_t i = 0; i < 10; ++i ) {
+            vec.emplace_back(
+                apoint_ts{ shyft::dtss::shyft_url(container, to_string(i), queries_t{ {"my_query", "some_value"}, {"removed", "value"} }) }
+            );
+        }
+
+        auto res = cli.evaluate(vec, period, false, false);
+    }
+
+    SUBCASE("Find using url's with queries") {
+        cli.find(shyft::dtss::shyft_url(container, "/path/to/something", queries_t{ {"my_query", "some_value"}, {"removed", "value"} }));
+    }
+}
+
+
+namespace {
+
+template < int Idx >
+struct multicontainer_test_dtss_container {
+
+    using ts_info = shyft::dtss::ts_info;
+    using gta_t = shyft::time_axis::generic_dt;
+    using gts_t = shyft::time_series::point_ts<gta_t>;
+    using queries_t = std::map<std::string, std::string>;
+
+    std::string root;
+
+    multicontainer_test_dtss_container() = default;
+    ~multicontainer_test_dtss_container() = default;
+
+    multicontainer_test_dtss_container(const std::string & root_dir) : root{ root_dir } {}
+
+    multicontainer_test_dtss_container(const multicontainer_test_dtss_container &) = default;
+    multicontainer_test_dtss_container & operator=(const multicontainer_test_dtss_container &) = default;
+
+    multicontainer_test_dtss_container(multicontainer_test_dtss_container &&) = default;
+    multicontainer_test_dtss_container & operator=(multicontainer_test_dtss_container &&) = default;
+
+    /*  Container API
+    * =============== */
+
+    void save(const std::string & fn, const gts_t & ts, bool overwrite = true, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("value");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"value"} );
+        FAST_CHECK_EQ( q->second, std::to_string(Idx) );
+    }
+
+    gts_t read(const std::string & fn, core::utcperiod p, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("value");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"value"} );
+        FAST_CHECK_EQ( q->second, std::to_string(Idx) );
+        return gts_t{};
+    }
+
+    void remove(const std::string & fn, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("value");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"value"} );
+        FAST_CHECK_EQ( q->second, std::to_string(Idx) );
+    }
+
+    ts_info get_ts_info(const std::string & fn, const queries_t & queries = queries_t{}) const {
+
+        FAST_CHECK_UNARY( fn.find("?") == fn.npos );  // there should be no query part in the filename
+
+        auto q = queries.find("value");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"value"} );
+        FAST_CHECK_EQ( q->second, std::to_string(Idx) );
+
+        return ts_info{};
+    }
+
+    std::vector<ts_info> find(const std::string & match, const queries_t & queries = queries_t{}) const {
+        auto q = queries.find("value");
+        FAST_REQUIRE_NE( q, queries.cend() );
+        FAST_CHECK_EQ( q->first, std::string{"value"} );
+        FAST_CHECK_EQ( q->second, std::to_string(Idx) );
+
+        return std::vector<ts_info>{};
+    };
+};
+
+struct multicontainer_test_dtss_dispatcher {
+
+    using queries_t = std::map<std::string, std::string>;
+    using container_wrapper_t = dtss::container_wrapper<
+        multicontainer_test_dtss_container<0>, multicontainer_test_dtss_container<1> >;
+
+    inline static const std::string container_query{ "container" };
+    inline static const std::array<std::string, 2> remove_queries{{ "removed", container_query }};
+
+    static void create_container(
+        const std::string & container_name,
+        const std::string & container_type,
+        const std::string & root_path,
+        shyft::dtss::server<multicontainer_test_dtss_dispatcher> & dtss_server
+    ) {
+        if ( container_type.empty() || container_type == "first" ) {
+            dtss_server.container[std::string{"FIRST_"} + container_name] = container_wrapper_t{ std::make_unique<multicontainer_test_dtss_container<0>>(root_path) };
+        } else if ( container_type == "second" ) {
+            dtss_server.container[std::string{"SECOND_"} + container_name] = container_wrapper_t{ std::make_unique<multicontainer_test_dtss_container<1>>(root_path) };
+        } else {
+            throw std::runtime_error{ std::string{"Cannot construct unknown container type: "} + container_type };
+        }
+    }
+     
+    static container_wrapper_t & get_container(
+        const std::string & container_name, const std::string & container_query,
+        dtss::server<multicontainer_test_dtss_dispatcher> & dtss_server
+    ) {
+        decltype(dtss_server.container)::iterator f;
+        if ( container_query.empty() || container_query == "first" ) {
+            f = dtss_server.container.find(std::string{"FIRST_"} + container_name);
+        } else if ( container_query == "second" ) {
+            f = dtss_server.container.find(std::string{"SECOND_"} + container_name);
+        } else {
+            throw std::runtime_error{ std::string{"Cannot construct unknown container type: "} + container_query };
+        }
+
+        if( f == std::end(dtss_server.container) )
+            throw runtime_error(std::string{"Failed to find shyft container: "} + container_name);
+
+        return f->second;
+    }
+};
+
+}
+
+TEST_CASE("dtss_server_with_multiple_containers") {
+
+    shyft::core::calendar utc;
+
+    using shyft::time_axis::generic_dt;
+    using shyft::time_series::dd::apoint_ts;
+    using shyft::time_series::ts_point_fx;
+    using ts_vector_t = shyft::time_series::dd::ats_vector;
+    using test_server_t = shyft::dtss::server<multicontainer_test_dtss_dispatcher>;
+    using queries_t = std::map<std::string, std::string>;
+
+    const int port = 40336;
+
+    test_server_t srv{};
+    srv.set_listening_port(port);
+    srv.add_container("container", "foo/bar/first", "first");
+    srv.add_container("container", "foo/bar/second", "second");
+    srv.start_async();
+
+    shyft::dtss::client cli{ std::string{"localhost:"} + std::to_string(port) };
+
+    /* NOTE: `remove` and `get_ts_info` are not called from the server...
+    */
+
+    SUBCASE("Save dispatched to the correct container") {
+        core::utctime t = utc.time(2016, 1, 1);
+        core::utctimespan dt = core::deltahours(1);
+size_t n = 10;
+generic_dt ta{ t, dt, n };
+
+ts_vector_t vec{};
+vec.emplace_back(
+    shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "0"}, {"container", "first"} }),
+    apoint_ts{ ta, 0 * 10.0, ts_point_fx::POINT_INSTANT_VALUE });
+vec.emplace_back(
+    shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "1"}, {"container", "second"} }),
+    apoint_ts{ ta, 1 * 10.0, ts_point_fx::POINT_INSTANT_VALUE });
+
+cli.store_ts(vec, false, false);
+    }
+
+    SUBCASE("Read dispatched to the correct container") {
+        utcperiod period{ utc.time(2016, 1, 1), utc.time(2017, 1, 1) };
+
+        ts_vector_t vec{};
+        vec.emplace_back(shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "0"}, {"container", "first"} }));
+        vec.emplace_back(shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "1"}, {"container", "second"} }));
+
+        auto res = cli.evaluate(vec, period, false, false);
+    }
+
+    SUBCASE("Find dispatched to the correct container") {
+        cli.find(shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "0"}, {"container", "first"} }));
+        cli.find(shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "1"}, {"container", "second"} }));
+    }
+}
+
+TEST_CASE("dtss_krls_io_routines") {
+    using krls_io = shyft::dtss::krls_pred_db_io;
+
+    shyft::core::calendar utc;
+
+    fs::path datapath = fs::temp_directory_path() / fs::unique_path();
+    fs::create_directories(datapath);
+    const std::string ffp = (datapath / fs::path{ "krls_datafile.b" }).string();
+    std::unique_ptr<std::FILE, decltype(&std::fclose)> fh{ std::fopen(ffp.c_str(), "w+b"), &std::fclose };
+
+    const std::string source_url = "shyft://container/path/to/ts";
+    const auto period = shyft::core::utcperiod{ utc.time(2017, 1, 1), utc.time(2018, 1, 1) };
+    const auto krls_dt = utc.DAY;
+    const auto point_fx = shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE;
+    const std::size_t krls_dict_size = 100000;
+    const double krls_tolerance = 0.0001;
+    const double rbfk_gamma = 0.001;
+
+    // create the default kernel
+    const auto predictor = krls_io::create_rbf_file(fh.get(), source_url, period, krls_dt, point_fx, krls_dict_size, krls_tolerance, rbfk_gamma);
+
+    // attempt to use io functions to read the file back, all with default skip
+
+    FAST_CHECK_UNARY(krls_io::can_read_file(fh.get()));
+
+    auto read_krls_header = krls_io::read_header(fh.get());
+    FAST_CHECK_EQ(read_krls_header.scaling, krls_dt);
+    FAST_CHECK_EQ(read_krls_header.tolerance, krls_tolerance);
+    FAST_CHECK_EQ(read_krls_header.point_fx, point_fx);
+    FAST_CHECK_EQ(read_krls_header.t_start, period.start);
+    FAST_CHECK_EQ(read_krls_header.t_end, period.end);
+
+    auto read_source_url = krls_io::read_source_url(fh.get());
+    FAST_CHECK_EQ(read_source_url, source_url);
+
+    auto read_kernel_type = krls_io::read_predictor_kernel_type(fh.get());
+    FAST_CHECK_EQ(read_kernel_type, shyft::dtss::krls_kernel_type_identifiers::radial_basis_kernel);
+
+    auto read_rbf_header = krls_io::read_predictor_rbf_header(fh.get());
+    FAST_CHECK_EQ(read_rbf_header.gamma, rbfk_gamma);
+
+    auto read_predictor = krls_io::read_predictor_rbf_predictor(fh.get());
+    FAST_CHECK_EQ(read_predictor.get_predictor_dt(), predictor.get_predictor_dt());
+    FAST_CHECK_EQ(read_predictor.get_tolerance(), predictor.get_tolerance());
+    FAST_CHECK_EQ(read_predictor.get_dictionary_size(), predictor.get_dictionary_size());
+    FAST_CHECK_EQ(read_predictor.get_max_dictionary_size(), predictor.get_max_dictionary_size());
+    FAST_CHECK_EQ(read_predictor.get_rbf_gamma(), predictor.get_rbf_gamma());
+    FAST_CHECK_EQ(read_predictor.get_predicted_ts_point_policy(), predictor.get_predicted_ts_point_policy());
+}
+
+TEST_CASE("dtss_krls_db_register_update_read_rbf_series") {
+    using calendar = shyft::core::calendar;
+    using krls_db_t = shyft::dtss::krls_pred_db;
+    using ts_vector_t = shyft::time_series::dd::ats_vector;
+    using utcperiod = shyft::core::utcperiod;
+    using utctime = shyft::core::utctime;
+
+    calendar utc;
+
+    fs::path krls_server_path = fs::temp_directory_path() / fs::unique_path();
+
+    const std::string krls_name = "test-series";
+    const std::string source_url = "test-series-url";
+    const auto earliest_time = utc.time(2017, 1, 1);
+    const auto middle_time = utc.time(2017, 3, 1);
+    const auto latest_time = utc.time(2017, 5, 1);
+    auto period = utcperiod{ earliest_time, middle_time };
+    const auto krls_dt = 6*calendar::HOUR;
+    const auto point_fx = shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE;
+    const std::size_t krls_dict_size = 1000000;
+    const double krls_tolerance = 0.001;
+    const double rbfk_gamma = 0.001;
+
+    // server callback
+    int data_dt = 2;
+    int callback_call_count = 0;
+    double data_offset = 0;
+    std::function<ts_vector_t(const std::string &, utcperiod, bool, bool)> server_read_cb =
+        [&callback_call_count, &period, &data_offset, point_fx, data_dt](const std::string &, utcperiod, bool, bool) -> ts_vector_t
+    {
+        callback_call_count += 1;
+
+        // construct time axis
+        std::size_t n = (period.end - period.start)/(data_dt*calendar::HOUR);
+        shyft::time_axis::fixed_dt ta{ period.start, data_dt*calendar::HOUR, n };
+        // generate values
+        std::vector<double> values{};
+        values.reserve(n);
+        for ( std::size_t i = 0; i < n; ++i ) {
+            values.emplace_back(data_offset + callback_call_count*i);
+        }
+        // setup return
+        ts_vector_t result{};
+        result.reserve(1);
+        result.emplace_back(ta, values, point_fx);
+        return result;
+    };
+    
+    // setup the krls container
+    krls_db_t krls_db{ krls_server_path.string(), server_read_cb };
+
+    // register a new series
+    krls_db.register_rbf_series(krls_name, source_url, period, krls_dt, point_fx, krls_dict_size, krls_tolerance, rbfk_gamma);
+    // --------------------
+    FAST_CHECK_EQ( callback_call_count, 1 );
+    FAST_CHECK_UNARY( fs::exists(krls_server_path / krls_name) );
+
+    // predict using the written data
+    std::size_t n = (period.end - period.start)/calendar::HOUR;
+    shyft::time_axis::generic_dt predict_ta{ period.start, calendar::HOUR, n };
+    auto result_ts = krls_db.predict_time_series(krls_name, predict_ta);
+    // --------------------
+    FAST_CHECK_EQ( callback_call_count, 1 );
+    FAST_REQUIRE_EQ( n, result_ts.size() );
+    for ( std::size_t i = 10; i < n; ++i ) {  // skip 10 samples because of initial error
+        FAST_CHECK_EQ( result_ts.value(i), doctest::Approx(callback_call_count*i/double(data_dt)).epsilon(0.1).scale(1) );  // epsilon is percent difference
+    }
+    data_offset = result_ts.value(n-1);
+
+    // update the data with one more year
+    period = utcperiod{ middle_time, latest_time };
+    krls_db.update_rbf_series(krls_name, period);
+    FAST_CHECK_EQ( callback_call_count, 2 );
+    // --------------------
+    n = (period.end - period.start)/calendar::HOUR;
+    predict_ta = shyft::time_axis::generic_dt{ period.start, calendar::HOUR, n };
+    result_ts = krls_db.predict_time_series(krls_name, predict_ta);
+    // --------------------
+    FAST_REQUIRE_EQ( n, result_ts.size() );
+    for ( std::size_t i = 10; i < n; ++i ) {  // skip 10 samples because of initial error
+        FAST_CHECK_EQ( result_ts.value(i), doctest::Approx(data_offset + callback_call_count*i/double(data_dt)).epsilon(0.1).scale(1) );  // epsilon is percent difference
+    }
+}
+
+TEST_CASE("dtss_krls_db_register_update_read_rbf_series_using_save_read") {
+    using calendar = shyft::core::calendar;
+    using gta_t = shyft::time_axis::generic_dt;
+    using gts_t = shyft::time_series::point_ts<gta_t>;
+    using krls_db_t = shyft::dtss::krls_pred_db;
+    using ts_vector_t = shyft::time_series::dd::ats_vector;
+    using utcperiod = shyft::core::utcperiod;
+    using utctime = shyft::core::utctime;
+
+    calendar utc;
+
+    fs::path krls_server_path = fs::temp_directory_path() / fs::unique_path();
+
+    const std::string krls_name = "test-series";
+    const std::string source_url = "test-series-url";
+    const auto earliest_time = utc.time(2017, 1, 1);
+    const auto middle_time = utc.time(2017, 3, 1);
+    const auto latest_time = utc.time(2017, 5, 1);
+    auto period = utcperiod{ earliest_time, middle_time };
+    const auto krls_dt = 6*calendar::HOUR;
+    const auto point_fx = shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE;
+    const std::size_t krls_dict_size = 1000000;
+    const double krls_tolerance = 0.001;
+    const double rbfk_gamma = 0.001;
+
+    // server callback
+    int data_dt = 2;
+    int callback_call_count = 0;
+    double data_offset = 0;
+    std::function<ts_vector_t(const std::string &, utcperiod, bool, bool)> server_read_cb =
+        [&callback_call_count, &period, &data_offset, point_fx, data_dt](const std::string &, utcperiod, bool, bool) -> ts_vector_t
+    {
+        callback_call_count += 1;
+
+        // construct time axis
+        std::size_t n = (period.end - period.start)/(data_dt*calendar::HOUR);
+        gta_t ta{ period.start, data_dt*calendar::HOUR, n };
+        // generate values
+        std::vector<double> values{};
+        values.reserve(n);
+        for ( std::size_t i = 0; i < n; ++i ) {
+            values.emplace_back(data_offset + callback_call_count*i);
+        }
+        // setup return
+        ts_vector_t result{};
+        result.reserve(1);
+        result.emplace_back(ta, values, point_fx);
+        return result;
+    };
+
+    // setup the krls container
+    krls_db_t krls_db{ krls_server_path.string(), server_read_cb };
+
+    // register a new series
+    std::size_t n = (period.end - period.start)/calendar::HOUR;
+    krls_db.save(krls_name,
+        gts_t{ gta_t{ period.start, calendar::HOUR, n }, 0., point_fx }, false,
+        krls_db_t::queries_t{
+            {"source_url", source_url},
+            {"dt_scaling", std::to_string(krls_dt)},
+            {"point_fx", "instant"},
+            {"krls_dict_size", std::to_string(krls_dict_size)},
+            {"tolerance", std::to_string(krls_tolerance)},
+            {"gamma", std::to_string(rbfk_gamma)}
+        });
+    // --------------------
+    FAST_CHECK_EQ( callback_call_count, 1 );
+    FAST_CHECK_UNARY( fs::exists(krls_server_path / krls_name) );
+
+    // predict using the written data
+    auto result_ts = krls_db.read(krls_name, period, krls_db_t::queries_t{
+            {"dt", std::to_string(calendar::HOUR)},
+        });
+    // --------------------
+    FAST_CHECK_EQ( callback_call_count, 1 );
+    FAST_REQUIRE_EQ( n, result_ts.size() );
+    for ( std::size_t i = 10; i < n; ++i ) {  // skip 10 samples because of initial error
+        FAST_CHECK_EQ( result_ts.value(i), doctest::Approx(callback_call_count*i/double(data_dt)).epsilon(0.1).scale(1) );  // epsilon is percent difference
+    }
+    data_offset = result_ts.value(n-1);
+
+    // update the data with one more year
+    period = utcperiod{ middle_time, latest_time };
+    n = (period.end - period.start)/calendar::HOUR;
+    krls_db.save(krls_name, gts_t{ gta_t{ period.start, calendar::HOUR, n }, 0., point_fx },
+        false, krls_db_t::queries_t{});
+    FAST_CHECK_EQ( callback_call_count, 2 );
+    // --------------------
+    n = (period.end - period.start)/calendar::HOUR;
+    result_ts = krls_db.read(krls_name, period, krls_db_t::queries_t{
+            {"dt", std::to_string(calendar::HOUR)},
+        });
+    // --------------------
+    FAST_REQUIRE_EQ( n, result_ts.size() );
+    for ( std::size_t i = 10; i < n; ++i ) {  // skip 10 samples because of initial error
+        FAST_CHECK_EQ( result_ts.value(i), doctest::Approx(data_offset + callback_call_count*i/double(data_dt)).epsilon(0.1).scale(1) );  // epsilon is percent difference
+    }
+}
+
 }

@@ -81,8 +81,8 @@ class WRFDataRepositoryTestCase(unittest.TestCase):
                 m = (x == x_ts) & (y == y_ts)
                 idxs = np.where(m > 0)
                 x_idx, y_idx = idxs[0][0], idxs[1][0]  # assumung geo-location is unique in dataset
-                self.assertTrue(all(ts_values == wrf_d[:n_hours + 1, x_idx, y_idx]),
-                                "wrf and shyft-TS of {} are not the same.".format(name))
+                self.assertTrue(np.allclose(ts_values, wrf_d[:n_hours + 1, x_idx, y_idx],rtol=1e-4,atol=1e-4),
+                                f"wrf and shyft-TS of {name} are not the same.")
                 # if i ==0:
                 #    plt.figure()
                 #    plt.plot(ts_values)
@@ -255,6 +255,26 @@ class WRFDataRepositoryTestCase(unittest.TestCase):
         #    self.fail("AromeDataRepository.get_timeseries(data_names, period, None) "
         #              "raised AromeDataRepositoryError unexpectedly.")
         # self.assertEqual(len(sources), len(data_names) - 1)
+
+    def test_utc_period_is_None(self):
+        EPSG, bbox, bpoly = self.wrf_epsg_bbox
+        # Period start
+        utc = api.Calendar()  # No offset gives Utc
+        t0 = utc.time(1999, 10)
+        t0_ymdhs = utc.calendar_units(t0)
+        date_str = "{}-{:02}".format(*[getattr(t0_ymdhs, k) for k in ['year', 'month']])
+        period = None
+
+        base_dir = path.join(shyftdata_dir, "repository", "wrf_data_repository")
+        filename = "wrfout_d03_{}".format(date_str)
+        reader = WRFDataRepository(EPSG, base_dir, filename=filename)
+        src_name = "temperature"
+        var_name_in_file = [k for k, v in reader.wrf_shyft_map.items() if v == src_name][0]
+        with Dataset(path.join(base_dir, filename)) as ds:
+            var = ds.variables[var_name_in_file]
+            nb_timesteps = var.shape[var.dimensions.index('Time')]
+        srcs = reader.get_timeseries((src_name,), period, geo_location_criteria=bpoly)
+        self.assertEqual(srcs[src_name][0].ts.size(), nb_timesteps)
 
 
 if __name__ == "__main__":

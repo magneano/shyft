@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 #include "py_convertible.h"
 
@@ -70,7 +72,7 @@ namespace expose {
 
         py::class_<sa::GeoPointSource>("GeoPointSource",
             "GeoPointSource contains common properties, functions\n"
-            "for the point sources in SHyFT.\n"
+            "for the point sources in Shyft.\n"
             "Typically it contains a GeoPoint (3d position), plus a time-series\n"
             )
             .def(py::init<const sc::geo_point&,const sa::apoint_ts&>( (py::arg("midpoint"),py::arg("ts"))  ) )
@@ -104,7 +106,7 @@ namespace expose {
     static void a_region_environment() {
         //SiH: Here I had trouble using def_readwrite(), the getter was not working as expected, the setter did the right thing
         //     work-around was to use add_property with explicit set_ get_ methods that returned  shared_ptr to vectors
-        py::class_<sa::a_region_environment>("ARegionEnvironment","Contains all geo-located sources to be used by a SHyFT core model")
+        py::class_<sa::a_region_environment>("ARegionEnvironment","Contains all geo-located sources to be used by a Shyft core model")
             .add_property("temperature",&sa::a_region_environment::get_temperature,&sa::a_region_environment::set_temperature)
             .add_property("precipitation",&sa::a_region_environment::get_precipitation,&sa::a_region_environment::set_precipitation)
             .add_property("wind_speed",&sa::a_region_environment::get_wind_speed,&sa::a_region_environment::set_wind_speed)

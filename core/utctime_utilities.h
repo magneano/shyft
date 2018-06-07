@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 
 #include <memory>
@@ -33,6 +35,10 @@ namespace shyft {
 				typedef long utctimespan;   /// utctimespan is typdedef'd as a utctime (thus __int64)
 		#endif
 
+        /*
+         * Forward declarations
+         */
+        struct calendar;
         /** \brief deltahours
          * \param n number of hours
          * \return utctimespan representing number of hours specified
@@ -63,7 +69,8 @@ namespace shyft {
 		inline utctime utctime_now() {return (utctime)time(0); }
 
         inline bool is_valid(utctime t) {return t != no_utctime;}
-
+        
+        enum class trim_policy:int8_t {TRIM_IN, TRIM_OUT};
         /** \brief utcperiod is defined
          *  as period on the utctime space, like
          * [start..end>, where end >=start to be valid
@@ -80,6 +87,11 @@ namespace shyft {
 
 			bool contains(const utcperiod& p) const {return valid()&&p.valid()&& p.start>=start &&p.end <=end;}
 			bool overlaps(const utcperiod& p) const {return ( (p.start >= end) || (p.end <= start) )?false:true; }
+
+            utcperiod trim(const calendar &c, utctimespan deltaT, trim_policy tp) const;
+            utctimespan diff_units(const calendar &c, utctimespan deltaT) const;
+            utctimespan diff_units(const calendar &c, utctimespan deltaT, utctimespan &remainder) const;
+
 			utctime start;
 			utctime end;
 			std::string to_string() const;
@@ -97,7 +109,8 @@ namespace shyft {
 				return utcperiod(std::max(a.start, b.start), std::min(a.end, b.end));
 			}
 			return utcperiod();
-        }
+        };
+
         namespace time_zone {
             using namespace std;
 

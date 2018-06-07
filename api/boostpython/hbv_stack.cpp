@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 
 #include "core/utctime_utilities.h"
@@ -87,6 +89,7 @@ namespace expose {
 				.def_readonly("soil_outflow", &HbvAllCollector::soil_outflow, " hbv soil output [m3/s] for the timestep") // Check??
 				.def_readonly("avg_discharge", &HbvAllCollector::avg_discharge, "Total discharge given in[m3/s] for the timestep")
 				.def_readonly("end_reponse", &HbvAllCollector::end_reponse, "end_response, at the end of collected")
+                .def_readonly("avg_charge",&HbvAllCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
 				;
 
 			typedef shyft::core::hbv_stack::discharge_collector HbvDischargeCollector;
@@ -96,7 +99,9 @@ namespace expose {
 				.def_readonly("snow_swe", &HbvDischargeCollector::snow_swe, "hbv snow swe, [mm] over the cell sca.. area, - at the end of timestep")
 				.def_readonly("avg_discharge", &HbvDischargeCollector::avg_discharge, "Total Outflow given in [m3/s] for the timestep")
 				.def_readonly("end_reponse", &HbvDischargeCollector::end_response, "end_response, at the end of collected")
-				.def_readwrite("collect_snow", &HbvDischargeCollector::collect_snow, "controls collection of snow routine");
+				.def_readwrite("collect_snow", &HbvDischargeCollector::collect_snow, "controls collection of snow routine")
+                .def_readonly("avg_charge",&HbvDischargeCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
+                ;
 
 			typedef shyft::core::hbv_stack::null_collector HbvNullCollector;
 			class_<HbvNullCollector>("HbvNullCollector", "collector that does not collect anything, useful during calibration to minimize memory&maximize speed")
@@ -149,7 +154,7 @@ namespace expose {
 BOOST_PYTHON_MODULE(_hbv_stack)
 {
 
-	boost::python::scope().attr("__doc__") = "SHyFT python api for the hbv_stack model";
+	boost::python::scope().attr("__doc__") = "Shyft python api for the hbv_stack model";
 	boost::python::def("version", version);
 	boost::python::docstring_options doc_options(true, true, false);// all except c++ signatures
 	expose::hbv_stack::parameter_state_response();

@@ -30,9 +30,9 @@ PTSSKOptModel.optimizer_t = PTSSKOptimizer
 PTSSKOptModel.full_model_t =PTSSKModel
 PTSSKModel.opt_model_t =PTSSKOptModel
 PTSSKModel.create_opt_model_clone = lambda self: create_opt_model_clone(self)
-PTSSKModel.create_opt_model_clone.__doc__ = create_opt_model_clone.__doc__
+#PTSSKModel.create_opt_model_clone.__doc__ = create_opt_model_clone.__doc__
 PTSSKOptModel.create_full_model_clone = lambda self: create_full_model_clone(self)
-PTSSKOptModel.create_full_model_clone.__doc__ = create_full_model_clone.__doc__
+#PTSSKOptModel.create_full_model_clone.__doc__ = create_full_model_clone.__doc__
 
 PTSSKCellAll.vector_t = PTSSKCellAllVector
 PTSSKCellOpt.vector_t = PTSSKCellOptVector
@@ -55,7 +55,7 @@ def __deserialize_from_str(s:str)->PTSSKStateWithIdVector:
 PTSSKStateWithIdVector.serialize_to_bytes = lambda self: serialize_to_bytes(self)
 PTSSKStateWithIdVector.serialize_to_str = lambda self: __serialize_to_str(self)
 PTSSKStateWithIdVector.deserialize_from_str = __deserialize_from_str
-PTSSKStateWithIdVector.state_vector = property(lambda self: extract_state_vector(self),doc=extract_state_vector.__doc__)
+PTSSKStateWithIdVector.state_vector = property(lambda self: extract_state_vector(self),doc="extract_state_vector.__doc__")
 PTSSKStateWithId.vector_t = PTSSKStateWithIdVector
 
 def deserialize_from_bytes(bytes: ByteVector)->PTSSKStateWithIdVector:

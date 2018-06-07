@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 
 #include "boostpython_pch.h"
 
@@ -87,6 +89,7 @@ namespace expose {
                 .def_readonly("ae_output",&PTSSKAllCollector::ae_output,"actual evap mm/h")
                 .def_readonly("pe_output",&PTSSKAllCollector::pe_output,"pot evap mm/h")
                 .def_readonly("end_reponse",&PTSSKAllCollector::end_reponse,"end_response, at the end of collected")
+                .def_readonly("avg_charge",&PTSSKAllCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
             ;
 
             typedef shyft::core::pt_ss_k::discharge_collector PTSSKDischargeCollector;
@@ -97,6 +100,7 @@ namespace expose {
                 .def_readonly("snow_swe",&PTSSKDischargeCollector::snow_swe,"skaugen snow swe, [mm] over the cell sca.. area, - at the end of timestep")
                 .def_readonly("end_reponse",&PTSSKDischargeCollector::end_response,"end_response, at the end of collected")
                 .def_readwrite("collect_snow",&PTSSKDischargeCollector::collect_snow,"controls collection of snow routine")
+                .def_readonly("avg_charge",&PTSSKDischargeCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
                 ;
             typedef shyft::core::pt_ss_k::null_collector PTSSKNullCollector;
             class_<PTSSKNullCollector>("PTSSKNullCollector","collector that does not collect anything, useful during calibration to minimize memory&maximize speed")
@@ -151,7 +155,7 @@ namespace expose {
 BOOST_PYTHON_MODULE(_pt_ss_k)
 {
 
-    boost::python::scope().attr("__doc__")="SHyFT python api for the pt_ss_k model";
+    boost::python::scope().attr("__doc__")="Shyft python api for the pt_ss_k model";
     boost::python::def("version", version);
 	boost::python::docstring_options doc_options(true, true, false);// all except c++ signatures
     expose::pt_ss_k::parameter_state_response();

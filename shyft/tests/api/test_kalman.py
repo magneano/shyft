@@ -7,7 +7,7 @@ import unittest
 class KalmanAndBiasPrediction(unittest.TestCase):
     """
     These tests verifies and demonstrates the Kalman and BiasPrediction functions available
-    in SHyFT api.
+    in Shyft api.
 
     """
 

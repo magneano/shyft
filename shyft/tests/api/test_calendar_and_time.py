@@ -39,7 +39,7 @@ class Calendar(unittest.TestCase):
         self.assertEqual(7, osl.diff_units(t0, t1, api.Calendar.DAY))
         self.assertEqual(1, osl.diff_units(t0, t1, api.Calendar.WEEK))
         self.assertEqual(0, osl.diff_units(t0, t1, api.Calendar.MONTH))
-        self.assertEqual(7 * 24, osl.diff_units(t0, t1, api.deltahours(1)))
+        self.assertEqual(7*24, osl.diff_units(t0, t1, api.deltahours(1)))
 
     def test_calendar_add_during_dst(self):
         osl = api.Calendar("Europe/Oslo")
@@ -79,9 +79,9 @@ class Calendar(unittest.TestCase):
 
     def test_quarter(self):
         t = self.std.time(2017, 2, 28, 1, 2, 3)
-        tt = self.std.trim(t,api.Calendar.QUARTER)
-        self.assertEqual(tt,self.std.time(2017, 1, 1))
-        self.assertEqual(1,self.std.quarter(t))
+        tt = self.std.trim(t, api.Calendar.QUARTER)
+        self.assertEqual(tt, self.std.time(2017, 1, 1))
+        self.assertEqual(1, self.std.quarter(t))
 
     def test_conversion_roundtrip(self):
         c1 = api.YMDhms(1960, 1, 2, 3, 4, 5)
@@ -108,7 +108,7 @@ class Calendar(unittest.TestCase):
         a = api.utctime_now()
         x = dt.datetime.utcnow()
         b = self.utc.time(x.year, x.month, x.day,
-                                     x.hour, x.minute, x.second)
+                          x.hour, x.minute, x.second)
         self.assertLess(abs(a - b), 2, 'Should be less than 2 seconds')
 
     def test_utc_time_to_string(self):
@@ -132,6 +132,8 @@ class Calendar(unittest.TestCase):
         p = api.UtcPeriod(t, t + api.deltahours(1))
         s = str(p)
         self.assertEqual(s, "[2000-01-02T03:04:05Z,2000-01-02T04:04:05Z>")
+        s = repr(p)
+        self.assertEqual(s, "[2000-01-02T03:04:05Z,2000-01-02T04:04:05Z>")
 
     def test_UtcPeriod_methods(self):
         p0 = api.UtcPeriod()
@@ -149,6 +151,49 @@ class Calendar(unittest.TestCase):
         self.assertFalse(p2.overlaps(p1))
         self.assertTrue(p3.overlaps(p1))
         self.assertTrue(p3.overlaps(p2))
+
+    def test_UtcPeriod_trim(self):
+        utc = api.Calendar()
+        t0 = utc.time(2018, 1, 1, 0, 0, 0)
+        t1 = utc.time(2018, 2, 1, 0, 0, 0)
+        t2 = utc.time(2018, 3, 1, 0, 0, 0)
+        t3 = utc.time(2018, 4, 1, 0, 0, 0)
+        p_0_1 = api.UtcPeriod(t0, t1)
+        p_0_3 = api.UtcPeriod(t0, t3)
+        assert api.UtcPeriod(t0, t1).trim(utc, utc.MONTH, api.trim_policy.TRIM_IN) == p_0_1
+        assert api.UtcPeriod(t0, t1 + 1).trim(utc, utc.MONTH) == p_0_1
+        assert api.UtcPeriod(t1 - 1, t2 + 1).trim(utc, utc.MONTH, api.trim_policy.TRIM_OUT) == p_0_3
+
+        # diff_units
+        assert api.UtcPeriod(t0, t3).diff_units(utc, utc.MONTH) == 3
+        # trim null period, should trow
+        p_null = api.UtcPeriod()
+        try:
+            p_null.trim(utc, utc.DAY)
+            did_raise = False
+        except RuntimeError:
+            did_raise = True
+        assert did_raise
+
+        assert p_null.diff_units(utc, utc.DAY) == 0
+        assert api.UtcPeriod(t3, t0).diff_units(utc, utc.MONTH) == -3
+
+    def test_UtcPeriod_intersection(self):
+        utc = api.Calendar()
+        t0 = utc.time(2018, 1, 1, 0, 0, 0)
+        t1 = utc.time(2018, 1, 2, 0, 0, 0)
+        t2 = utc.time(2018, 1, 3, 0, 0, 0)
+        t3 = utc.time(2018, 1, 4, 0, 0, 0)
+
+        p0 = api.UtcPeriod(t0, t2)
+        p1 = api.UtcPeriod(t1, t3)
+        p2 = api.UtcPeriod(t0, t1)
+        p3 = api.UtcPeriod(t2, t3)
+
+        assert api.UtcPeriod.intersection(p0, p1) == api.UtcPeriod(t1, t2)
+        assert not api.UtcPeriod.intersection(p0, p3).valid()
+        assert not api.UtcPeriod.intersection(p2, p3).valid()
+        assert api.intersection(p0, p1) == api.UtcPeriod(t1, t2)
 
     def test_swig_python_time(self):
         """

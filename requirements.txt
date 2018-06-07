@@ -1,0 +1,13 @@
+python==3.6
+pyyaml
+numpy
+libgfortran
+netcdf4
+gdal
+matplotlib
+requests
+nose
+coverage
+pip
+shapely
+pyproj

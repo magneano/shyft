@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 #include "core/utctime_utilities.h"
 #include "core/priestley_taylor.h"
@@ -82,6 +84,7 @@ namespace expose {
                 .def_readonly("ae_output",&PTHSKAllCollector::ae_output,"actual evap mm/h")
                 .def_readonly("pe_output",&PTHSKAllCollector::pe_output,"pot evap mm/h")
                 .def_readonly("end_reponse",&PTHSKAllCollector::end_reponse,"end_response, at the end of collected")
+                .def_readonly("avg_charge",&PTHSKAllCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
             ;
 
             typedef shyft::core::pt_hs_k::discharge_collector PTHSKDischargeCollector;
@@ -92,6 +95,7 @@ namespace expose {
                 .def_readonly("snow_swe",&PTHSKDischargeCollector::snow_swe,"hbv snow swe, [mm] over the cell sca.. area, - at the end of timestep")
                 .def_readonly("end_reponse",&PTHSKDischargeCollector::end_response,"end_response, at the end of collected")
                 .def_readwrite("collect_snow",&PTHSKDischargeCollector::collect_snow,"controls collection of snow routine")
+                .def_readonly("avg_charge",&PTHSKDischargeCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
                 ;
             typedef shyft::core::pt_hs_k::null_collector PTHSKNullCollector;
             class_<PTHSKNullCollector>("PTHSKNullCollector","collector that does not collect anything, useful during calibration to minimize memory&maximize speed")
@@ -143,7 +147,7 @@ namespace expose {
 BOOST_PYTHON_MODULE(_pt_hs_k)
 {
 
-    boost::python::scope().attr("__doc__")="SHyFT python api for the pt_hs_k model";
+    boost::python::scope().attr("__doc__")="Shyft python api for the pt_hs_k model";
     boost::python::def("version", version);
 	boost::python::docstring_options doc_options(true, true, false);// all except c++ signatures
     expose::pt_hs_k::parameter_state_response();

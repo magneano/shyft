@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 
 #include "core/skaugen.h"
@@ -35,10 +37,10 @@ namespace expose {
          ;
 
         class_<response>("SkaugenResponse")
-         .def_readwrite("sca",&response::sca,"from snow-routine in [m3/s]")
-         .def_readwrite("swe",&response::swe,"from snow-routine in [m3/s]")
-         .def_readwrite("outflow",&response::outflow,"from snow-routine in [m3/s]")
-         .def_readwrite("total_stored_water",&response::total_stored_water,"def. as sca*(swe+lwc)")
+         .def_readwrite("sca",&response::sca,"snow-covered area in fraction")
+         .def_readwrite("swe",&response::swe,"snow water equivalient [mm] over cell-area")
+         .def_readwrite("outflow",&response::outflow,"from snow-routine in [mm/h] over cell-area")
+         .def_readwrite("total_stored_water",&response::swe,"same as swe(deprecated)")
          ;
 
         typedef  calculator<parameter,state,response> SkaugenCalculator;

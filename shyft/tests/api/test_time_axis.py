@@ -22,13 +22,12 @@ class TimeAxis(unittest.TestCase):
         pass
 
     def test_index_of(self):
-        self.assertEqual(self.ta.index_of(self.t),0)
-        self.assertEqual(self.ta.index_of(self.t,0), 0)
-        self.assertEqual(self.ta.index_of(self.t-3600), api.npos)
-        self.assertEqual(self.ta.open_range_index_of(self.t),0)
-        self.assertEqual(self.ta.open_range_index_of(self.t,0), 0)
-        self.assertEqual(self.ta.open_range_index_of(self.t-3600), api.npos)
-
+        self.assertEqual(self.ta.index_of(self.t), 0)
+        self.assertEqual(self.ta.index_of(self.t, 0), 0)
+        self.assertEqual(self.ta.index_of(self.t - 3600), api.npos)
+        self.assertEqual(self.ta.open_range_index_of(self.t), 0)
+        self.assertEqual(self.ta.open_range_index_of(self.t, 0), 0)
+        self.assertEqual(self.ta.open_range_index_of(self.t - 3600), api.npos)
 
     def test_create_timeaxis(self):
         self.assertEqual(self.ta.size(), self.n)
@@ -45,18 +44,19 @@ class TimeAxis(unittest.TestCase):
         tot_dt = 0
         for p in self.ta:
             tot_dt += p.timespan()
-        self.assertEqual(tot_dt, self.n * self.d)
+        self.assertEqual(tot_dt, self.n*self.d)
 
     def test_timeaxis_str(self):
         s = str(self.ta)
         self.assertTrue(len(s) > 10)
+        self.assertTrue(repr(self.ta) == str(self.ta))
 
     def test_point_timeaxis_(self):
         """ 
         A point time axis takes n+1 points do describe n-periods, where
         each period is defined as [ point_i .. point_i+1 >
         """
-        all_points = api.UtcTimeVector([t for t in range(self.t, self.t + (self.n + 1) * self.d, self.d)])
+        all_points = api.UtcTimeVector([t for t in range(self.t, self.t + (self.n + 1)*self.d, self.d)])
         tap = api.TimeAxisByPoints(all_points)
         self.assertEqual(tap.size(), self.ta.size())
         for i in range(self.ta.size()):
@@ -64,6 +64,7 @@ class TimeAxis(unittest.TestCase):
         self.assertEqual(tap.t_end, all_points[-1], "t_end should equal the n+1'th point if supplied")
         s = str(tap)
         self.assertTrue(len(s) > 0)
+        self.assertTrue(str(tap) == repr(tap))
 
     def test_generic_timeaxis(self):
         c = api.Calendar('Europe/Oslo')
@@ -79,6 +80,8 @@ class TimeAxis(unittest.TestCase):
         self.assertEqual(len(tag2), n)
         self.assertEqual(tag2.time(0), t0)
         self.assertIsNotNone(tag2.calendar_dt.calendar)
+        self.assertTrue(repr(tag1) == str(tag1))
+        self.assertTrue(repr(tag2) == str(tag2))
 
     def test_timeaxis_time_points(self):
         c = api.Calendar('Europe/Oslo')

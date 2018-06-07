@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 #include <vector>
 #include <string>
@@ -37,13 +39,14 @@ struct adjust_state_model {
     RM &rm;///< Just a reference to the model, no copy semantics
 	typedef  std::vector<typename RM::state_t>state_vector_t;
     std::vector<int> cids;///< selected catchments, empty means all.
-	size_t i0{ 0u };
+	size_t i0{ 0u }; ///< first step on time-axis to tune into
+	size_t n {1u}; ///< number of step to use for averaging the inflow to
     adjust_state_model()=delete;
 	state_vector_t  s0;///< the snap-shot of current state when starting the model
 	void revert_to_state_0() { rm.set_states(s0); }
     /**Construct a wrapper around the RM so that we can use multiple tune to flow*/
-    adjust_state_model( RM&rm,const std::vector<int> &cids,size_t i0=0
-		) :rm(rm), cids(cids),i0(i0) {
+    adjust_state_model( RM&rm,const std::vector<int> &cids,size_t i0=0,size_t n=1
+		) :rm(rm), cids(cids),i0(i0),n(n){
         rm.set_catchment_calculation_filter(cids);// only calc for cells we are working on.
 		rm.get_states(s0);// important: get the state 0 snap-shot from the model as it is now
     }
@@ -51,18 +54,21 @@ struct adjust_state_model {
     /** calculate the model response discharge, given a specified scale-factor
      * relative the region model initial-state variable
      * \param q_scale the scale factor to be applied to the initial-state
-     * \return discharge in m3/s for the first time-step, using the selected catchment-filters.
+     * \return discharge in m3/s for the n first time-step from i0, using the selected catchment-filters.
      */
     double discharge(double q_scale) {
 		revert_to_state_0();
 		rm.adjust_q(q_scale,cids);
-		rm.run_cells(0,i0,1);// run one step
-		double q_avg= cell_statistics::sum_catchment_feature_value(
+		rm.run_cells(0,i0,n);// run n  steps
+        double q_sum=0.0; // compute average q over those steps
+        for(size_t i=i0;i<i0+n;++i) {
+		     q_sum+= cell_statistics::sum_catchment_feature_value(
                 *rm.get_cells(),cids,
                 [](const typename RM::cell_t&c) {return c.rc.avg_discharge; },
-                i0
-        );
-        return q_avg;
+                i
+            );
+        }
+        return q_sum/double(n);
     }
     
     /** \brief Adjust state to tune the flow of region-model and selected catchments to a target value.
@@ -76,17 +82,20 @@ struct adjust_state_model {
      * region-model initial state is not changed during the process
      *
      * \param q_wanted flow in m3/s
-     * \param scale_range (default 3.0) ratio based scaling is bounded between scale_0/scale_range .. scale_0*scale_range
+     * \param scale_range (default 10.0) ratio based scaling is bounded between scale_0/scale_range .. scale_0*scale_range
      * \param scale_eps (default 0.001) terminate iteration when the scale-factor search-region is less than scale_0*scale_eps
      * \param max_iter  (default 300) terminate search for minimum if iterations exceeds this number
      * \return q_0,q_r, diagnostics , basically tuned flow in m3/s achieved
      */
-    q_adjust_result tune_flow(double q_wanted, double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300) {
+    q_adjust_result tune_flow(double q_wanted, double scale_range=10.0,double scale_eps=1e-3,size_t max_iter=300) {
         q_adjust_result r;
         r.q_0= discharge(1.0);// starting out with scale=1.0, establish q_0
         double scale= q_wanted/r.q_0;// approximate guess for scale storage factor to start with
         try {
-        dlib::find_min_single_variable(
+            if(!isfinite(r.q_0)) {
+                throw std::runtime_error("the initial simulated discharge is nan");
+            }
+            dlib::find_min_single_variable(
                     [this,q_wanted](double x)->double{
                         double q_diff= this->discharge(x) - q_wanted;
                         return q_diff*q_diff;

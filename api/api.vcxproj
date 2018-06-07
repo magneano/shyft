@@ -49,7 +49,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-1_66;</IncludePath>
+    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-$(SHYFT_BOOST_VERSION);</IncludePath>
     <LibraryPath>$(LibraryPath);$(SHYFT_DEPENDENCIES)\lib;</LibraryPath>
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
@@ -57,7 +57,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(LibraryPath);$(SHYFT_DEPENDENCIES)\lib;</LibraryPath>
-    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-1_66;</IncludePath>
+    <IncludePath>$(IncludePath);$(SHYFT_DEPENDENCIES)\include;$(SHYFT_DEPENDENCIES)\include\boost-$(SHYFT_BOOST_VERSION);</IncludePath>
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
     <TargetName>shyft_$(ProjectName)</TargetName>
@@ -67,7 +67,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>ARMA_DONT_USE_WRAPPER;ARMA_USE_LAPACK;ARMA_USE_BLAS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE;BOOST_VARIANT_MINIMIZE_SIZE;XSHYFT_NO_PCH;_CRT_SECURE_NO_WARNINGS;ARMA_DONT_PRINT_ERRORS;ARMA_USE_CXX11;BOOST_NUMERIC_ODEINT_CXX11;BOOSTSERIAL;BOOST_THREAD_USE_DLL;BOOST_LIB_DIAGNOSTIC=1;BOOST_ALL_DYN_LINK=1;_WINDOWS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);ARMA_DONT_PRINT_CXX11_WARNING</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ARMA_DONT_USE_WRAPPER;ARMA_USE_LAPACK;ARMA_USE_BLAS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE;BOOST_VARIANT_MINIMIZE_SIZE;BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS;BOOST_MPL_LIMIT_LIST_SIZE=30;BOOST_MPL_LIMIT_VECTOR_SIZE=30;XSHYFT_NO_PCH;_CRT_SECURE_NO_WARNINGS;ARMA_DONT_PRINT_ERRORS;ARMA_USE_CXX11;BOOST_NUMERIC_ODEINT_CXX11;BOOSTSERIAL;BOOST_THREAD_USE_DLL;BOOST_LIB_DIAGNOSTIC=1;BOOST_ALL_DYN_LINK=1;_WINDOWS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);ARMA_DONT_PRINT_CXX11_WARNING</PreprocessorDefinitions>
       <PrecompiledHeaderFile>EnkiServicePch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -92,7 +92,7 @@
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>ARMA_DONT_USE_WRAPPER;ARMA_USE_LAPACK;ARMA_USE_BLAS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE;BOOST_VARIANT_MINIMIZE_SIZE;XSHYFT_NO_PCH;_CRT_SECURE_NO_WARNINGS;ARMA_DONT_PRINT_ERRORS;ARMA_USE_CXX11;BOOST_NUMERIC_ODEINT_CXX11;BOOSTSERIAL;BOOST_THREAD_USE_DLL;BOOST_LIB_DIAGNOSTIC=0;BOOST_ALL_DYN_LINK=1;_WINDOWS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);ARMA_DONT_PRINT_CXX11_WARNING</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ARMA_DONT_USE_WRAPPER;ARMA_USE_LAPACK;ARMA_USE_BLAS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE;BOOST_VARIANT_MINIMIZE_SIZE;BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS;BOOST_MPL_LIMIT_LIST_SIZE=30;BOOST_MPL_LIMIT_VECTOR_SIZE=30;XSHYFT_NO_PCH;_CRT_SECURE_NO_WARNINGS;ARMA_DONT_PRINT_ERRORS;ARMA_USE_CXX11;BOOST_NUMERIC_ODEINT_CXX11;BOOSTSERIAL;BOOST_THREAD_USE_DLL;BOOST_LIB_DIAGNOSTIC=0;BOOST_ALL_DYN_LINK=1;_WINDOWS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);ARMA_DONT_PRINT_CXX11_WARNING</PreprocessorDefinitions>
       <PrecompiledHeaderFile>EnkiServicePch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..</AdditionalIncludeDirectories>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>

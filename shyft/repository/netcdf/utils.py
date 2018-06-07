@@ -1,13 +1,15 @@
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
 import os
 import re
 import numpy as np
 import pyproj
+from netCDF4 import Dataset
 from shapely.ops import transform
 from shapely.prepared import prep
 from functools import partial
 from shapely.geometry import MultiPoint, Polygon, MultiPolygon
 from shyft import api
-from shyft.repository.interfaces import InterfaceError
 
 UTC = api.Calendar()
 
@@ -59,11 +61,12 @@ def _numpy_to_geo_ts_vec(data, x, y, z, err):
     Convert timeseries from numpy structures to shyft.api geo-timeseries vector.
     Parameters
     ----------
-    data: dict of np.ndarray
+    data: dict of tuples (np.ndarray, (list of)api.Time Axis)
         array with shape
         (nb_forecasts, nb_lead_times, nb_ensemble_members, nb_points) or
         (nb_lead_times, nb_ensemble_members, nb_points) or
         (nb_lead_times, nb_points)
+        one time axis of size nb_lead_times for each forecast
     x: np.ndarray
         X coordinates in meters in cartesian coordinate system, with array shape = (nb_points)
     y: np.ndarray
@@ -188,7 +191,7 @@ def _limit_2D(x, y, data_cs, target_cs, geo_location_criteria, padding, err, cli
         if clip_in_data_cs:
             # Transform from source coordinates to target coordinates
             x_in_poly, y_in_poly = pyproj.transform(data_proj, target_proj, xy_in_poly[:, 0],
-                                                    xy_in_poly[:, 1])  # in SHyFT coord sys
+                                                    xy_in_poly[:, 1])  # in Shyft coord sys
         else:
             x_in_poly, y_in_poly = xy_in_poly[:, 0], xy_in_poly[:, 1]
 
@@ -242,7 +245,7 @@ def _limit_2D(x, y, data_cs, target_cs, geo_location_criteria, padding, err, cli
         if clip_in_data_cs:
             # Transform from source coordinates to target coordinates
             x_in_poly, y_in_poly = pyproj.transform(data_proj, target_proj, xy_in_poly[:, 0],
-                                                    xy_in_poly[:, 1])  # in SHyFT coord sys
+                                                    xy_in_poly[:, 1])  # in Shyft coord sys
         else:
             x_in_poly, y_in_poly = xy_in_poly[:, 0], xy_in_poly[:, 1]
 
@@ -314,9 +317,11 @@ def _limit_1D(x, y, data_cs, target_cs, geo_location_criteria, padding, err, cli
     return xx, yy, xy_mask, slice(xy_inds[0], xy_inds[-1] + 1)
 
 def _make_time_slice(time, utc_period, err):
+    if utc_period is None:
+        # If period is None set period to be from start to end of dataset time dimension
+        utc_period = api.UtcPeriod(int(time[0]), int(time[-1]))
     idx_min = np.argmin(time <= utc_period.start) - 1  # raise error if result is -1
     idx_max = np.argmax(time >= utc_period.end)  # raise error if result is 0
-
     if idx_min < 0:
         raise err(
                 "The earliest time in repository ({}) is later than the start of the period for which data is "
@@ -465,27 +470,77 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
     """
     if utc_period is None:
         return ensemble
-    else:
-        # TODO; fix so it treats INSTNAT TYPE separetly from AVERAGE
-        ta = ensemble[0][list(ensemble[0].keys())[0]][0].ts.time_axis
-        if ta.total_period().start > utc_period.start or ta.total_period().end < utc_period.end:
-            raise err("Time axis does not cover utc_period.")
+
+    # Check time axis of first ensemble member/geo_point and if required create new time axis to use for clipping
+    member = ensemble[0]
+    time_axis = {}
+    is_optimal = {}
+    for key, geo_ts in member.items():
+        is_optimal[key] = False
+        point_type = geo_ts[0].ts.point_interpretation() == api.POINT_INSTANT_VALUE
+        ta = geo_ts[0].ts.time_axis
+        if ta.total_period().start > utc_period.start or ta.time_points[-1] - point_type < utc_period.end:
+            raise err("Found time axis that does not cover utc_period.")
         idx_start = np.argmax(ta.time_points > utc_period.start) - 1
-        idx_end = np.argmin(ta.time_points < utc_period.end)
+        idx_end = np.argmin(ta.time_points < utc_period.end + point_type)
         if idx_start > 0 or idx_end < len(ta.time_points) - 1:
             if ta.timeaxis_type == api.TimeAxisType.FIXED:
                 dt = ta.time(1) - ta.time(0)
                 n = int(idx_end - idx_start)
-                ta = api.TimeAxis(int(ta.time_points[idx_start]), dt, n)
+                time_axis[key] = api.TimeAxis(int(ta.time_points[idx_start]), dt, n)
             else:
                 time_points = api.UtcTimeVector(ta.time_points[idx_start:idx_end].tolist())
                 t_end = ta.time_points[idx_end]
-                ta = api.TimeAxis(time_points, int(t_end))
-            return [{key: source_vector_map[key]([source_type_map[key](s.mid_point(), s.ts.average(ta))
-                                                  for s in geo_ts]) for key, geo_ts in f.items()} for f in ensemble]
+                time_axis[key] = api.TimeAxis(time_points, int(t_end))
         else:
-            return ensemble
+            is_optimal[key] = True
+            time_axis[key] = ta
 
+    if all(list(is_optimal.values())):  # No need to clip if all are optimal
+        return ensemble
+
+    return [{key: source_vector_map[key]([source_type_map[key](s.mid_point(), s.ts.average(time_axis[key]))
+                                              for s in geo_ts]) for key, geo_ts in f.items()} for f in ensemble]
+
+
+
+
+def create_ncfile(data_file, variables, dimensions, ncattrs=None):
+    """
+    Create a ncfile ready for accepting shyft geo data.
+
+    Parameters
+    -----------
+
+    data_file: netcdf filename to create **will be overwritten**
+
+    dimensions: a dictionary keyed by 'dimensions'
+
+    variables: a dictionary keyed by 'variable_name' with a list
+        containing: [datatype, dimension tuple, and a dict of attributes]
+
+    ncattrs: a dictionary keyed by nc file attributes
+
+    Returns
+    -------
+    a netcdf file object handle to be filled with data
+
+    """
+
+    with Dataset(data_file, 'w') as dset:
+
+        if ncattrs:
+            dset.setncatts(ncattrs)
+
+        for dimension, size in dimensions.items():
+            dset.createDimension(dimension, size)
+
+        for name, content in variables.items():
+            dtype, dims, attrs = content
+            dset.createVariable(name, dtype, dims)
+            dset[name].setncatts(attrs)
+
+        # dset.close()
 
 def dummy_var(input_src_types, utc_period, geo_location_criteria):
     """

@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 
 #include <string>
@@ -20,7 +22,7 @@ namespace shyft {
      *
      *   notice:
      *      a) the most usual time-axis is the fixed_dt time-axis
-     *         in the SHyFT core, this is the one we use(could even need a highspeed-nocompromise version)
+     *         in the Shyft core, this is the one we use(could even need a highspeed-nocompromise version)
      *
      *      b) continuous/dense time-axis: there are no holes in total_period
      *                               types: fixed_dt, calendar_dt, point_dt

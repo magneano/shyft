@@ -12,7 +12,7 @@ from shyft.api import pt_hps_k
 
 class ShyftApi(unittest.TestCase):
     """
-    Verify basic SHyFT api calibration related functions and structures
+    Verify basic Shyft api calibration related functions and structures
     """
 
     def verify_parameter_for_calibration(self, param, expected_size, valid_names, test_dict=None):

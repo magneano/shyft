@@ -1,3 +1,5 @@
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
 import os
 from shyft import api
 from netCDF4 import Dataset
@@ -28,8 +30,7 @@ class WXRepository(GeoTsRepository):
         flattened: bool
             Flags whether grid_points are flattened
         allow_year_shift: bool
-            Flags whether shift of years is allowed.
-            Example: if file contains data for 2017 and
+            Flags whether shift of years is allowed
         """
         self.allow_year_shift = allow_year_shift
         if flattened:
@@ -59,12 +60,6 @@ class WXRepository(GeoTsRepository):
         Get ensemble of shyft source vectors of time series covering utc_period
         for input_source_types.
 
-        Time series are constructed by concatenating values from forecasts
-        according to fc_periodicity whose lead period
-        (nb_lead_intervals_to_drop, nb_lead_intervals_to_drop + fc_len_to_concat)
-        intersect the utc_period. See _get_time_structure_from_dataset for details
-        on fc_len_to_concat.
-
         Parameters
         ----------
         see interfaces.GeoTsRepository
@@ -86,3 +81,16 @@ class WXRepository(GeoTsRepository):
             res = wx_repo.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria)
         return _clip_ensemble_of_geo_timeseries(res, utc_period, WXRepositoryError)
 
+    def get_forecast_ensemble(self, input_source_types, utc_period, t_c, geo_location_criteria=None):
+        """
+        Same as get_timeseries since no time_stamp structure to filename
+
+        Parameters
+        ----------
+        see interfaces.GeoTsRepository
+
+        Returns
+        -------
+        see interfaces.GeoTsRepository
+        """
+        return self.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria=geo_location_criteria)

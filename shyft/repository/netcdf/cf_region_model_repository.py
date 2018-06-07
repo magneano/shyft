@@ -1,3 +1,5 @@
+# This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+# See file COPYING for more details **/
 """
 Read region netCDF files with cell data.
 
@@ -22,6 +24,8 @@ from shapely.ops import transform
 from shyft import shyftdata_dir
 from shyft.orchestration.configuration.config_interfaces import RegionConfig, ModelConfig, RegionConfigError
 from shyft.orchestration.configuration.dict_configs import DictModelConfig, DictRegionConfig
+from .utils import create_ncfile
+
 
 class CFRegionModelRepositoryError(Exception):
     pass
@@ -128,7 +132,7 @@ class CFRegionModelRepository(interfaces.RegionModelRepository):
                 m_catch = np.in1d(c_ids, self._catch_ids)
                 xcoord_m = xcoord[m_catch]
                 ycoord_m = ycoord[m_catch]
-            
+
             dataset_epsg = None
             if 'crs' in Vars.keys():
                 dataset_epsg = Vars['crs'].epsg_code.split(':')[1]
@@ -153,7 +157,7 @@ class CFRegionModelRepository(interfaces.RegionModelRepository):
                 bounding_region = BoundingBoxRegion(xcoord_m, ycoord_m, dataset_epsg, self._epsg)
             self.bounding_box = bounding_region.bounding_box(self._epsg)
             x, y, m_xy, _ = self._limit(xcoord, ycoord, source_cs, target_cs)
-            
+
             mask = ((m_xy)&(m_catch))
 
             areas = Vars['area'][mask]
@@ -163,7 +167,7 @@ class CFRegionModelRepository(interfaces.RegionModelRepository):
             c_ids = Vars["catchment_id"][mask]
             c_ids_unique = list(np.unique(c_ids))
             # c_indx = np.array([c_ids_unique.index(cid) for cid in c_ids]) # since ID to Index conversion not necessary
-            
+
 
             ff = Vars["forest-fraction"][mask]
             lf = Vars["lake-fraction"][mask]
@@ -222,6 +226,94 @@ class CFRegionModelRepository(interfaces.RegionModelRepository):
         region_model.clone = do_clone
         return region_model
 
+    def cell_data_to_netcdf(self, region_model, output_dir):
+        """
+        Writes cell_data from a shyft region_model in the same format the
+         'cf_region_model_repository' expects.
+
+        Parameters
+        -----------
+        region_model: shyft.region_model
+
+        model_id: str identifier of region_model
+
+        Returns
+        -------
+
+
+        """
+
+        nc_file = "{}_cell_data.nc".format(output_dir)
+        # repository = {'class': self.__class__,
+        #               'params': {'data_file': nc_file}
+        #               }
+
+        # with open('{}.yaml'.format(nc_file), 'w') as yml:
+        #     yaml.dump(repository, yml)
+
+
+        dimensions = {'cell': len(region_model.cells)}
+
+        variables = {'y': [np.float, ('cell',), {'axis': 'Y',
+                                                 'units': 'm',
+                                                 'standard_name': 'projection_y_coordinate'}],
+
+                     'x': [np.float, ('cell',), {'axis': 'X',
+                                                 'units': 'm',
+                                                 'standard_name': 'projection_x_coordinate'}],
+
+                     'z': [np.float, ('cell',), {'axis': 'Z',
+                                                 'units': 'm',
+                                                 'standard_name': 'height',
+                                                 'long_name': 'height above mean sea level'}],
+
+                     'crs': [np.int32, ('cell',), {'grid_mapping_name': 'transverse_mercator',
+                                                   'epsg_code': 'EPSG:' + str(region_model.bounding_region.epsg()),
+                                                   'proj4': "+proj = utm + zone = 33 + ellps = WGS84 + datum = WGS84 + units = m + no_defs"}],
+
+                     'area': [np.float, ('cell',), {'grid_mapping': 'crs',
+                                                    'units': 'm^2',
+                                                    'coordinates': 'y x z'}],
+
+                     'forest-fraction': [np.float, ('cell',), {'grid_mapping': 'crs',
+                                                               'units': '-',
+                                                               'coordinates': 'y x z'}],
+
+                     'glacier-fraction': [np.float, ('cell',), {'grid_mapping': 'crs',
+                                                                'units': '-',
+                                                                'coordinates': 'y x z'}],
+
+                     'lake-fraction': [np.float, ('cell',), {'grid_mapping': 'crs',
+                                                             'units': '-',
+                                                             'coordinates': 'y x z'}],
+
+                     'reservoir-fraction': [np.float, ('cell',), {'grid_mapping': 'crs',
+                                                                  'units': '-',
+                                                                  'coordinates': 'y x z'}],
+
+                     'catchment_id': [np.int32, ('cell',), {'grid_mapping': 'crs',
+                                                            'units': '-',
+                                                            'coordinates': 'y x z'}],
+                     }
+
+        create_ncfile(nc_file, variables, dimensions)
+        nci = Dataset(nc_file, 'a')
+
+        extracted_geo_cell_data = region_model.extract_geo_cell_data()
+        nci.variables['x'][:] = [gcd.mid_point().x for gcd in extracted_geo_cell_data]
+        nci.variables['y'][:] = [gcd.mid_point().y for gcd in extracted_geo_cell_data]
+        nci.variables['z'][:] = [gcd.mid_point().z for gcd in extracted_geo_cell_data]
+        nci.variables['area'][:] = [gcd.area() for gcd in extracted_geo_cell_data]
+        nci.variables['crs'][:] = [len(region_model.cells) * [region_model.bounding_region.epsg()]]
+        nci.variables['catchment_id'][:] = [gcd.catchment_id() for gcd in extracted_geo_cell_data]
+        nci.variables['lake-fraction'][:] = [gcd.land_type_fractions_info().lake() for gcd in extracted_geo_cell_data]
+        nci.variables['reservoir-fraction'][:] = [gcd.land_type_fractions_info().reservoir() for gcd in extracted_geo_cell_data]
+        nci.variables['glacier-fraction'][:] = [gcd.land_type_fractions_info().glacier() for gcd in extracted_geo_cell_data]
+        nci.variables['forest-fraction'][:] = [gcd.land_type_fractions_info().forest() for gcd in extracted_geo_cell_data]
+
+        nci.close()
+
+
 
 class BoundingBoxRegion(interfaces.BoundingRegion):
 
@@ -258,3 +350,7 @@ class BoundingBoxRegion(interfaces.BoundingRegion):
 
     def epsg(self):
         return self._epsg
+
+
+
+

@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 #include <fstream>
 
@@ -130,7 +132,56 @@ void finalize_api() {
     expose::dtss_finalize();
 }
 #ifdef _WIN32
-#include "Windows.h"
+// there are some extra fuzz needed to get win working
+// it goes here:
+
+#define _WIN32_WINNT 0x0501 // XP and above
+#include <sdkddkver.h>
+#include <stdio.h>
+#include <windows.h>
+#pragma comment(lib,"ntdll.lib")
+EXTERN_C NTSTATUS NTAPI NtSetInformationProcess(HANDLE, ULONG, PVOID, ULONG);
+#if 0
+typedef NTSTATUS(NTAPI *NtQueryInformationProcessFn)(HANDLE process, ULONG infoClass, void* data,ULONG dataSize, ULONG* outSize);
+static NtQueryInformationProcessFn NtQueryInformationProcess;
+
+typedef NTSTATUS(NTAPI *NtSetInformationProcessFn)(HANDLE process, ULONG infoClass, void* data,ULONG dataSize);
+static NtSetInformationProcessFn NtSetInformationProcess;
+#endif
+// these values determined by poking around in the debugger - use at your own risk!
+const DWORD ProcessInformationMemoryPriority = 0x27;
+const DWORD ProcessInformationIoPriority = 0x21;
+const DWORD DefaultMemoryPriority = 5;
+const DWORD LowMemoryPriority = 3;
+const DWORD DefaultIoPriority = 2;
+const DWORD LowIoPriority = 1;
+static void win_throw_on_error(DWORD r,std::string msg) {
+    if (r!=0) throw std::runtime_error(msg + std::string(", error-code:")+std::to_string(GetLastError()));
+}
+static void win_set_priority(int p_class) {
+    DWORD cpu, io, mem;
+    if (p_class==0) {
+        cpu = NORMAL_PRIORITY_CLASS;
+        mem = DefaultMemoryPriority;
+        io = DefaultIoPriority;
+    } else if (p_class==-1) {
+        cpu = BELOW_NORMAL_PRIORITY_CLASS;
+        mem = LowMemoryPriority;
+        io = LowIoPriority;
+    } else {
+        throw std::runtime_error("Only 0=normal and -1=low are supported for priority_class");
+    }
+    // locate the functions for querying/setting memory and IO priority
+    // HMODULE ntdll = LoadLibrary("ntdll.dll");
+    // NtSetInformationProcess = (NtSetInformationProcessFn)GetProcAddress(ntdll, "NtSetInformationProcess");
+
+    auto me =GetCurrentProcess();// we don't need to release this accoring to https://msdn.microsoft.com/en-us/library/windows/desktop/ms683179(v=vs.85).aspx
+    if (!me) throw std::runtime_error("Failed to get current process handle");
+    win_throw_on_error(!SetPriorityClass(me, cpu), "Failed setting cpu-priority");
+    win_throw_on_error(NtSetInformationProcess(me, ProcessInformationMemoryPriority,&mem, sizeof(mem)), "Failed setting mem-priority");
+    win_throw_on_error(NtSetInformationProcess(me, ProcessInformationIoPriority, &io, sizeof(io)), "Failed setting mem-priority");
+}
+
 std::string win_short_path(const std::string& long_path) {
     long length = GetShortPathName(long_path.c_str(), NULL, 0);
     std::string r(length+1, '\0');
@@ -139,14 +190,16 @@ std::string win_short_path(const std::string& long_path) {
     return r;
 }
 #else
+//-- on linux we are not even close to having these problems
 std::string win_short_path(const std::string& long_path) {
     return long_path;
 }
+void win_set_priority(int) {}
 #endif
 
 BOOST_PYTHON_MODULE(_api) {
     namespace py = boost::python;
-    py::scope().attr("__doc__") = "SHyFT python api providing basic types";
+    py::scope().attr("__doc__") = "Shyft python api providing basic types";
     py::def("version", version);
     py::docstring_options doc_options(true, true, false);// all except c++ signatures
     expose::api();
@@ -162,6 +215,15 @@ BOOST_PYTHON_MODULE(_api) {
             doc_parameter("path","str","a long path form")
             doc_returns("short_path","str","windows 8.3 path string if on windows for *existing* files, otherwise same as input path")
             );
+    py::def("win_set_priority", win_set_priority, py::arg("p_class"),
+            doc_intro("Win32 Api function to set normal (=0) or low(=-1) priority")
+            doc_intro("This is *very* specific to windows, and especially task-scheduler/bg.tasks")
+            doc_intro("get by default a complete garbled priority leaving the process you run")
+            doc_intro("close to useless when it comes to cpu,io and memory performance")
+            doc_intro("The UI does not help fixing this, and even the xml edit of files does not solve memory/io issues")
+            doc_parameters()
+            doc_parameter("p_class","int","priority class, 0=normal, -1=below normal(slightly above useless")
+    );
     py::def("_finalize", &finalize_api);
     py::object atexit = py::object(py::handle<>(PyImport_ImportModule("atexit")));
     py::object finalize = py::scope().attr("_finalize");

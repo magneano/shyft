@@ -3,9 +3,9 @@ export WORKSPACE=$(readlink --canonicalize --no-newline `dirname ${0}`/../..)
 # to align the cmake support:
 export SHYFT_DEPENDENCIES_DIR=${WORKSPACE}/shyft_dependencies
 armadillo_name=armadillo-8.400.0
-dlib_name=dlib-19.10
-boost_ver=1_66_0
-numpy_ver=1.13
+dlib_name=dlib-${SHYFT_DLIB_VERSION:-19.11}
+boost_ver=${SHYFT_BOOST_VERSION:-1_67}_0
+numpy_ver=${SHYFT_BOOST_NUMPY_VERSION:-1.14}
 cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
 echo ---------------
 echo Windows Update/build shyft-dependencies
@@ -112,6 +112,11 @@ if [ ! -d boost_${boost_ver} ]; then
     7z -y e boost_${boost_ver}.tar.gz
     7z -y x boost_${boost_ver}.tar
     pushd boost_${boost_ver}
+	if [ ${boost_ver} == "1_67_0" ]; then 
+		echo Patching boost python windows only autolinking fix for boost 1.67 version
+		${WGET} https://www.boost.org/patches/1_67_0/0003-Python-Fix-auto-linking-logic-Windows-only.patch
+		patch boost/python/detail/config.hpp 0003-Python-Fix-auto-linking-logic-Windows-only.patch
+	fi;
     echo "set PYTHONHOME=%BOOST_PYTHONHOME%" >bboost.cmd
     echo "call bootstrap.bat" >> bboost.cmd
     echo "b2 -d0 -j 6 define=BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE link=shared variant=release,debug threading=multi runtime-link=shared address-model=64 --with-system --with-filesystem --with-date_time --with-serialization --with-python --prefix=%cd%\.. install" >> bboost.cmd

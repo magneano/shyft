@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 #pragma once
 
@@ -48,7 +50,8 @@ using id_vector_t = vector<string>;
 struct srv_connection {
     unique_ptr<dlib::iosockstream> io;
     string host_port;
-    int timeout_ms;
+    int timeout_ms{1000};
+    bool is_open{false};
     void open(int timeout_ms=1000);
     void close(int timeout_ms=1000);
     void reopen(int timeout_ms=1000);
@@ -66,29 +69,31 @@ struct client {
      */
     vector<srv_connection> srv_con;
 
-	bool auto_connect{true}; ///< if enabled, connections are made as needed, and kept short, otherwise externally managed.
+	bool auto_connect{ true }; ///< if enabled, connections are made as needed, and kept short, otherwise externally managed.
 
-    bool compress_expressions{true};///< compress expressions to gain speed
+    bool compress_expressions{ true };///< compress expressions to gain speed
 
-	client (const string& host_port, bool auto_connect = true, int timeout_ms=1000);
+	client(const string & host_port, bool auto_connect = true, int timeout_ms = 1000);
 
-    client(const vector<string>& host_ports,bool auto_connect,int timeout_ms);
+    client(const vector<string> & host_ports, bool auto_connect, int timeout_ms);
 
-	void reopen(int timeout_ms=1000);
+	void reopen(int timeout_ms = 1000);
 
-	void close(int timeout_ms=1000);
+	void close(int timeout_ms = 1000);
 
-	vector<apoint_ts> percentiles(ts_vector_t const& tsv, utcperiod p, gta_t const&ta, const vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache);
+	vector<apoint_ts> percentiles(const ts_vector_t & tsv, utcperiod p, const gta_t & ta, const vector<int64_t> & percentile_spec, bool use_ts_cached_read, bool update_ts_cache);
 
-	vector<apoint_ts> evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,bool update_ts_cache) ;
+	vector<apoint_ts> evaluate(const ts_vector_t & tsv, utcperiod p, bool use_ts_cached_read, bool update_ts_cache);
 
-	void store_ts(const ts_vector_t &tsv, bool overwrite_on_write, bool cache_on_write) ;
+	void store_ts(const ts_vector_t & tsv, bool overwrite_on_write, bool cache_on_write);
     
-    void merge_store_ts(const ts_vector_t &tsv, bool cache_on_write) ;
+    void merge_store_ts(const ts_vector_t & tsv, bool cache_on_write);
 
-	ts_info_vector_t find(const string& search_expression) ;
+	ts_info_vector_t find(const string & search_expression);
 
-	void cache_flush() ;
+    void remove(const string & name);
+
+	void cache_flush();
 
 	cache_stats get_cache_stats();
 

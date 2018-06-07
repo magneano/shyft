@@ -16,9 +16,6 @@
     <ClCompile Include="core_serialization.cpp">
       <Filter>serialization</Filter>
     </ClCompile>
-    <ClCompile Include="dtss.cpp">
-      <Filter>dtss</Filter>
-    </ClCompile>
     <ClCompile Include="dtss_client.cpp">
       <Filter>dtss</Filter>
     </ClCompile>
@@ -156,6 +153,9 @@
       <Filter>dtss</Filter>
     </ClInclude>
     <ClInclude Include="dtss_db.h">
+      <Filter>dtss</Filter>
+    </ClInclude>
+    <ClInclude Include="dtss_krls.h">
       <Filter>dtss</Filter>
     </ClInclude>
     <ClInclude Include="dtss_msg.h">

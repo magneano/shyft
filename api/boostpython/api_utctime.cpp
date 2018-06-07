@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 
 #include "core/utctime_utilities.h"
@@ -17,7 +19,7 @@ namespace expose {
     static void e_calendar() {
 
         std::string (shyft::core::calendar::*to_string_t)(shyft::core::utctime) const= &calendar::to_string;//selects correct ptr.
-        std::string (calendar::*to_string_p)(utcperiod) const =&calendar::to_string;
+        std::string (calendar::*to_string_p)(utcperiod) const=&calendar::to_string;
         utctimespan (calendar::*diff_units)(utctime,utctime,utctimespan) const=&calendar::diff_units;
         utctime (calendar::*time_YMDhms)(YMDhms) const = &calendar::time;
         utctime (calendar::*time_YWdhms)(YWdhms) const = &calendar::time;
@@ -25,7 +27,7 @@ namespace expose {
         utctime (calendar::*time_from_week_6)(int, int, int, int, int, int) const = &calendar::time_from_week;
         class_<calendar, shared_ptr<calendar>>("Calendar",
             doc_intro("Calendar deals with the concept of human calendar")
-            doc_intro(" In SHyFT we practice the 'utctime-perimeter' principle,")
+            doc_intro(" In Shyft we practice the 'utctime-perimeter' principle,")
             doc_intro("  * so the core is utc-time only ")
             doc_intro("  * we deal with time-zone and calendars at the interfaces/perimeters")
             doc_intro(" in python, this corresponds to timestamp[64], or as the integer version of the time package representation")
@@ -161,8 +163,7 @@ namespace expose {
              doc_parameter("n", "int", "number of timesteps to add")
              doc_returns("n_units", "int", "number of units, so that t2 = c.add(t1,delta_t,n) + remainder(discarded)")
              doc_see_also("add(t,delta_t,n),trim(t,delta_t)")
-
-             )
+        )
         .def("trim",&calendar::trim,args("t","delta_t"),
             doc_intro("round time t down to the nearest calendar time-unit delta_t")
             doc_intro("taking the calendar time-zone and dst into account")
@@ -249,20 +250,57 @@ namespace expose {
 
 
     static void e_utcperiod() {
+        enum_<shyft::core::trim_policy>("trim_policy",
+                doc_intro("Enum to decide if to trim inwards or outwards where TRIM_IN means inwards")
+            )
+            .value("TRIM_IN", shyft::core::trim_policy::TRIM_IN)
+            .value("TRIM_OUT", shyft::core::trim_policy::TRIM_OUT)
+            .export_values()
+            ;
         bool (utcperiod::*contains_t)(utctime) const = &utcperiod::contains;
         bool (utcperiod::*contains_p)(const utcperiod&) const = &utcperiod::contains;
+        utctimespan (utcperiod::*diff_units)(const calendar&, utctimespan) const = &utcperiod::diff_units;
         class_<utcperiod>("UtcPeriod","UtcPeriod defines the open utctime range [start..end> \nwhere end is required to be equal or greater than start")
         .def(init<utctime,utctime>(args("start,end"),"Create utcperiod given start and end"))
         .def("valid",&utcperiod::valid,"returns true if start<=end otherwise false")
         .def("contains",contains_t,args("t"),"returns true if utctime t is contained in this utcperiod" )
         .def("contains",contains_p,args("p"),"returns true if utcperiod p is contained in this utcperiod" )
         .def("overlaps",&utcperiod::overlaps,args("p"), "returns true if period p overlaps this utcperiod" )
+        .def("trim",&utcperiod::trim,(py::arg("self"),py::arg("calendar"),py::arg("delta_t"),py::arg("trim_policy")=shyft::core::trim_policy::TRIM_IN), 
+                doc_intro("Round UtcPeriod up or down to the nearest calendar time-unit delta_t")
+                doc_intro("taking the calendar time-zone and dst into account")
+                doc_parameters()
+                doc_parameter("calendar", "calendar", "shyft calendar")
+                doc_parameter("delta_t", "int", "timestep in seconds, with semantic interpretation of Calendar.(DAY,WEEK,MONTH,YEAR)")
+                doc_parameter("trim_policy", "trim_policy", "TRIM_IN if rounding period inwards, else rounding outwards")
+                doc_returns("trimmed_UtcPeriod", "UtcPeriod", "new trimmed UtcPeriod")
+        )
+        .def("diff_units",diff_units,(py::arg("self"),py::arg("calendar"),py::arg("delta_t")),
+             doc_intro("Calculate the distance from start to end of UtcPeriod in specified units, taking dst into account if observed")
+             doc_intro("The function takes calendar semantics when delta_t is calendar::DAY,WEEK,MONTH,YEAR,")
+             doc_intro("and in addition also dst if observed.")
+             doc_intro("e.g. the diff_units of calendar::DAY over summer->winter shift is 1,")
+             doc_intro("even if the number of hours during those days are 23 and 25 summer and winter transition respectively")
+             doc_parameters()
+             doc_parameter("calendar", "calendar", "shyft calendar")
+             doc_parameter("delta_t", "int", "timestep in seconds, with semantic interpretation of DAY,WEEK,MONTH,YEAR")
+             doc_returns("n_units", "int", "number of units in UtcPeriod")
+        )
         .def("__str__",&utcperiod::to_string,"returns the str using time-zone utc to convert to readable time")
         .def(self == self)
         .def(self != self)
         .def("timespan",&utcperiod::timespan,"returns end-start, the timespan of the period")
         .def_readwrite("start",&utcperiod::start,"Defines the start of the period, inclusive")
-        .def_readwrite("end",&utcperiod::end,"Defines the end of the period, not inclusive");
+        .def_readwrite("end",&utcperiod::end,"Defines the end of the period, not inclusive")
+        .def("intersection",&intersection,(py::arg("a"),py::arg("b")),
+            doc_intro("Returns the intersection of two periods")
+            doc_intro("if there is an intersection, the resulting period will be .valid() and .timespan()>0")
+            doc_intro("If there is no intersection, an empty not .valid() period is returned")
+            doc_parameters()
+            doc_parameter("a","UtcPeriod","1st UtcPeriod argument")
+            doc_parameter("b","UtcPeriod","2nd UtcPeriod argument")
+            doc_returns("intersection","UtcPeriod","The computed intersection, or an empty not .valid() UtcPeriod")
+        ).staticmethod("intersection");
         def("intersection",&intersection,(py::arg("a"),py::arg("b")),
             doc_intro("Returns the intersection of two periods")
             doc_intro("if there is an intersection, the resulting period will be .valid() and .timespan()>0")

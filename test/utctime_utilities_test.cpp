@@ -49,6 +49,21 @@ TEST_CASE("utcperiod_intersection") {
     FAST_CHECK_EQ(intersection(utcperiod(1,5),utcperiod(2,4)),utcperiod(2,4));
 }
 
+TEST_CASE("test_utcperiod_trim") {
+    calendar utc;
+    utctime t0=utc.time(2018,1,1,0,0,0);
+    utctime t1=utc.time(2018,2,1,0,0,0);
+    utctime t2=utc.time(2018,3,1,0,0,0);
+    utctime t3=utc.time(2018,4,1,0,0,0);
+
+    TS_ASSERT_EQUALS(utcperiod(t0,t1).trim(utc,utc.MONTH,trim_policy::TRIM_IN),utcperiod(t0,t1));
+    TS_ASSERT_EQUALS(utcperiod(t0,t1+1).trim(utc,utc.MONTH,trim_policy::TRIM_IN),utcperiod(t0,t1));
+    TS_ASSERT_EQUALS(utcperiod(t1-1,t2+1).trim(utc,utc.MONTH,trim_policy::TRIM_OUT),utcperiod(t0,t3));
+    
+    //diff_units test
+    TS_ASSERT_EQUALS(utcperiod(t0,t3).diff_units(utc,utc.MONTH),3);
+}
+
 TEST_CASE("test_calendar_trim") {
     // simple trim test
     calendar cet(deltahours(1));

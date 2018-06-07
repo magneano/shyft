@@ -129,8 +129,14 @@ class RegionModel(unittest.TestCase):
         unspecified_area = model.statistics.unspecified_area(cids)
         self.assertAlmostEqual(total_area, forest_area + glacier_area + lake_area + reservoir_area + unspecified_area)
         cids.append(3)
-        total_area_no_match = model.statistics.total_area(cids)  # now, cids contains 3, that matches no cells
-        self.assertAlmostEqual(total_area_no_match, 0.0)
+        try:
+            model.statistics.total_area(cids)  # now, cids contains 3, that matches no cells
+            ok = False
+        except RuntimeError as re:
+            ok = True
+            assert re
+
+        self.assertTrue(ok)
 
     def test_model_initialize_and_run(self):
         num_cells = 20
@@ -180,6 +186,22 @@ class RegionModel(unittest.TestCase):
         m_ip_parameter = model.interpolation_parameter  # illustrate that we can get back the passed interpolation parameter as a property of the model
         self.assertEqual(m_ip_parameter.use_idw_for_temperature, True)  # just to ensure we really did get back what we passed in
         self.assertAlmostEqual(m_ip_parameter.temperature_idw.zscale, 0.5)
+        #
+        # Section to demo that we can ensure that model.cells[].env_ts.xxx
+        # have finite-values only
+        #
+        for env_ts_x in [model.cells[0].env_ts.temperature,
+                         model.cells[0].env_ts.precipitation,
+                         model.cells[0].env_ts.rel_hum,
+                         model.cells[0].env_ts.radiation,
+                         model.cells[0].env_ts.wind_speed]:
+            self.assertTrue(model.is_cell_env_ts_ok())  # demon how to verify that cell.env_ts can be checked prior to run
+            vx = env_ts_x.value(0)  # save value
+            env_ts_x.set(0, float('nan'))  # insert a nan
+            self.assertFalse(model.is_cell_env_ts_ok())  # demo it returns false if nan @cell.env_ts
+            env_ts_x.set(0, vx)  # insert back original value
+            self.assertTrue(model.is_cell_env_ts_ok())  # ready to run again
+
         s0 = pt_gs_k.PTGSKStateVector()
         for i in range(num_cells):
             si = pt_gs_k.PTGSKState()
@@ -195,6 +217,11 @@ class RegionModel(unittest.TestCase):
         sum_discharge_value = model.statistics.discharge_value(cids, 0)  # at the first timestep
         sum_charge = model.statistics.charge(cids)
         sum_charge_value = model.statistics.charge_value(cids, 0)
+        self.assertAlmostEqual(sum_charge_value, -111.75,places=2)
+        cell_charge=model.statistics.charge_value(api.IntVector([0,1,3]), 0,ix_type=api.stat_scope.cell)
+        self.assertAlmostEqual(cell_charge, -16.86330,places=2)
+        charge_sum_1_2_6 = model.statistics.charge(api.IntVector([1,2, 6]), ix_type=api.stat_scope.cell).values.to_numpy().sum()
+        self.assertAlmostEqual(charge_sum_1_2_6,-39.0524,places=2)
         ae_output = model.actual_evaptranspiration_response.output(cids)
         ae_pot_ratio = model.actual_evaptranspiration_response.pot_ratio(cids)
         self.assertIsNotNone(ae_output)
@@ -284,15 +311,23 @@ class RegionModel(unittest.TestCase):
         q_1 = model.cells[0].state.kirchner.q
         self.assertAlmostEqual(q_0*2.0, q_1)
         model.revert_to_initial_state()  # ensure we have a known state
-        model.run_cells(0, 10, 1)  # just run step 10
-        q_avg = model.statistics.discharge_value(cids, 10)  # get out the discharge for step 10
+        model.run_cells(0, 10, 2)  # just run step 10 and 11
+        q_avg = (model.statistics.discharge_value(cids, 10) + model.statistics.discharge_value(cids, 11))/2.0  # get out the discharge for step 10 and 11
         x = 0.7  # we want x*q_avg as target
         model.revert_to_initial_state()  # important, need start state for the test here
         adjust_result = model.adjust_state_to_target_flow(x*q_avg, cids, start_step=10, scale_range=3.0, scale_eps=1e-3,
-                                                          max_iter=350)  # This is how to adjust state to observed average flow for cids for tstep 10
+                                                          max_iter=350, n_steps=2)  # This is how to adjust state to observed average flow for cids for tstep 10
         self.assertEqual(len(adjust_result.diagnostics), 0)  # diag should be len(0) if ok.
-        self.assertAlmostEqual(adjust_result.q_r, q_avg*x, 3)  # verify we reached target
-        self.assertAlmostEqual(adjust_result.q_0, q_avg, 3)  # .q_0,
+        self.assertAlmostEqual(adjust_result.q_r, q_avg*x, 2)  # verify we reached target
+        self.assertAlmostEqual(adjust_result.q_0, q_avg, 2)  # .q_0,
+        # now verify what happens if we put in bad values for observed value
+        adjust_result = model.adjust_state_to_target_flow(float('nan'), cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
+        assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
+        # then verify what happens if we put in bad values on simulated result
+        model.cells[0].env_ts.temperature.set(10,float('nan'))
+        adjust_result = model.adjust_state_to_target_flow(30.0, cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
+        assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
+
 
     def test_optimization_model(self):
         num_cells = 20
@@ -363,7 +398,6 @@ class RegionModel(unittest.TestCase):
         # verify the interface to the new optimize_global function
         global_opt_param = optimizer.optimize_global(p0, max_n_evaluations=1500, max_seconds=3.0, solver_eps=1e-5)
         self.assertIsNotNone(global_opt_param)  # just to ensure signature and results are covered
-
 
     def test_hbv_model_initialize_and_run(self):
         num_cells = 20

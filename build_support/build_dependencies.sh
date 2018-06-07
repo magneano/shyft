@@ -1,15 +1,15 @@
 #!/bin/bash
-export WORKSPACE=$(readlink --canonicalize --no-newline `dirname ${0}`/../..)
+export SHYFT_WORKSPACE=${SHYFT_WORKSPACE:=$(readlink --canonicalize --no-newline `dirname ${0}`/../..)}
 # to align the cmake support:
-export SHYFT_DEPENDENCIES_DIR=${WORKSPACE}/shyft_dependencies
+SHYFT_DEPENDENCIES_DIR=${SHYFT_DEPENDENCIES_DIR:=${SHYFT_WORKSPACE}/shyft_dependencies}
 armadillo_name=armadillo-8.400.0
-dlib_name=dlib-19.10
-boost_ver=1_66_0
+dlib_name=dlib-19.11
+boost_ver=1_67_0
 pybind11_ver=v2.2.2
 cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
 echo ---------------
-echo Update/build shyft-dependencies
-echo WORKSPACE..............: ${WORKSPACE}
+echo Update/build shyft dependencies
+echo SHYFT_WORKSPACE........: ${SHYFT_WORKSPACE}
 echo SHYFT_DEPENDENCIES_DIR.: ${SHYFT_DEPENDENCIES_DIR}
 echo PACKAGES...............: miniconda w/shyft_env, doctest, boost_${boost_ver}, ${armadillo_name}, ${dlib_name} 
 
@@ -42,7 +42,7 @@ if [ ! -d ${dlib_name} ]; then
     pushd ${dlib_name}
     mkdir -p build
     dlib_cfg="-DDLIB_PNG_SUPPORT=0 -DDLIB_GIF_SUPPORT=0 -DDLIB_LINK_WITH_SQLITE3=0 -DDLIB_NO_GUI_SUPPORT=1 -DDLIB_DISABLE_ASSERTS=1 -DDLIB_JPEG_SUPPORT=0 -DDLIB_USE_BLAS=0 -DDLIB_USE_LAPACK=0 -DBUILD_SHARED_LIBS=ON"
-    cd build && cmake .. -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -DCMAKE_INSTALL_LIBDIR=lib ${cmake_common} ${dlib_cfg} && cmake --build . --config Release --target install
+    cd build && cmake .. -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -DCMAKE_INSTALL_LIBDIR=lib ${cmake_common} ${dlib_cfg} && cmake --build . --config Debug --target install
     popd
 fi;
 echo Done ${dlib_name}
@@ -57,8 +57,9 @@ if [ ! -d doctest ]; then
 fi;
 echo Done doctest
 
-cd ${WORKSPACE}
+cd ${SHYFT_WORKSPACE}
 # we cache minconda on travis, so the directory exists, have to check for bin dir:
+if [ ! ${CONDA_PREFIX} ]; then
 if [ ! -d miniconda/bin ]; then
     echo Building miniconda
     if [ -d miniconda ]; then
@@ -67,18 +68,18 @@ if [ ! -d miniconda/bin ]; then
     if [ ! -f miniconda.sh ]; then
         wget  -O miniconda.sh http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
     fi;
-    bash miniconda.sh -b -p ${WORKSPACE}/miniconda
+    bash miniconda.sh -b -p ${SHYFT_WORKSPACE}/miniconda
 
     # Update conda to latest version, assume we start with 4.3 which
     # requires PATH to be set
     OLDPATH=${PATH}
-    export PATH="${WORKSPACE}/miniconda/bin:$PATH"
+    export PATH="${SHYFT_WORKSPACE}/miniconda/bin:$PATH"
 
     old_conda_version=$(conda --version | sed "s/conda \(.*\)/\1/")
     echo "Old conda version is ${old_conda_version}"
     if [[ $(version ${old_conda_version}) -ge $(version "4.4") ]]; then
 	PATH=$OLDPATH
-	source ${WORKSPACE}/miniconda/etc/profile.d/conda.sh
+	source ${SHYFT_WORKSPACE}/miniconda/etc/profile.d/conda.sh
 	conda activate
     else
 	source activate
@@ -91,19 +92,21 @@ if [ ! -d miniconda/bin ]; then
     if [[ $(version ${old_conda_version}) -lt $(version "4.4") &&
 	      $(version ${new_conda_version}) -ge $(version "4.4") ]]; then
 	PATH=$OLDPATH
-	source ${WORKSPACE}/miniconda/etc/profile.d/conda.sh
+	source ${SHYFT_WORKSPACE}/miniconda/etc/profile.d/conda.sh
 	conda activate
     fi
 
     conda install numpy
     conda create -n shyft_env python=3.6 pyyaml numpy libgfortran netcdf4 gdal matplotlib requests nose coverage pip shapely  pyproj
-    ln -s ${WORKSPACE}/miniconda/include/python3.6m ${WORKSPACE}/miniconda/include/python3.6
-    ln -s ${WORKSPACE}/miniconda/envs/shyft_env/include/python3.6m ${WORKSPACE}/miniconda/envs/shyft_env/include/python3.6 
+    ln -s ${SHYFT_WORKSPACE}/miniconda/include/python3.6m ${SHYFT_WORKSPACE}/miniconda/include/python3.6
+    ln -s ${SHYFT_WORKSPACE}/miniconda/envs/shyft_env/include/python3.6m ${SHYFT_WORKSPACE}/miniconda/envs/shyft_env/include/python3.6 
 fi;
 echo Done minconda
+export PATH="${SHYFT_WORKSPACE}/miniconda/bin:$PATH"
+fi;
 
 
-export PATH="${WORKSPACE}/miniconda/bin:$PATH"
+
 cd ${SHYFT_DEPENDENCIES_DIR}
 if [ ! -d boost_${boost_ver} ]; then
     echo Building boost_${boost_ver}
@@ -134,7 +137,7 @@ fi;
 
 echo Done pybind11
 
-cd ${WORKSPACE}
+cd ${SHYFT_WORKSPACE}
 if [ -d shyft-data ]; then 
     pushd shyft-data
     git pull >/dev/null
@@ -144,6 +147,6 @@ else
 fi;
 echo Done shyft-data
 #echo Update shyft/shyft/lib with all 3rd party .so so that rpath will work for python extensions
-#mkdir -p ${WORKSPACE}/shyft/shyft/lib
-#install  --preserve-timestamps --target=${WORKSPACE}/shyft/shyft/lib ${SHYFT_DEPENDENCIES_DIR}/lib/*.so.*
+#mkdir -p ${SHYFT_WORKSPACE}/shyft/shyft/lib
+#install  --preserve-timestamps --target=${SHYFT_WORKSPACE}/shyft/shyft/lib ${SHYFT_DEPENDENCIES_DIR}/lib/*.so.*
 

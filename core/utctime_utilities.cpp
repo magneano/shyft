@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "utctime_utilities.h"
 #include <ostream>
 #include <cstring>
@@ -826,6 +828,26 @@ namespace shyft {
             vector<string> r;
             for(size_t i=0;i<time_zone::n_tzdef;++i) r.push_back(time_zone::tzdef[i].region);
             return r;
+        }
+
+        utcperiod utcperiod::trim(const calendar &c, utctimespan deltaT, trim_policy tp=trim_policy::TRIM_IN) const {
+            utcperiod trimmed_utcperiod;
+            if (tp==trim_policy::TRIM_IN) {
+                trimmed_utcperiod.start = c.trim(c.add(start, deltaT, 1) - 1, deltaT);
+                trimmed_utcperiod.end = c.trim(end, deltaT);
+            }
+            else {
+                trimmed_utcperiod.start = c.trim(start, deltaT);
+                trimmed_utcperiod.end = c.trim(c.add(end, deltaT, 1) - 1, deltaT);
+            }
+            return trimmed_utcperiod;
+        }
+
+        utctimespan utcperiod::diff_units(const calendar &c, utctimespan deltaT) const {
+            return c.diff_units(start, end, deltaT);
+        }
+        utctimespan utcperiod::diff_units(const calendar &c, utctimespan deltaT, utctimespan &remainder) const {
+            return c.diff_units(start, end, deltaT, remainder);
         }
 
     } // core

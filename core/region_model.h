@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 
 
@@ -625,9 +627,9 @@ namespace shyft {
 			 * \param start_step, specifies the time_axis start-step/period to use during adjustment
 			 * \return obtained flow in m3/s units. This can deviate from wanted flow due to model and state constraints
 			 */
-			q_adjust_result adjust_state_to_target_flow(double wanted_flow_m3s,const std::vector<int>& cids,size_t start_step=0,double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300) {
+			q_adjust_result adjust_state_to_target_flow(double wanted_flow_m3s,const std::vector<int>& cids,size_t start_step=0,double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300,size_t n_steps=1) {
 			    auto old_catchment_filter=catchment_filter;
-                adjust_state_model<region_model> a(*this,cids, start_step);
+                adjust_state_model<region_model> a(*this,cids, start_step,n_steps);
                 q_adjust_result r;
                 try {
                     r=a.tune_flow(wanted_flow_m3s,scale_range,scale_eps,max_iter);
@@ -948,6 +950,19 @@ namespace shyft {
                     r=std::make_shared<pts_t>(rn.local_inflow(rid));
                 }
                 return r;
+            }
+            
+            /** check if all values in cell.env_ts for selected calculation-filter is non-nan,
+             * i.e. valid numbers 
+             */
+            bool is_cell_env_ts_ok() {
+                for(const auto& c: *cells) {
+                    if ( is_calculated_by_catchment_ix(c.geo.catchment_ix)) {
+                        if(c.env_ts.has_nan_values())
+                            return false;
+                    }
+                }
+                return true;
             }
         protected:
             /** \brief parallell_run using a mid-point split + async to engange multicore execution

@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #pragma once
 
 #include <string>
@@ -39,7 +41,7 @@ namespace shyft {
                 // Collect responses as time series
                 pts_t avg_discharge;  ///< Kirchner Discharge given in [m^3/s] for the timestep
                 pts_t charge_m3s; ///< = precip + glacier - act_evap - avg_discharge [m^3/s] for the timestep
-                pts_t snow_total_stored_water;  ///< aka sca*(swe + lwc) in [mm]
+                pts_t snow_total_stored_water;  ///< swe in [mm] for the cell area
                 pts_t snow_outflow;  ///< skaugen snow output [m^3/s] for the timestep
                 pts_t glacier_melt;///< [m3/s] for the timestep
                 pts_t ae_output;  ///< actual evap mm/h
@@ -77,7 +79,7 @@ namespace shyft {
                     // Convert discharge to volume per time unit (m^3/s) instead of mm per time step
                     avg_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area));
                     charge_m3s.set(idx, response.charge_m3s);
-                    snow_total_stored_water.set(idx, mmh_to_m3s(response.snow.total_stored_water, destination_area));
+                    snow_total_stored_water.set(idx, response.snow.swe);
                     // Convert snow outflow to volume per time unit (m^3/s) instead of mm per time step
                     snow_outflow.set(idx, mmh_to_m3s(response.snow.outflow, destination_area));
                     glacier_melt.set(idx, response.gm_melt_m3s);
@@ -89,13 +91,13 @@ namespace shyft {
 
             /** \brief collector for discharge only */
             struct discharge_collector {
-                double destination_area;
+                double destination_area;///< in m^2 
                 pts_t avg_discharge; ///< Discharge given in [m^3/s] as the average of the timestep
                 pts_t charge_m3s; ///< = precip + glacier - act_evap - avg_discharge [m^3/s] for the timestep
                 response_t end_response;///<< end_response, at the end of collected
                 bool collect_snow;
-                pts_t snow_sca;
-                pts_t snow_swe;
+                pts_t snow_sca;///< snow covered area fraction
+                pts_t snow_swe;///< mm, snow water equivalent for the total cell  area
 
                 discharge_collector() : destination_area(0.0),collect_snow(false) {}
                 explicit discharge_collector(const double destination_area) : destination_area(destination_area),collect_snow(false) {}
@@ -132,8 +134,8 @@ namespace shyft {
              * and we need all the RAM for useful purposes.
              */
             struct null_collector {
-                void initialize(const timeaxis_t& time_axis,int start_step=0,int n_steps=0, double area=0.0) {}
-                void collect(size_t i, const state_t& response) {}
+                void initialize(const timeaxis_t& ,int =0,int =0, double =0.0) {}
+                void collect(size_t , const state_t& ) {}
             };
 
             /** \brief the state_collector collects all state if enabled
@@ -146,8 +148,8 @@ namespace shyft {
                 // State variables to collect as time series
                 double destination_area;
                 pts_t kirchner_discharge; ///< Kirchner state instant Discharge given in m^3/s
-                pts_t snow_swe;
-                pts_t snow_sca;
+                pts_t snow_swe;///< in units mm @ cell area
+                pts_t snow_sca;//< in units sca fraction
                 pts_t snow_alpha;
                 pts_t snow_nu;
                 pts_t snow_lwc;
@@ -189,10 +191,10 @@ namespace shyft {
                     if (collect_state) {
                         kirchner_discharge.set(idx, mmh_to_m3s(state.kirchner.q, destination_area));
                         snow_sca.set(idx, state.snow.sca);
-                        snow_swe.set(idx, state.snow.swe);
+                        snow_swe.set(idx, state.snow.swe_for_cell_area());
                         snow_alpha.set(idx, state.snow.alpha);
                         snow_nu.set(idx, state.snow.nu);
-                        snow_lwc.set(idx, state.snow.free_water);
+                        snow_lwc.set(idx, state.snow.free_water_for_cell_area());
                         snow_residual.set(idx, state.snow.residual);
                     }
                 }

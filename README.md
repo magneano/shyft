@@ -1,14 +1,15 @@
+|                        |                                                                                                                                                     |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Shyft Documentation    | [![Documentation Status](https://readthedocs.org/projects/shyft/badge/?version=latest)](http://shyft.readthedocs.org/en/latest/)                    |
+| Travis Build           | [![Build Status](https://travis-ci.org/statkraft/shyft.svg?branch=master)](https://travis-ci.org/statkraft/shyft)                                   |
+| Shyft Google Group     | [![Shyft Google Group](https://img.shields.io/badge/Shyft%20Google%20Group-active-blue.svg)](https://groups.google.com/forum/#!forum/shyft)         |
+| License                | [![Gnu GPL license](https://img.shields.io/badge/license-GPLv2-blue.svg)](https://github.com/statkraft/shyft/blob/master/LICENSE)                   |
 
-|Branch      |Status   |Docs   |
-|------------|---------|---------|
-|master       | [![Build Status](https://travis-ci.org/statkraft/shyft.svg?branch=master)](https://travis-ci.org/statkraft/shyft) | [![Doc Development](https://img.shields.io/badge/docs-latest-blue.svg)](http://shyft.readthedocs.io/en/latest/) |
 
 # ABOUT
 
-Shyft is an OpenSource hydrological toolbox developed by [Statkraft](http://www.statkraft.com). It is optimized for highly efficient modeling of hydrologic processes following the paradigm of distributed, lumped parameter models -- though recent developments have introduced more physically based / process-level methods.
+Shyft is an open source hydrological toolbox developed at [Statkraft](http://www.statkraft.com). It is optimized for highly efficient modeling of hydrologic processes following the paradigm of distributed, lumped parameter models -- with recent developments introducing more physically based / process-level methods.
 
-
-The code is based on an early [initiative for distributed hydrological simulation](http://www.sintef.no/sintef-energi/xergi/xergi-2004/nr-1---april/betre-tilsigsprognoser-med-meir-informasjon/) , called [ENKI](https://bitbucket.org/enkiopensource/enki) funded by Statkraft and developed at Sintef by Sjur Kolberg with contributions from Kolbjorn Engeland and Oddbjorn Bruland.
 
 # DOCUMENTATION
 
@@ -26,11 +27,13 @@ the C++ core were Sigbjørn Helset <Sigbjorn.Helset@statkraft.com> and
 Ola Skavhaug <ola@xal.no>.
 
 Orchestration and the Python wrappers were originally developed by
-John F. Burkhart <john.burkhart@statkraft.com>
+John F. Burkhart <john.burkhart@statkraft.com> with later contributions
+from Yisak Sultan Abdella <yisaksultan.abdella@statkraft.com>
+
+Copyright (C) Sigbjørn Helset (SiH), John F. Burkhart (JFB), Ola Skavhaug (OS), Yisak Sultan Abdella (YAS), Statkraft AS
 
 
 # THANKS
-
 
 Contributors and current project participants include:
  * Sigbjørn Helset <Sigbjorn.Helset@statkraft.com>
@@ -39,7 +42,7 @@ Contributors and current project participants include:
  * Yisak Sultan Abdella <YisakSultan.Abdella@statkraft.com>
  * Felix Matt <f.n.matt@geo.uio.no>
  * Francesc Alted <faltet@gmail.com>
-
+ 
 
 # COPYING / LICENSE
 
@@ -70,12 +73,14 @@ git clone https://github.com/statkraft/shyft-doc.git
 
 For compiling and running Shyft, you will need:
 
-* A C++1y compiler (gcc-5 or higher)
+* A C++1y compiler (gcc-7 or higher)
 * The BLAS and LAPACK libraries (development packages)
-* A Python3 (3.4 or higher) interpreter
+* A Python3 (3.6 or higher) interpreter
 * The NumPy package (>= 1.8.0)
 * The netCDF4 package (>= 1.2.1)
-* The CMake building tool (2.8.7 or higher)
+* The CMake building tool (3.9 or higher)
+* 3rd party dependencies for c++ extensions and tests
+  boost, dlib, armadillo, doctest
 
 In addition, a series of Python packages are needed mainly for running the tests. These can be easily installed via:
 
@@ -101,7 +106,33 @@ NOTE: the build/compile instructions below have been mainly tested on Linux plat
 
 NOTE: the dependency regarding a modern compiler generally means gcc-7 is required to build Shyft.
 
-You can compile Shyft by using the typical procedure for Python packages. We use environment variables to control the build. The `SHYFT_DEPENDENCIES_DIR` defines where the dependencies will be built (or exist). When you call `setup.py` the script will call cmake. If the dependencies exist in the aforementioned directory, they will be used. Otherwise, they will be downloaded and built into that directory as part of the build process. If not set, cmake will create a directory `shyft-dependencies` in the `shyft` repository directory. A suggestion is to set the `shyft-dependencies` directory to your `shyft-workspace`. If you have set these as part of your `conda environment` per the instructions above, and assuming you are active in that environment, then simply:
+You can compile Shyft by using the typical procedure for Python packages. 
+
+Shyft currently uses boost, dlib, armadillo and doctest to build the python-extensions.
+
+The dependencies can be provided as pr. standard on your linux-system, 
+or 
+built from source following standard build-recipe from those above mentioned libraries.
+
+We supply scripts to automate the build-from source strategy: 
+
+shyft/build_support/build_dependencies.sh  (linux)
+shyft/build_support/win_build_dependencies.sh (windows)
+
+You should execute the build_dependencies.sh script just after initial checkout or refresh,
+prior to building the python extensions. The scripts will download and build required
+packages in `shyft_dependencies` directory in parallel with shyft directory.
+
+The linux build will also download miniconda with required packages for the shyft_env
+in parallel with the shyft directory, effectively giving a complete sandboxed shyft
+development setup.
+
+You should then prepend to miniconda/bin to PATH prior to working with shyft
+to ensure that the correct python interpreter is picked up.
+
+When you call `setup.py` the script will call cmake. If the dependencies exist in the aforementioned directory, they will be used.
+Otherwise cmake will attempt to locate the libraries from the system.
+
  
  ```bash
  pip install -r requirements.txt
@@ -114,9 +145,9 @@ NOTE: If you haven't set `env_vars` as part of your conda environment, then you 
 ```bash
 # assumes you are still in the shyft_workspace directory containing
 # the git repositories
-export SHYFT_WORKSPACE=`pwd`
-mkdir shyft-dependencies
-export SHYFT_DEPENDENCIES_DIR=$SHYFT_WORKSPACE/shyft-dependencies
+bash shyft/build_support/build_dependencies.sh
+export PATH=$SHYFT_WORKSPACE/miniconda/bin:$PATH
+export LD_LIBRARY_PATH=$SHYFT_WORKSPACE/shyft_dependencies/lib
 cd shyft #the shyft repository
 python setup.py build_ext --inplace
 ```
@@ -132,15 +163,6 @@ The quickest and easiest test to run is:
 python -c "from shyft import api"
 ```
 
-If this raises:
-`ImportError: libboost_python3.so.1.61.0: cannot open shared object file: No such file or directory`
-
-Then you don't have your `LD_LIBRARY_PATH` set correctly. This should point to:
-
-```bash
-export LD_LIBRARY_PATH=$SHYFT_DEPENDENCIES_DIR/local/lib
-```
-
 To run further tests, see the TESTING section below. 
 
 ### INSTALLING
@@ -151,8 +173,6 @@ If the tests above run, then you can simply install Shyft using:
 cd $SHYFT_WORKSPACE/shyft
 python setup.py install
 ```
-
-Just be aware of the dependency of the LD_LIBRARY_PATH so that the libboost libraries are found.
 
 Now, you should be set to start working with the [shyft documentation](https://shyft.readthedocs.org) and 
 ideally clone the [shyft-doc](https://github.com/statkraft/shyft-doc) repositories to work through the 
@@ -168,22 +188,20 @@ manually (in fact, if you plan to develop Shyft, this may be recommended because
 the integrated C++ tests).  The steps are the usual ones:
 
 ```bash
-$ export SHYFT_SOURCES=$SHYFT_WORKSPACE  # absolute path required!
-$ cd $SHYFT_SOURCES
+$ cd $SHYFT_WORKSPACE/shyft
 $ mkdir build
 $ cd build
-$ export SHYFT_DEPENDENCIES_DIR=$SHYFT_SOURCES/.. # directory_to_keep_dependencies,  absolute path
 $ cmake ..      # configuration step; or "ccmake .." for curses interface
 $ make -j 4     # do the actual compilation of C++ sources (using 4 processes)
-$ make install  # copy Python extensions somewhere in $SHYFT_SOURCES
+$ make install  # install python extensions into the shyft python source tree
 ```
 
 We have the beast compiled by now.  For testing:
 
 ```bash
-$ export LD_LIBRARY_PATH=$SHYFT_DEPENDENCIES_DIR/local/lib
+$ export LD_LIBRARY_PATH=$SHYFT_WORKSPACE/shyft_dependencies/lib
 $ make test     # run the C++ tests
-$ export PYTHONPATH=$SHYFT_SOURCES
+$ export PYTHONPATH=$SHYFT_WORKSPACE/shyft
 $ nosetests ..  # run the Python tests
 ```
 
@@ -223,5 +241,3 @@ To run some of the C++ core tests you can try the following:
 cd $SHYFT_WORKSPACE/shyft/build/test
 make test
 ```
-
-

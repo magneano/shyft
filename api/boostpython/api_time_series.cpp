@@ -1,3 +1,5 @@
+/** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
+See file COPYING for more details **/
 #include "boostpython_pch.h"
 
 #include "core/utctime_utilities.h"
@@ -70,8 +72,10 @@ namespace expose {
     static string nice_str(const shared_ptr<time_series::dd::ice_packing_recession_ts>&b) { return "ice_packing_recession_ts(" + nice_str(b->flow_ts) + "," + nice_str(b->ice_packing_ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::krls_interpolation_ts>&b) { return "krls(" + nice_str(b->ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::qac_ts>&b) { return "qac_ts(" + nice_str(apoint_ts(b->ts)) + ", "+nice_str(apoint_ts(b->cts))+"..)"; }
+	static string nice_str(const shared_ptr<time_series::dd::inside_ts>&b) { return "inside_ts(" + nice_str(apoint_ts(b->ts)) + ", "+to_string(b->p.min_x)+", "+to_string(b->p.max_x)+", ..)"; }
+	static string nice_str(const shared_ptr<time_series::dd::decode_ts>&b) { return "decode_ts(" + nice_str(apoint_ts(b->ts)) + ",start_bit="+to_string(b->p.start_bit)+",n_bits="+to_string(b->p.n_bits())+")"; }
 
-
+	
 	static string nice_str(const apoint_ts&ats) {
 		if (!ats.ts)
 			return "null";
@@ -93,6 +97,8 @@ namespace expose {
         if (const auto& b = dynamic_pointer_cast<time_series::dd::ice_packing_recession_ts>(ats.ts)) return nice_str(b);
 		if (const auto& b = dynamic_pointer_cast<time_series::dd::krls_interpolation_ts>(ats.ts)) return nice_str(b);
 		if (const auto& b = dynamic_pointer_cast<time_series::dd::qac_ts>(ats.ts)) return nice_str(b);
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::inside_ts>(ats.ts)) return nice_str(b);
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::decode_ts>(ats.ts)) return nice_str(b);
 
 		return "not_yet_stringified_ts";
 	}
@@ -105,7 +111,32 @@ namespace expose {
 			)
 			.def(vector_indexing_suite<core_ts_vector>());
 	}
-
+	
+    /** ats_vector python expose helper for constructor variants so that
+     * it's easy for to use. We can't use py_convertible since
+     * python get confused by 3*tsv etc. (trying to convert 3 -> tsvector) 
+     */
+	struct ats_vector_ext {
+        static ats_vector *create_default() {return new ats_vector{};}
+        static ats_vector *create_from_clone(const ats_vector& c) {return new ats_vector(c);}
+        static ats_vector *create_from_ts_list(py::list tsl) {
+            size_t n = py::len(tsl);
+            if(n==0) return new ats_vector{};
+            auto r= new ats_vector();
+            r->reserve(n);
+            for(size_t i=0;i<n;++i) {
+                py::object ts= tsl[i];
+                py::extract<apoint_ts> xts(ts);
+                if(xts.check()) {
+                    r->push_back(xts());
+                } else {
+                    throw runtime_error("Failed to convert "+ to_string(i)+" element to TimeSeries");
+                }
+            }
+            return r;
+        }
+    };
+    
     static void expose_ats_vector() {
         using namespace shyft::api;
         typedef ats_vector(ats_vector::*m_double)(double)const;
@@ -124,10 +155,23 @@ namespace expose {
                 doc_intro("In addition, .average(..),.integral(..),.accumulate(..),.time_shift(..), .percentiles(..)")
                 doc_intro("  is also supported")
                 doc_intro("")
-                doc_intro("All operation returns a *new* ts-vector, containing the resulting expressions")
+                doc_intro("All operation returns a *new* ts-vector, containing the resulting expressions"),
+                no_init
             )
             .def(vector_indexing_suite<ats_vector>())
-            .def(init<ats_vector const&>(args("clone_me")))
+            .def("__init__",make_constructor(&ats_vector_ext::create_default,default_call_policies()),
+                doc_intro("Create an empty TsVector")
+            )
+            .def("__init__",make_constructor(&ats_vector_ext::create_from_clone,default_call_policies(),(py::arg("cloneme"))),
+                doc_intro("Create a shallow clone of  the TsVector")
+                doc_parameters()
+                doc_parameter("cloneme","TsVector","The TsVector to be cloned")
+            )
+            .def("__init__",make_constructor(&ats_vector_ext::create_from_ts_list,default_call_policies(),(py::arg("ts_list"))),
+                doc_intro("Create a TsVector from a python list of TimeSeries")
+                doc_parameters()
+                doc_parameter("ts_list","List[TimeSeries]","A list of TimeSeries")
+            )
             .def("values_at",&ats_vector::values_at_time,args("t"),
                  doc_intro("Computes the value at specified time t for all time-series")
                  doc_parameters()
@@ -266,6 +310,23 @@ namespace expose {
                   doc_notes()
                   doc_see_also("nash_sutcliffe,forecast_merge")
              )
+             .def("inside", &ats_vector::inside,
+                (py::arg("self"),py::arg("min_v"),py::arg("max_v"),py::arg("nan_v")=shyft::nan,py::arg("inside_v")=1.0,py::arg("outside_v")=0.0),
+                doc_intro(
+                    "Create an inside min-max range ts-vector, that transforms the point-values\n"
+                    "that falls into the half open range [min_v .. max_v > to \n"
+                    "the value of inside_v(default=1.0), or outside_v(default=0.0),\n"
+                    "and if the value considered is nan, then that value is represented as nan_v(default=nan)\n"
+                    "You would typically use this function to form a true/false series (inside=true, outside=false)\n"
+                )
+                doc_parameters()
+                doc_parameter("min_v","float","minimum range, values <  min_v are not inside min_v==NaN means no lower limit")
+                doc_parameter("max_v","float","maximum range, values >= max_v are not inside. max_v==NaN means no upper limit")
+                doc_parameter("nan_v","float","value to return if the value is nan")
+                doc_parameter("inside_v","float","value to return if the ts value is inside the specified range")
+                doc_parameter("outside_v","float","value to return if the ts value is outside the specified range")
+                doc_returns("inside_tsv","TsVector","New TsVector where each element is an evaluated-on-demand inside time-series")
+            )
             // defining vector math-operations goes here
             .def(-self)
             .def(self*double())
@@ -310,7 +371,7 @@ namespace expose {
             def("max", (f_atsv_double)max, args("ts_vector", "number"), "return max of ts_vector and number");
             def("max", (f_double_atsv)max, args("number", "ts_vector"), "return max of number and ts_vector");
             def("max", (f_atsv_atsv)max, args("a", "b"), "return max of ts_vectors a and b (requires equal size!)");
-
+            
             // we also need a vector of ats_vector for quantile_map_forecast function
             typedef std::vector<ats_vector> TsVectorSet;
             class_<TsVectorSet>("TsVectorSet",
@@ -418,6 +479,7 @@ namespace expose {
         self_ts_t  min_ts_f =&pts_t::min;
         self_dbl_t max_double_f=&pts_t::max;
         self_ts_t  max_ts_f =&pts_t::max;
+        
         typedef ts_bind_info TsBindInfo;
         class_<TsBindInfo>("TsBindInfo",
             doc_intro("TsBindInfo gives information about the time-series and it's binding")
@@ -440,7 +502,7 @@ namespace expose {
 			)
             .def(vector_indexing_suite<TsBindInfoVector>())
             ;
-
+        py_api::iterable_converter().from_python<TsBindInfoVector>();
 		class_<apoint_ts>("TimeSeries",
                 doc_intro("A time-series providing mathematical and statistical operations and functionality.")
                 doc_intro("")
@@ -478,25 +540,31 @@ namespace expose {
 			    init<>( (py::arg("self")), doc_intro("constructs and empty time-series"))
             )
 
-			.def(init<const time_axis::generic_dt&, double, time_series::ts_point_fx >(
-				(py::arg("self"),py::arg("ta"), py::arg("fill_value"), py::arg("point_fx")),
-				doc_intro("construct a time-series with time-axis ta, specified fill-value, and point interpretation policy point_fx")
-				)
-			)
 			.def(init<const time_axis::generic_dt&, const std::vector<double>&, time_series::ts_point_fx >(
 				(py::arg("self"),py::arg("ta"), py::arg("values"), py::arg("point_fx")),
 				doc_intro("construct a timeseries time-axis ta, corresponding values and point interpretation policy point_fx")
 				)
 			)
+			.def(init<const time_axis::generic_dt&, double, time_series::ts_point_fx >(
+				(py::arg("self"),py::arg("ta"), py::arg("fill_value"), py::arg("point_fx")),
+				doc_intro("construct a time-series with time-axis ta, specified fill-value, and point interpretation policy point_fx")
+				)
+			)
 
+			.def(init<const time_axis::fixed_dt&, const std::vector<double>&, time_series::ts_point_fx >(
+				(py::arg("self"),py::arg("ta"),py::arg("values"), py::arg("point_fx")),
+				doc_intro("construct a timeseries timeaxis ta with corresponding values, and point interpretation policy point_fx")
+				)
+			)
 			.def(init<const time_axis::fixed_dt&, double, time_series::ts_point_fx >(
 				(py::arg("self"),py::arg("ta"),py::arg("fill_value"),py::arg("point_fx")),
 				doc_intro("construct a timeseries with fixed-delta-t time-axis ta, specified fill-value, and point interpretation policy point_fx")
 				)
 			)
-			.def(init<const time_axis::fixed_dt&, const std::vector<double>&, time_series::ts_point_fx >(
-				(py::arg("self"),py::arg("ta"),py::arg("values"), py::arg("point_fx")),
-				doc_intro("construct a timeseries timeaxis ta with corresponding values, and point interpretation policy point_fx")
+
+			.def(init<const time_axis::point_dt&, const std::vector<double>&, time_series::ts_point_fx >(
+				(py::arg("self"),py::arg("ta"), py::arg("values"), py::arg("point_fx")),
+				doc_intro("construct a time-series with a point-type time-axis ta, corresponding values, and point-interpretation point_fx")
 				)
 			)
 			.def(init<const time_axis::point_dt&, double, time_series::ts_point_fx>(
@@ -504,11 +572,7 @@ namespace expose {
 				doc_intro("construct a time-series with a point-type time-axis ta, specified fill-value, and point-interpretation point_fx")
 				)
 			)
-			.def(init<const time_axis::point_dt&, const std::vector<double>&, time_series::ts_point_fx >(
-				(py::arg("self"),py::arg("ta"), py::arg("values"), py::arg("point_fx")),
-				doc_intro("construct a time-series with a point-type time-axis ta, corresponding values, and point-interpretation point_fx")
-				)
-			)
+
             .def(init<const rts_t &>(
 				(py::arg("self"),py::arg("core_result_ts")),
 				doc_intro("construct a time-series from a shyft core time-series, to ease working with core-time-series in user-interface/scripting")
@@ -592,6 +656,7 @@ namespace expose {
 			.def("average", &apoint_ts::average, (py::arg("self"),py::arg("ta")),
                 doc_intro("create a new ts that is the true average of self")
                 doc_intro("over the specified time-axis ta.")
+                doc_intro("Notice that same definition as for integral applies; non-nan parts goes into the average")
                 doc_parameters()
                 doc_parameter("ta","TimeAxis","time-axis that specifies the periods where true-average is applied")
                 doc_returns("ts","TimeSeries","a new time-series expression, that will provide the true-average when requested")
@@ -829,7 +894,7 @@ namespace expose {
                 doc_intro("... )) + np.random.uniform(-0.75, 0.75, n_)  # add uniform noise")
                 doc_intro(">>> data[n_//2 - 1:n_//2 + 2] = float('nan')  # add some missing data")
                 doc_intro(">>> ")
-                doc_intro(">>> # create SHyFT data structures")
+                doc_intro(">>> # create Shyft data structures")
                 doc_intro(">>> ta = TimeAxis(t0, dt, n_)")
                 doc_intro(">>> temperature_ts = TimeSeries(ta, DoubleVector.from_numpy(data),")
                 doc_intro("...                             point_interpretation_policy.POINT_AVERAGE_VALUE)")
@@ -896,7 +961,7 @@ namespace expose {
                 doc_intro("... )) + np.random.uniform(-0.75, 0.75, n_)  # add uniform noise")
                 doc_intro(">>> temperature_data[n_ // 2 - 1:n_ // 2 + 2] = float('nan')  # add some missing data")
                 doc_intro(">>> ")
-                doc_intro(">>> # create SHyFT data structures for temperature")
+                doc_intro(">>> # create Shyft data structures for temperature")
                 doc_intro(">>> ta = TimeAxis(t0, dt, n_)")
                 doc_intro(">>> temperature_ts = TimeSeries(ta, DoubleVector.from_numpy(temperature_data),")
                 doc_intro("...                             point_interpretation_policy.POINT_AVERAGE_VALUE)")
@@ -909,7 +974,7 @@ namespace expose {
                 doc_intro(">>> flow_data = -0.0000000015*(x - x0)*(x - x1) + 1 + np.random.uniform(-0.5, 0.5, n_)")
                 doc_intro(">>> del x0, x1, x")
                 doc_intro(">>> ")
-                doc_intro(">>> # create SHyFT data structures for temperature")
+                doc_intro(">>> # create Shyft data structures for temperature")
                 doc_intro(">>> flow_ts = TimeSeries(ta, DoubleVector.from_numpy(flow_data),")
                 doc_intro("...                      point_interpretation_policy.POINT_AVERAGE_VALUE)")
                 doc_intro(">>> ")
@@ -985,9 +1050,50 @@ namespace expose {
                  doc_parameter("cts","TimeSeries","time-series that keeps the values to be filled in at points that are NaN or outside min-max-limits")
                  doc_returns("min_max_check_ts_fill","TimeSeries","Evaluated on demand time-series with NaN, out of range values filled in")
             )
+            .def("inside", &apoint_ts::inside,
+                (py::arg("self"),py::arg("min_v"),py::arg("max_v"),py::arg("nan_v")=shyft::nan,py::arg("inside_v")=1.0,py::arg("outside_v")=0.0),
+                doc_intro(
+                    "Create an inside min-max range ts, that transforms the point-values\n"
+                    "that falls into the half open range [min_v .. max_v > to \n"
+                    "the value of inside_v(default=1.0), or outside_v(default=0.0),\n"
+                    "and if the value considered is nan, then that value is represented as nan_v(default=nan)\n"
+                    "You would typically use this function to form a true/false series (inside=true, outside=false)\n"
+                )
+                doc_parameters()
+                doc_parameter("min_v","float","minimum range, values <  min_v are not inside min_v==NaN means no lower limit")
+                doc_parameter("max_v","float","maximum range, values >= max_v are not inside. max_v==NaN means no upper limit")
+                doc_parameter("nan_v","float","value to return if the value is nan")
+                doc_parameter("inside_v","float","value to return if the ts value is inside the specified range")
+                doc_parameter("outside_v","float","value to return if the ts value is outside the specified range")
+                doc_returns("inside_ts","TimeSeries","Evaluated on demand inside time-series")
+            )
+            .def("decode", &apoint_ts::decode,
+                (py::arg("self"),py::arg("start_bit"),py::arg("n_bits")),
+                doc_intro(
+                    "Create an time-series that decodes the source using provided\n"
+                    "specification start_bit and n_bits.\n"
+                    "This function can typically be used to decode status-signals from sensors stored as \n"
+                    "binary encoded bits, using integer representation\n"
+                    "The floating point format allows up to 52 bits to be precisely stored as integer\n"
+                    "- thus there are restrictions to start_bit and n_bits accordingly.\n"
+                    "Practical sensors quality signals have like 32 bits of status information encoded\n"
+                    "If the value in source time-series is \n"
+                    " a) negative\n"
+                    " b) nan\n"
+                    " c) larger than 52 bits\n"
+                    "Then nan is returned for those values\n"
+                    "\n"
+                    "ts.decode(start_bit=1,n_bits=1) will return values [0,1,nan]\n"
+                    "similar:\n"
+                    "ts.decode(start_bit=1,n_bits=2) will return values [0,1,2,3,nan]\n"
+                    "etc..\n"
+                )
+                doc_parameters()
+                doc_parameter("start_bit","int","where in the n-bits integer the value is stored, range[0..51]")
+                doc_parameter("n_bits","int","how many bits are encoded, range[0..51], but start_bit +n_bits < 51")
+                doc_returns("decode_ts","TimeSeries","Evaluated on demand decoded time-series")
+            )
 
-            //.def("max",max_stat_ts_ts_f,args("ts_a","ts_b"),"create a new ts that is the max(ts_a,ts_b)").staticmethod("max")
-            //.def("min",min_stat_ts_ts_f,args("ts_a","ts_b"),"create a new ts that is the max(ts_a,ts_b)").staticmethod("min")
 			.def("partition_by",&apoint_ts::partition_by,
                 (py::arg("self"),py::arg("calendar"), py::arg("t"), py::arg("partition_interval"), py::arg("n_partitions"), py::arg("common_t0")),
 				doc_intro("from a time-series, construct a TsVector of n time-series partitions.")
