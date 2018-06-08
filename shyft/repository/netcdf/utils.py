@@ -11,6 +11,10 @@ from functools import partial
 from shapely.geometry import MultiPoint, Polygon, MultiPolygon
 from shyft import api
 
+class RepositoryUtilsError(Exception):
+    pass
+
+
 UTC = api.Calendar()
 
 source_type_map = {"relative_humidity": api.RelHumSource,
@@ -540,41 +544,51 @@ def create_ncfile(data_file, variables, dimensions, ncattrs=None):
             dset.createVariable(name, dtype, dims)
             dset[name].setncatts(attrs)
 
-        # dset.close()
 
-def dummy_var(input_src_types, utc_period, geo_location_criteria):
+def dummy_var(input_src_types: list, utc_period: "api.UtcPeriod", geo_location_criteria, ts_interval=86400):
     """
-    A copy of utils._numpy_to_geo_ts_vec in order to dummy radiation, humidity and wind_speed
-    Convert timeseries from numpy structures to shyft.api geo-timeseries vector.
+    Purpose is to provide dummy radiation, humidity and wind_speed
+    called from `get_timeseries` method of a `shyft.GeoTsRepository`
+
+    Will return one source 'station', from the lower left corner of the
+    geo_location_criteria.bounds. Shyft interpolation will take care of
+    the rest...
+
+    Returns a timeseries covering the period at the interval defined by ts_interval.
+
     Parameters
     ----------
-    data: dict of np.ndarray
-        array with shape
-        (nb_forecasts, nb_lead_times, nb_ensemble_members, nb_points) or
-        (nb_lead_times, nb_ensemble_members, nb_points) or
-        (nb_lead_times, nb_points)
-    x: np.ndarray
-        X coordinates in meters in cartesian coordinate system, with array shape = (nb_points)
-    y: np.ndarray
-        Y coordinates in meters in cartesian coordinate system, with array shape = (nb_points)
-    z: np.ndarray
-        elevation in meters, with array shape = (nb_points)
+        input_source_types: list
+            List of source types to retrieve (precipitation,temperature..)
+        utc_period: api.UtcPeriod
+            The utc time period that should (as a minimum) be covered.
+        geo_location_criteria: {shapely.geometry.Polygon, shapely.geometry.MultiPolygon}
+            Polygon defining the boundary for selecting points. All points located inside this boundary will be fetched.
+        ts_interval: int [86400]
+            describes the interval used to calculate the periodicity of the timeseries
+
     Returns
     -------
-    timeseries: dict
-        Time series arrays keyed by type
+    geo_loc_ts: dictionary
+            dictionary keyed by source type, where values are api vectors of geo
+            located timeseries.
+            Important notice: The returned time-series should at least cover the
+            requested period. It could return *more* data than in
+            the requested period, but must return sufficient data so
+            that the f(t) can be evaluated over the requested period.
     """
 
-    ndays = (utc_period.end - utc_period.start) / 86400
+    nint = (utc_period.end - utc_period.start) / ts_interval
 
     def _ta(t):
         t0 = int(t[0])
         t1 = int(t[1])
         return api.TimeAxis(t0, t1 - t0, len(t))
 
-    times = np.linspace(utc_period.start, utc_period.end, ndays, 86400)
+    times = np.linspace(utc_period.start, utc_period.end, nint, ts_interval)
 
     ta = _ta(times)
+    #TODO: could make more sophisticated to get mid point, etc.
     x, y, urx, ury = geo_location_criteria.bounds
     x = np.array([x])
     y = np.array([y])
@@ -584,6 +598,7 @@ def dummy_var(input_src_types, utc_period, geo_location_criteria):
 
     data = {}
 
+    #TODO: this is where the 'dummy' data is generated. Could be made more robust, quick fix for now
     for var in input_src_types:
         if var == 'radiation':
             data[var] = ( np.ones((len(times), len(x))) * 1, ta)
@@ -593,16 +608,15 @@ def dummy_var(input_src_types, utc_period, geo_location_criteria):
             data[var] = (np.ones((len(times), len(x))) * 0.6, ta)
 
 
-    shape = list(data.values())[0][0].shape
-    ndim = len(shape)
+    ndim = len(list(data.values())[0][0].shape)
 
     if ndim == 4:
-        raise(InterfaceError("Dummy not implemented for ensembles"))
+        raise(RepositoryUtilsError("Dummy not implemented for ensembles"))
     elif ndim == 3:
-        raise (InterfaceError("Dummy not implemented for ensembles"))
+        raise (RepositoryUtilsError("Dummy not implemented for ensembles"))
     elif ndim == 2:
         geo_ts = {key: create_geo_ts_type_map[key](ta, geo_pts, arr[:, :].transpose(), series_type[key])
                   for key, (arr, ta) in data.items()}
     else:
-        raise err("Number of dimensions, ndim, of Numpy array to be converted to shyft GeoTsVector not 2<=ndim<=4.")
+        raise RepositoryUtilsError("Number of dimensions, ndim, of Numpy array to be converted to shyft GeoTsVector not 2<=ndim<=4.")
     return geo_ts

@@ -16,89 +16,82 @@ from shapely.geometry import box
 class SeNorgeDataRepositoryTestCase(unittest.TestCase):
     def test_get_timeseries(self):
         """
-        #Simple regression test of WRF data repository.
+        #Simple regression test of senorge data repository.
         """
         EPSG, bbox, bpoly = self.senorge_epsg_bbox
 
         # Period start
         n_days = 5
-        t0 = api.YMDhms(2015, 2)
-        date_str = "{}-{:02}".format(t0.year, t0.month)
+        t0 = api.YMDhms(1957, 1, 2)
         utc = api.Calendar()  # No offset gives Utc
         period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_days*24))
 
-        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository", "senorge2")
-        f1 = "seNorge2_PREC1d_grid_2015.nc"
-#        f1 = "wrfout_d03_{}".format(date_str)
+        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository")
+        f1 = "senorge_test.nc"
 
         senorge1 = SeNorgeDataRepository(EPSG, base_dir, filename=f1, allow_subset=True)
-        senorge1_data_names = ("precipitation",)
+        senorge1_data_names = ("temperature",)
         sources = senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
         self.assertTrue(len(sources) > 0)
 
         self.assertTrue(set(sources) == set(senorge1_data_names))
-#        self.assertTrue(sources["temperature"][0].ts.size() == n_hours + 1)
-        p0 = sources["precipitation"][0].ts
-#        temp0 = sources["temperature"][0].ts
+        p0 = sources["temperature"][0].ts
         self.assertTrue(p0.size() == n_days + 1)
-#        self.assertTrue(p0.time(0) == temp0.time(0))
         self.assertTrue(p0.time(0), period.start)
 
-        # Number test:
-        # asserting shyft-sources time series are same as time series of corresponding location in wrf dataset.
-        dset = Dataset(path.join(base_dir, f1))
-        lat = dset.variables["Y"]
-        lon = dset.variables["X"]
-
-        senorge_data = {}
-
-#        senorge_data["temperature"] = dset.variables["mean_temperature"][:]
-        senorge_data["precipitation"] = dset.variables["precipitation_amount"][:]
-#        senorge_data["temperature"] -= 273.16
-
-        data_cs =  "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0" #"+init=EPSG:32633"
-        target_cs = "+init=EPSG:32633"
-        data_proj = Proj(data_cs)
-        target_proj = Proj(target_cs)
-        lon_m, lat_m = np.meshgrid(lon, lat)
-        x, y = transform(data_proj, target_proj, lon_m[:], lat_m[:])
-
-
-        for name, senorge_d in senorge_data.items():
-            srs = sources[name]
-            for i, s in enumerate(srs):
-                mp = s.mid_point()
-                x_ts, y_ts, z_ts = mp.x, mp.y, mp.z
-                ts = s.ts
-                ts_values = ts.v.to_numpy()
-
-                # find indixes in senorge-dataset
-                m = (x == x_ts) & (y == y_ts)
-                idxs = np.where(m > 0)
-#                x_idx, y_idx = idxs[0][0], idxs[1][0]  # assumung geo-location is unique in dataset
-#                self.assertTrue(all(ts_values == senorge_d[:n_hours + 1, x_idx, y_idx]),
-#                                "senorge and shyft-TS of {} are not the same.".format(name))
-                # if i ==0:
-                #    plt.figure()
-                #    plt.plot(ts_values)
-                #    plt.title([name])
-                #    plt.show()
+#         # Number test:
+#         # asserting shyft-sources time series are same as time series of
+#         # corresponding location in senorge dataset.
+#         dset = Dataset(path.join(base_dir, f1))
+#         lat = dset.variables["Y"]
+#         lon = dset.variables["X"]
+#
+#         senorge_data = {}
+#
+#         senorge_data["temperature"] = dset.variables["mean_temperature"][:]
+#
+#         data_cs =  "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0" #"+init=EPSG:32633"
+#         target_cs = "+init=EPSG:32633"
+#         data_proj = Proj(data_cs)
+#         target_proj = Proj(target_cs)
+#         lon_m, lat_m = np.meshgrid(lon, lat)
+#         x, y = transform(data_proj, target_proj, lon_m[:], lat_m[:])
+#
+#
+#         for name, senorge_d in senorge_data.items():
+#             srs = sources[name]
+#             for i, s in enumerate(srs):
+#                 mp = s.mid_point()
+#                 x_ts, y_ts, z_ts = mp.x, mp.y, mp.z
+#                 ts = s.ts
+#                 ts_values = ts.v.to_numpy()
+#
+#                 # find indixes in senorge-dataset
+#                 m = (x == x_ts) & (y == y_ts)
+#                 idxs = np.where(m > 0)
+# #                x_idx, y_idx = idxs[0][0], idxs[1][0]  # assumung geo-location is unique in dataset
+# #                self.assertTrue(all(ts_values == senorge_d[:n_hours + 1, x_idx, y_idx]),
+# #                                "senorge and shyft-TS of {} are not the same.".format(name))
+#                 # if i ==0:
+#                 #    plt.figure()
+#                 #    plt.plot(ts_values)
+#                 #    plt.title([name])
+#                 #    plt.show()
 
     def test_get_dummy(self):
         """
-        #Simple regression test of WRF data repository.
+        #Simple regression test of dummy variables from `utils.dummy_var`
         """
         EPSG, bbox, bpoly = self.senorge_epsg_bbox
 
         # Period start
         n_days = 5
-        t0 = api.YMDhms(2015, 2)
-        date_str = "{}-{:02}".format(t0.year, t0.month)
+        t0 = api.YMDhms(1957, 1)
         utc = api.Calendar()  # No offset gives Utc
         period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_days * 24))
 
-        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository", "senorge2")
-        f1 = "seNorge2_PREC1d_grid_2015.nc"
+        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository")
+        f1 = "senorge_test.nc"
 
         senorge1 = SeNorgeDataRepository(EPSG, base_dir, filename=f1, allow_subset=True)
         senorge1_data_names = ("radiation",)
@@ -202,19 +195,18 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         bpoly = box(min(bbox[0]), min(bbox[1]), max(bbox[0]), max(bbox[1]))
 
         # Period start
-        year = 2015
+        year = 1957
         month = 1
         n_hours = 30
-        date_str = "{}-{:02}".format(year, month)
         utc = api.Calendar()  # No offset gives Utc
         t0 = api.YMDhms(year, month)
         period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_hours))
 
-        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository", "senorge2")
-        filename = "seNorge2_PREC1d_grid_2015.nc"
+        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository")
+        filename = "senorge_test.nc"
         reader = SeNorgeDataRepository(EPSG, base_dir, filename=filename,
                                    padding=0)
-        data_names = ("precipitation",)
+        data_names = ("temperature",)
 
         tss = reader.get_timeseries(data_names, period, geo_location_criteria=bpoly)
 
@@ -225,7 +217,7 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
     def test_subsets(self):
         EPSG, bbox, bpoly = self.senorge_epsg_bbox
         # Period start
-        year = 2015
+        year = 1957
         month = 1
         n_hours = 30
         date_str = "{}-{:02}".format(year, month)
@@ -233,10 +225,10 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         t0 = api.YMDhms(year, month)
         period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_hours))
 
-        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository", "senorge2")
-        filename = "seNorge2_PREC1d_grid_2015.nc"
+        base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository")
+        filename = "senorge_test.nc"
 
-        data_names = ("precipitation","foo")
+        data_names = ("temperature", "foo")
         allow_subset = False
         reader = SeNorgeDataRepository(EPSG, base_dir, filename=filename,
                                    allow_subset=allow_subset)

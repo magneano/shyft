@@ -6,6 +6,7 @@ import os
 import numpy as np
 from netCDF4 import Dataset
 from shyft import api
+from shyft import shyftdata_dir
 from .. import interfaces
 from .time_conversion import convert_netcdf_time
 from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, _make_time_slice, _get_files, dummy_var
@@ -16,29 +17,20 @@ class SeNorgeDataRepositoryError(Exception):
 
 class SeNorgeDataRepository(interfaces.GeoTsRepository):
     """
-    Repository for geo located timeseries given as WRF(*) data in
-    netCDF(3) files.
-    NetCDF dataset assumptions:
-        * Dimensions:
-           Time = UNLIMITED ; // (1 currently)
-           DateStrLen = 19 ;
-           west_east = 73 ;
-           south_north = 60 ;
-           bottom_top = 29 ;
-           bottom_top_stag = 30 ;
-           soil_layers_stag = 4 ;
-           west_east_stag = 74 ;
-           south_north_stag = 61 ;
-        * Variables:
-          TODO: A lot.  We really want to list them here?
-    (*) WRF model output is from:
-        http://www2.mmm.ucar.edu/wrf/users/docs/user_guide_V3/users_guide_chap5.htm
+    Repository for senorge TEMP and PREC netcdf data files available per:
+
+
+    Cristian Lussana, & Ole Einar Tveito. (2017). seNorge2 dataset [Data set]. Zenodo.
+    http://doi.org/10.5281/zenodo.845733
+
     """
 
     def __init__(self, epsg, directory, filename=None, elevation_file=None, padding=5000., allow_subset=False):
         """
-        Construct the netCDF4 dataset reader for data from WRF NWP model,
-        and initialize data retrieval.
+        Construct the netCDF4 dataset reader for data for seNorge v2 datasets,
+
+        Information on datasets are available from: http://doi.org/10.5281/zenodo.845733
+
         Parameters
         ----------
         epsg: string
@@ -60,7 +52,6 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         self._directory = directory
         if filename is None:
             filename = "seNorge2_PREC1d_grid_2015"
-#            filename = "wrfout_d03_(\d{4})-(\d{2})"
         self._filename = filename
         self.allow_subset = allow_subset
         if not os.path.isdir(directory):
@@ -72,7 +63,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                 raise SeNorgeDataRepositoryError(
                     "Elevation file '{}' not found".format(self.elevation_file))
         else:
-            self.elevation_file = "/home/sven/workspace/shyft-data/repository/senorge_data_repository/seNorge2_dem_UTM33_comp.nc"
+            self.elevation_file = os.path.join(shyftdata_dir, "repository/senorge_data_repository/seNorge2_dem_UTM33.nc")
 
         self.shyft_cs = "+init=EPSG:{}".format(epsg)
         self._padding = padding
@@ -82,7 +73,8 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             "mean_temperature": "temperature",
             "precipitation_amount": "precipitation",
             "radiation": "radiation",
-            "wind_speed": "wind_speed"
+            "wind_speed": "wind_speed",
+            "relative_humidity": "relative_humidity"
             }
 
         self.var_units = {"mean_temperature": ['C'],
@@ -90,9 +82,6 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                           "x_wind_10m": ['m/s'],
                           "y_wind_10m": ['m/s'],
                           "integral_of_surface_downwelling_shortwave_flux_in_air_wrt_time": ['W s/m^2'],
-                          'dew_point_temperature_2m': ['K'],
-                          'surface_air_pressure': ['Pa'],
-                          'sea_level_pressure': ['Pa'],
                           }
 
         # Fields that need an additional timeslice because the measure average values
@@ -116,16 +105,17 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         see shyft.repository.interfaces.GeoTsRepository
         """
 
-        filename = os.path.join(self._directory, self._filename)
-        if not os.path.isfile(filename):
-            if re.compile(self._filename).groups > 0:  # check if it is a filename-pattern
-                filename = _get_files(self._directory, self._filename, utc_period.start, SeNorgeDataRepositoryError)
-            else:
-                raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
-
+        # for these variables we use 'dummy' data
         if any(a in input_source_types for a in ('radiation', 'wind_speed', 'relative_hum')):
             return dummy_var(input_source_types, utc_period, geo_location_criteria)
+
         else:
+            filename = os.path.join(self._directory, self._filename)
+            if not os.path.isfile(filename):
+                if re.compile(self._filename).groups > 0:  # check if it is a filename-pattern
+                    filename = _get_files(self._directory, self._filename, utc_period.start, SeNorgeDataRepositoryError)
+                else:
+                    raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
             with Dataset(filename) as dataset:
                 return self._get_data_from_dataset(dataset, input_source_types, utc_period, geo_location_criteria)
 
@@ -200,42 +190,16 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
     def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria, ensemble_member=None):
 
 
-         #x_var = dataset.variables.get("X", None)
-        #y_var = dataset.variables.get("Y", None)
-        #time = dataset.variables.get("time", None)
-        #if not all([x_var, y_var, time]):
-        #    raise SeNorgeDataRepositoryError("Something is wrong with the dataset."
-        #                                 " x/y coords or time not found.")
-
-        #time = convert_netcdf_time(time.units, time)
-        #data_cs_proj4 = "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
-        #if data_cs_proj4 is None:
-        #    raise SeNorgeDataRepositoryError("No coordinate system information in dataset.")
-
-
         #copied from met_netcdf repo
         # Check for presence and consistency of coordinate variables
         time, x_var, y_var, data_cs, coord_conv = self._check_and_get_coord_vars(dataset, input_source_types)
 
-
-        # Check units of meteorological variables
-#        unit_ok = {k: dataset.variables[k].units in self.var_units[k]
-#                   for k in dataset.variables.keys() if self.senorge_shyft_map.get(k, None) in input_source_types}
-#        if not all(unit_ok.values()):
-#            raise SeNorgeDataRepositoryError("The following variables have wrong unit: {}.".format(
-#                ', '.join([k for k, v in unit_ok.items() if not v])))
-        # Make spatial slice
         x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:] * coord_conv, y_var[:] * coord_conv,
                                                                data_cs.proj4, self.shyft_cs, geo_location_criteria,
                                                                self._padding, SeNorgeDataRepositoryError)
 
-
         # Make temporal slilce
         time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
-
-        # from wrf_repo
-#        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:], y_var[:], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
-        # end from wrf repo
 
 
         raw_data = {}
@@ -283,9 +247,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             returned_data = []
             for i in range(dataset.dimensions['ensemble_member'].size):
                 ens_slice[ens_dim_idx] = i
-                #print([(k, raw_data[k][0].shape) for k in raw_data])
                 ensemble_raw = {k: (raw_data[k][0][ens_slice], raw_data[k][1], raw_data[k][2]) for k in raw_data.keys()}
-                #print([(k,ensemble_raw[k][0].shape) for k in ensemble_raw])
                 returned_data.append(_numpy_to_geo_ts_vec(self._transform_raw(ensemble_raw, time[time_slice]),#, issubset=issubset)
                                                           x, y, z, SeNorgeDataRepositoryError))
         else:
@@ -293,36 +255,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                                                  x, y, z, SeNorgeDataRepositoryError)
         return returned_data
 
-        #end of copy
 
-#        time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
-#        x, y, (x_inds, y_inds), (x_slice, y_slice) = _limit_2D(x_var[:], y_var[:], data_cs_proj4, self.shyft_cs, geo_location_criteria, self._padding, SeNorgeDataRepositoryError, clip_in_data_cs=False)
-
-#        raw_data = {}
-
-#        for k in dataset.variables.keys():
-#            if self.senorge_shyft_map.get(k, None) in input_source_types:
-#                if k in self._shift_fields and issubset:  # Add one to time slice
-#                    data_time_slice = slice(time_slice.start, time_slice.stop + 1)
-#                else:
-#                    data_time_slice = time_slice
-#                data = dataset.variables[k]
-#                pure_arr = _slice_var_2D(data, x_var.dimensions[2], y_var.dimensions[1], x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
-#                                         slices={'Time': data_time_slice, 'ensemble_member': ensemble_member}
-#                )
-#                raw_data[self.senorge_shyft_map[k]] = pure_arr, k
-
-
-        # Make sure requested fields are valid, and that dataset contains the requested data.
-#        if not self.allow_subset and not (set(raw_data.keys()).issuperset(input_source_types)):
-#            raise SeNorgeDataRepositoryError("Could not find all data fields")
-
-        #extracted_data = self._transform_raw(raw_data, time[time_slice], issubset=issubset)
-        #return _numpy_to_geo_ts_vec(extracted_data, x, y, SeNorgeDataRepositoryError)
-
-
-    ######
-    # from metnetcdf repo
 
     def _read_elevation_file(self, filename, x_var_name, y_var_name, geo_location_criteria):
         with Dataset(filename) as dataset:
