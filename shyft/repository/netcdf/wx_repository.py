@@ -1,6 +1,7 @@
 # This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
 # See file COPYING for more details **/
 import os
+import time
 from shyft import api
 from netCDF4 import Dataset
 from .time_conversion import convert_netcdf_time
@@ -17,7 +18,7 @@ class WXRepositoryError(Exception):
 
 class WXRepository(GeoTsRepository):
 
-    def __init__(self, epsg, filename, padding=15000., flattened=False, allow_year_shift=True):
+    def __init__(self, epsg, filename, padding=15000., flattened=False, allow_year_shift=True, cache_data=True):
         """
         Construct the netCDF4 dataset reader for concatenated gridded forecasts and initialize data retrieval.
 
@@ -33,6 +34,8 @@ class WXRepository(GeoTsRepository):
             Flags whether shift of years is allowed
         """
         self.allow_year_shift = allow_year_shift
+        self.cache_data = cache_data
+        self.cache = None
         if flattened:
             self.wx_repo = ConcatDataRepository(epsg, filename, padding=padding)
         elif not flattened:
@@ -74,11 +77,17 @@ class WXRepository(GeoTsRepository):
             utc_start_shifted = utc_period.start - d_t
             utc_end_shifted = utc_period.end - d_t
             utc_period_shifted = api.UtcPeriod(utc_start_shifted, utc_end_shifted)
-            raw_ens = wx_repo.get_timeseries_ensemble(input_source_types, utc_period_shifted, geo_location_criteria)
-            res = [{key: self.source_vector_map[key]([self.source_type_map[key](src.mid_point(), src.ts.time_shift(d_t))
-                    for src in geo_ts]) for key, geo_ts in ens.items()} for ens in raw_ens]
         else:
-            res = wx_repo.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria)
+            d_t = 0
+            utc_period_shifted = utc_period
+        if self.cache_data:
+            if self.cache is None:
+                self.cache = wx_repo.get_timeseries_ensemble(input_source_types, None, geo_location_criteria)
+            raw_ens = self.cache
+        else:
+            raw_ens = wx_repo.get_timeseries_ensemble(input_source_types, utc_period_shifted, geo_location_criteria)
+        res = [{key: self.source_vector_map[key]([self.source_type_map[key](src.mid_point(), src.ts.time_shift(d_t))
+                    for src in geo_ts]) for key, geo_ts in ens.items()} for ens in raw_ens]
         return _clip_ensemble_of_geo_timeseries(res, utc_period, WXRepositoryError)
 
     def get_forecast_ensemble(self, input_source_types, utc_period, t_c, geo_location_criteria=None):
@@ -93,4 +102,9 @@ class WXRepository(GeoTsRepository):
         -------
         see interfaces.GeoTsRepository
         """
-        return self.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria=geo_location_criteria)
+        print("WXRepository.get_forecast_ensembles")
+        t_total = time.time()
+        res = self.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria=geo_location_criteria)
+        elapsed_time = time.time() - t_total
+        print("Total time for WXRepository.get_forecast_ensembles: {}".format(elapsed_time))
+        return res
