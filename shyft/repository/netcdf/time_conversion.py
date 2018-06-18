@@ -1,7 +1,7 @@
 # This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
 # See file COPYING for more details **/
 from shyft import api
-from netcdftime import utime
+from cftime import utime
 import numpy as np
 
 """ These are the current supported regular time-step intervals """

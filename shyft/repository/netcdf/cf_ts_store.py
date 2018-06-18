@@ -266,10 +266,10 @@ class TimeSeriesStore:
         with Dataset(self.file_path, 'a') as ds:
             # 1. load the data
             time_variable = 'time'
-            time = ds.variables.get(time_variable, None)
 
-            if time is None:
-                raise TimeSeriesStoreError('Something is wrong with the dataset. time not found.')
+            # if time is None:
+            #     raise TimeSeriesStoreError('Something is wrong with the dataset. time not found.')
+            time = ds.variables.get(time_variable, None)
             var = ds.variables.get(self.ts_meta_info.variable_name, None)
 
             if var is None:

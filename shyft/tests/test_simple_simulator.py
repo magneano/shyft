@@ -35,13 +35,13 @@ def print_param(header_text, param):
 class SimulationTestCase(unittest.TestCase):
 
     def setUp(self):
-        dir = path.dirname(__file__)
-        self.region_config_file = path.join(dir, "netcdf", "neanidelva_region.yaml")
-        self.model_config_file = path.join(dir, "netcdf", "neanidelva_model.yaml")
-        self.dataset_config_file = path.join(dir, "netcdf", "neanidelva_datasets.yaml")
-        self.interpolation_config_file = path.join(dir, "netcdf", "neanidelva_interpolation.yaml")
-        self.sim_config_file = path.join(dir, "netcdf", "neanidelva_simulation.yaml")
-        self.calib_config_file = path.join(dir, "netcdf", "neanidelva_calibration.yaml")
+        dir = shyftdata_dir #path.dirname(__file__)
+        self.region_config_file = path.join(dir, "neanidelv/yaml_config", "neanidelva_region.yaml")
+        self.model_config_file = path.join(dir, "neanidelv/yaml_config", "neanidelva_model.yaml")
+        self.dataset_config_file = path.join(dir, "neanidelv/yaml_config", "neanidelva_datasets.yaml")
+        self.interpolation_config_file = path.join(dir, "neanidelv/yaml_config", "neanidelva_interpolation.yaml")
+        self.sim_config_file = path.join(dir, "neanidelv/yaml_config", "neanidelva_simulation.yaml")
+        self.calib_config_file = path.join(dir, "neanidelv/yaml_config", "neanidelva_calibration.yaml")
 
         self.region_config = RegionConfig(self.region_config_file)
         self.model_config = ModelConfig(self.model_config_file)

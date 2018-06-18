@@ -1,6 +1,7 @@
 from os import path
 import unittest
 
+from shyft import shyftdata_dir
 from shyft.repository.default_state_repository import DefaultStateRepository
 from shyft.orchestration.configuration.yaml_configs import YAMLSimConfig
 from shyft.orchestration.simulators.config_simulator import ConfigSimulator
@@ -17,14 +18,13 @@ class ConfigSimulationTestCase(unittest.TestCase):
         self.assertEqual(t1, utc.time(2015, 6, 1, 2, 3, 4))
 
     def test_run_geo_ts_data_config_simulator(self):
-        # These config files are versioned in shyft git
-        config_dir = path.join(path.dirname(__file__), "netcdf")
+        # These config files are versioned in shyft-data git
+        config_dir = path.join(shyftdata_dir, "neanidelv/yaml_config")
         config_file = path.join(config_dir, "neanidelva_simulation.yaml")
         config_section = "neanidelva"
         cfg = YAMLSimConfig(config_file, config_section, overrides={'config': {'number_of_steps': 168}})
 
         # These config files are versioned in shyft-data git. Read from ${SHYFTDATA}/netcdf/orchestration-testdata/
-        # TODO: Put all config files needed to run this test under the same versioning system (shyft git)
         simulator = ConfigSimulator(cfg)
         #n_cells = simulator.region_model.size()
         state_repos = DefaultStateRepository(simulator.region_model)
