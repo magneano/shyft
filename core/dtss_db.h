@@ -296,15 +296,19 @@ public:
         auto ffp = make_full_path(fn);
         reader_file_lock lck(f_mx, ffp);
 
-        std::unique_ptr<std::FILE, decltype(&std::fclose)> fh{ std::fopen(ffp.c_str(), "rb"), &std::fclose };
-        auto h = read_header(fh.get());
-        ts_info i;
-        i.name = fn;
-        i.point_fx = h.point_fx;
-        i.modified = utctime(fs::last_write_time(ffp));
-        i.data_period = h.data_period;
-        // consider time-axis type info, dt.. as well
-        return i;
+        if ( this->save_path_exists(fn) ) {
+            std::unique_ptr<std::FILE, decltype(&std::fclose)> fh{ std::fopen(ffp.c_str(), "rb"), &std::fclose };
+            auto h = read_header(fh.get());
+            ts_info i;
+            i.name = fn;
+            i.point_fx = h.point_fx;
+            i.modified = utctime(fs::last_write_time(ffp));
+            i.data_period = h.data_period;
+            // consider time-axis type info, dt.. as well
+            return i;
+        } else {
+            throw std::runtime_error(std::string{"ts_db: no ts named: "}+fn);
+        }
     }
 
     /** find all ts_info s that matches the specified re match string

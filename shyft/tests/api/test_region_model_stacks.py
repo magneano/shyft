@@ -128,6 +128,8 @@ class RegionModel(unittest.TestCase):
         reservoir_area = model.statistics.reservoir_area(cids)
         unspecified_area = model.statistics.unspecified_area(cids)
         self.assertAlmostEqual(total_area, forest_area + glacier_area + lake_area + reservoir_area + unspecified_area)
+        elevation = model.statistics.elevation(cids)
+        assert abs(elevation-475/2.0) < 1e-3, 'average height'
         cids.append(3)
         try:
             model.statistics.total_area(cids)  # now, cids contains 3, that matches no cells
