@@ -11,4 +11,4 @@ coverage
 pip
 shapely
 pyproj
-cftime
+netcdftime

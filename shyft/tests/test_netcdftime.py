@@ -1,7 +1,7 @@
 import unittest
 from shyft import api
 from shyft.repository.netcdf.time_conversion import convert_netcdf_time
-from cftime import utime
+from netcdftime import utime
 import numpy as np
 
 
