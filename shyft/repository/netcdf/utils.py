@@ -601,9 +601,9 @@ def dummy_var(input_src_types: list, utc_period: "api.UtcPeriod", geo_location_c
     #TODO: this is where the 'dummy' data is generated. Could be made more robust, quick fix for now
     for var in input_src_types:
         if var == 'radiation':
-            data[var] = ( np.ones((len(times), len(x))) * 1, ta)
+            data[var] = ( np.ones((len(times), len(x))) * 50.0, ta)
         if var == 'wind_speed':
-            data[var] = (np.ones((len(times), len(x))) * 2, ta)
+            data[var] = (np.ones((len(times), len(x))) * 2.0, ta)
         if var == 'relative_humidity':
             data[var] = (np.ones((len(times), len(x))) * 0.6, ta)
 
