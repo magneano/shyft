@@ -39,6 +39,17 @@ namespace expose {
             .def_readwrite("rel_hum",&CellEnvironmentConstRHumWind::rel_hum)
             .def("init",&CellEnvironmentConstRHumWind::init,args("ta"),"zero all series, set time-axis ta")
             ;
-
+            
+        enum_<shyft::core::stat_scope>("stat_scope",
+            doc_intro("Defines the scope of the indexes passed to statistics functions")
+            doc_intro(".cell      : the indexes are considered as the i'th cell")
+            doc_intro(".catchment : the indexes are considered catchment identifiers")
+            doc_intro("")
+            doc_intro("The statistics is then covering the cells that matches the selected criteria")
+            )
+            .value("cell",shyft::core::stat_scope::cell_ix)
+            .value("catchment",shyft::core::stat_scope::catchment_ix)
+            .export_values()
+            ;
     }
 }

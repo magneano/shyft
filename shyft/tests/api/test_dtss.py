@@ -546,6 +546,48 @@ class DtssTestCase(unittest.TestCase):
             # now it should work
             client.remove("shyft://test/foo")
 
+    def test_get_ts_info(self):
+        """
+        Verify we can get specific TsInfo objects for time-series from the server backend.
+        """
+        with tempfile.TemporaryDirectory() as c_dir:
+
+            # start the server
+            dtss = DtsServer()
+            port_no = find_free_port()
+            host_adr = 'localhost:{0}'.format(port_no)
+            dtss.set_listening_port(port_no)
+            dtss.set_container("testing", c_dir)  # notice we set container 'test' to point to c_dir directory
+            dtss.start_async()  # the internal shyft time-series will be stored to that container
+
+            # get a client
+            client = DtsClient(host_adr)
+
+            try:
+                client.get_ts_info(r'shyft://testing/data')
+            except Exception as e:
+                pass
+            else:
+                # only end up here if no exceptions
+                self.fail('Could fetch info for non-existing ts info')
+
+            # setup some data
+            utc = Calendar()
+            d = deltahours(1)
+            n = 365*24//3
+            t = utc.time(2016, 1, 1)
+            ta = TimeAxis(t, d, n)
+            tsv = TsVector()
+            pts = TimeSeries(ta, np.linspace(start=0, stop=1.0, num=ta.size()), point_fx.POINT_AVERAGE_VALUE)
+            tsv.append(TimeSeries(r'shyft://testing/data', pts))
+            client.store_ts(tsv)
+
+            info: TsInfo = client.get_ts_info(r'shyft://testing/data')
+
+            self.assertEqual(info.name, r'data')
+            self.assertEqual(info.point_fx, point_fx.POINT_AVERAGE_VALUE)
+            self.assertEqual(info.data_period, ta.total_period())
+
     def test_failures(self):
         """
         Verify that dtss client server connections are auto-magically

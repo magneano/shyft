@@ -50,7 +50,8 @@ api/python/*_wrap.cpp
 shyft/tests/state_tmp
 ValgrindOut.xml
 cachegrind.out.*
-
+*#
+*~
 /SHyFT.VC.db
 *.opendb
 *.user

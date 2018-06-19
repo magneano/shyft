@@ -39,7 +39,7 @@
 					<Add directory="../bin/Release" />
 				</Linker>
 				<ExtraCommands>
-					<Add after="cd ../bin/Release &amp;&amp; ./test_shyft -nv  -ts=inverse_distance" />
+					<Add after="cd ../bin/Release &amp;&amp; ./test_shyft -nv  -ts=skaugen" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -188,7 +188,7 @@
 			<Option virtualFolder="serialization/" />
 		</Unit>
 		<Unit filename="skaugen_test.cpp">
-			<Option virtualFolder="interpolation/" />
+			<Option virtualFolder="methods/" />
 		</Unit>
 		<Unit filename="test_ice_packing.cpp">
 			<Option virtualFolder="time_series/" />
@@ -209,15 +209,15 @@
 		<Unit filename="time_series_average_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_decode_test.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>
 		<Unit filename="time_series_fixup_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
 		<Unit filename="time_series_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
-		<Unit filename="time_series_decode_test.cpp">
-			<Option virtualFolder="time_series/" />
-		</Unit>	
 		<Unit filename="utctime_utilities_test.cpp">
 			<Option virtualFolder="time_and_calendar/" />
 		</Unit>

@@ -91,6 +91,8 @@ struct client {
 
 	ts_info_vector_t find(const string & search_expression);
 
+    ts_info get_ts_info(const string & ts_url);
+
     void remove(const string & name);
 
 	void cache_flush();

@@ -151,7 +151,7 @@ class Calendar(unittest.TestCase):
         self.assertFalse(p2.overlaps(p1))
         self.assertTrue(p3.overlaps(p1))
         self.assertTrue(p3.overlaps(p2))
-    
+
     def test_UtcPeriod_trim(self):
         utc = api.Calendar()
         t0 = utc.time(2018, 1, 1, 0, 0, 0)
@@ -191,8 +191,9 @@ class Calendar(unittest.TestCase):
         p3 = api.UtcPeriod(t2, t3)
 
         assert api.UtcPeriod.intersection(p0, p1) == api.UtcPeriod(t1, t2)
-        assert api.UtcPeriod.intersection(p0, p3).valid() == False
-        assert api.UtcPeriod.intersection(p2, p3).valid() == False
+        assert not api.UtcPeriod.intersection(p0, p3).valid()
+        assert not api.UtcPeriod.intersection(p2, p3).valid()
+        assert api.intersection(p0, p1) == api.UtcPeriod(t1, t2)
 
     def test_swig_python_time(self):
         """

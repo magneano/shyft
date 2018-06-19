@@ -92,7 +92,10 @@ struct adjust_state_model {
         r.q_0= discharge(1.0);// starting out with scale=1.0, establish q_0
         double scale= q_wanted/r.q_0;// approximate guess for scale storage factor to start with
         try {
-        dlib::find_min_single_variable(
+            if(!isfinite(r.q_0)) {
+                throw std::runtime_error("the initial simulated discharge is nan");
+            }
+            dlib::find_min_single_variable(
                     [this,q_wanted](double x)->double{
                         double q_diff= this->discharge(x) - q_wanted;
                         return q_diff*q_diff;

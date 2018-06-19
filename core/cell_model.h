@@ -169,7 +169,18 @@ namespace shyft {
             }
         }
 
-        using namespace std;
+        using std::vector;
+        using std::runtime_error;
+        using std::map;
+        using std::shared_ptr;
+        using std::to_string;
+        
+        /** when using statistics, we pass indexes, these can either adress catchment id or cell-id */
+        enum struct stat_scope {
+            cell_ix,
+            catchment_ix
+        };
+        
         /** \brief cell statistics provides ts feature summation over cells
          *
          * Since the cells are different, like different features, based on
@@ -178,22 +189,31 @@ namespace shyft {
          * Using this technique, there is only one line pr. feature sum/average needed
          * -and we can keep the kloc down to a minimum.
          *
-         * Using swig/python, we need a helper class in either _api.h, or api.i
-         *  to provide the functions to python layer
          *
          */
         struct cell_statistics {
 
 			/**throws runtime_error if catchment_indexes contains cid that's not part of cells */
 			template<typename cell>
-			static void verify_cids_exist(const vector<cell>& cells, const vector<int>& catchment_indexes) {
-				if (catchment_indexes.size() == 0) return;
-				map<int, bool> all_cids;
-				for (const auto&c : cells) all_cids[c.geo.catchment_id()] = true;
-				for(auto cid:catchment_indexes)
-					if (all_cids.count(cid) == 0)
-						throw runtime_error(string("one or more supplied catchment_indexes does not exist:") + to_string(cid));
+			static void verify_cids_exist(const vector<cell>& cells, const vector<int>& indexes,stat_scope it) {
+				if (indexes.size() == 0) return;
+                if(it==stat_scope::cell_ix) {
+                    for(auto cid:indexes)
+                        if(cid <0 || cid >cells.size())
+                            throw runtime_error(string("Supplied cell index reference ")+ to_string(cid)+" is ouside valid range 0 .."+to_string(cells.size()));
+                } else {
+                    map<int, bool> all_cids;
+                    for (const auto&c : cells) all_cids[c.geo.catchment_id()] = true;
+                    for(auto cid:indexes)
+                        if (all_cids.count(cid) == 0)
+                            throw runtime_error(string("one or more supplied catchment_indexes does not exist:") + to_string(cid));
+                }
 			}
+			/** returns true if cell matches index_type criteria  */
+			template<typename cell>
+			inline static bool is_match(const cell&c,stat_scope it,int cid,size_t i) {
+                return (it==stat_scope::cell_ix && cid==i) || (it==stat_scope::catchment_ix && c.geo.catchment_id() == (size_t) cid);
+            }
 
             /** \brief average_catchment_feature returns the area-weighted average
              *
@@ -207,21 +227,22 @@ namespace shyft {
              */
             template<typename cell, typename cell_feature_ts>
             static shared_ptr<pts_t> average_catchment_feature(const vector<cell>& cells, const vector<int>& catchment_indexes,
-                                                               cell_feature_ts&& cell_ts) {
+                                                               cell_feature_ts&& cell_ts, stat_scope it=stat_scope::catchment_ix) {
                 if (cells.size() == 0)
                     throw runtime_error("no cells to make statistics on");
-				verify_cids_exist(cells, catchment_indexes);
+				verify_cids_exist(cells, catchment_indexes,it);
                 shared_ptr<pts_t> r;
 				double sum_area = 0.0;
 				bool match_all = catchment_indexes.size() == 0;
-				for (const auto& c : cells) {
+				for (size_t i=0;i<cells.size();++i) {
+                    const auto& c = cells[i];
                     if (match_all) {
                         if(!r) r= make_shared<pts_t>(cell_ts(c).ta, 0.0, ts_point_fx::POINT_AVERAGE_VALUE);
                         r->add_scale(cell_ts(c), c.geo.area());  // c.env_ts.temperature, could be a feature(c) func return ref to ts
                         sum_area += c.geo.area();
                     } else {
                         for (auto cid : catchment_indexes) {
-                            if ( c.geo.catchment_id() == (size_t) cid) { // criteria
+                            if (is_match(c,it,cid,i)) { // criteria
                                 if (!r) r = make_shared<pts_t>(cell_ts(c).ta, 0.0, ts_point_fx::POINT_AVERAGE_VALUE);
                                 r->add_scale(cell_ts(c), c.geo.area());  // c.env_ts.temperature, could be a feature(c) func return ref to ts
                                 sum_area += c.geo.area();
@@ -241,27 +262,28 @@ namespace shyft {
 			* \param cells that we want to perform calculation on
 			* \param catchment_indexes list of catchment-id that identifies the cells, if zero length, all are averaged
 			* \param cell_ts  a callable that fetches the cell feature we want to average
-			* \param i the i'th time-step for which we compute the value
+			* \param j the j'th time-step for which we compute the value
 			* \throw runtime_error if number of cells are zero
 			* \return area weighted feature sum, as a double value
 			*/
 			template<typename cell, typename cell_feature_ts>
-			static double average_catchment_feature_value(const vector<cell>& cells, const vector<int>& catchment_indexes,
-				cell_feature_ts&& cell_ts,size_t i) {
+			static double average_catchment_feature_value(const vector<cell>& cells, const vector<int>& indexes,
+				cell_feature_ts&& cell_ts,size_t j, stat_scope it=stat_scope::catchment_ix) {
 				if (cells.size() == 0)
 					throw runtime_error("no cells to make statistics on");
-				verify_cids_exist(cells, catchment_indexes);
+				verify_cids_exist(cells, indexes,it);
 				double r = 0.0;
 				double sum_area = 0.0;
-				bool match_all = catchment_indexes.size() == 0;
-				for (const auto& c : cells) {
+				bool match_all = indexes.size() == 0;
+				for (size_t i=0;i<cells.size();++i) {
+                    const auto& c = cells[i];
 					if (match_all) {
-						r += cell_ts(c).value(i)*c.geo.area();  // c.env_ts.temperature, could be a feature(c) func return ref to ts
+						r += cell_ts(c).value(j)*c.geo.area();  // c.env_ts.temperature, could be a feature(c) func return ref to ts
 						sum_area += c.geo.area();
 					} else {
-						for (auto cid : catchment_indexes) {
-							if (c.geo.catchment_id() == (size_t)cid) { // criteria
-								r += cell_ts(c).value(i)*c.geo.area();  // c.env_ts.temperature, could be a feature(c) func return ref to ts
+						for (auto cid : indexes) {
+							if (is_match(c,it,cid,i)) { // criteria
+								r += cell_ts(c).value(j)*c.geo.area();  // c.env_ts.temperature, could be a feature(c) func return ref to ts
 								sum_area += c.geo.area();
 								break;
 							}
@@ -284,21 +306,22 @@ namespace shyft {
              * \return feature sum, as a ts, a  shared_ptr<pts_ts>
              */
 			template<typename cell, typename cell_feature_ts>
-            static shared_ptr<pts_t> sum_catchment_feature(const vector<cell>& cells, const vector<int>& catchment_indexes,
-                                                           cell_feature_ts && cell_ts) {
+            static shared_ptr<pts_t> sum_catchment_feature(const vector<cell>& cells, const vector<int>& indexes,
+                                                           cell_feature_ts && cell_ts,stat_scope it=stat_scope::catchment_ix) {
                 if (cells.size() == 0)
                     throw runtime_error("no cells to make statistics on");
-				verify_cids_exist(cells, catchment_indexes);
+				verify_cids_exist(cells, indexes,it);
                 shared_ptr<pts_t> r;
-				bool match_all = catchment_indexes.size() == 0;
+				bool match_all = indexes.size() == 0;
 
-				for (const auto& c : cells) {
+				for (size_t i=0;i<cells.size();++i) {
+                    const auto& c = cells[i];
                     if (match_all) {
                         if(!r) r= make_shared<pts_t>(cell_ts(c).ta, 0.0, ts_point_fx::POINT_AVERAGE_VALUE);
                         r->add(cell_ts(c));
                     } else {
-                        for (auto cid : catchment_indexes) {
-                            if (c.geo.catchment_id() == (size_t)cid) { //criteria
+                        for (auto cid : indexes) {
+                            if (is_match(c,it,cid,i)) { //criteria
                                 if (!r) r = make_shared<pts_t>(cell_ts(c).ta, 0.0, ts_point_fx::POINT_AVERAGE_VALUE);
                                 r->add(cell_ts(c));  //c.env_ts.temperature, could be a feature(c) func return ref to ts
                                 break;
@@ -315,26 +338,27 @@ namespace shyft {
 			* \param cells that we want to perform calculation on
 			* \param catchment_indexes list of catchment-id that identifies the cells, if zero length, all are summed
 			* \param cell_ts a callable that fetches the cell feature we want to sum
-			* \param i the i'th time-step of the time-axis to use
+			* \param j the j'th time-step of the time-axis to use
 			* \throw runtime_error if number of cells are zero
 			* \return feature sum, as a ts, a  shared_ptr<pts_ts>
 			*/
 			template<typename cell, typename cell_feature_ts>
-			static double sum_catchment_feature_value(const vector<cell>& cells, const vector<int>& catchment_indexes,
-				cell_feature_ts && cell_ts, size_t i) {
+			static double sum_catchment_feature_value(const vector<cell>& cells, const vector<int>& indexes,
+				cell_feature_ts && cell_ts, size_t j,stat_scope it=stat_scope::catchment_ix) {
 				if (cells.size() == 0)
 					throw runtime_error("no cells to make statistics on");
-				verify_cids_exist(cells, catchment_indexes);
+				verify_cids_exist(cells, indexes,it);
 				double r = 0.0;
-				bool match_all = catchment_indexes.size() == 0;
+				bool match_all = indexes.size() == 0;
 
-				for (const auto& c : cells) {
+				for (size_t i=0;i<cells.size();++i) {
+                    const auto& c = cells[i];
 					if (match_all) {
-						r += cell_ts(c).value(i);
+						r += cell_ts(c).value(j);
 					} else {
-						for (auto cid : catchment_indexes) {
-							if (c.geo.catchment_id() == (size_t)cid) { //criteria
-								r+=cell_ts(c).value(i);  //c.env_ts.temperature, could be a feature(c) func return ref to ts
+						for (auto cid : indexes) {
+							if (is_match(c,it,cid,i)) { //criteria
+								r+=cell_ts(c).value(j);  //c.env_ts.temperature, could be a feature(c) func return ref to ts
 								break;
 							}
 						}
@@ -350,26 +374,27 @@ namespace shyft {
 			* \param cells that we want to extract feature from
 			* \param catchment_indexes list of catchment-id that identifies the cells, if zero length, all are summed
 			* \param cell_ts a callable that fetches the cell feature ts
-			* \param i the i'th step on the time-axis of the cell-feature
+			* \param j the j'th step on the time-axis of the cell-feature
 			* \throw runtime_error if number of cells are zero
-			* \return vector filled with feature for the i'th time-step on timeaxis
+			* \return vector filled with feature for the j'th time-step on timeaxis
 			*/
 			template<typename cell, typename cell_feature_ts>
 			static vector<double> catchment_feature(const vector<cell>& cells, const vector<int>& catchment_indexes,
-				cell_feature_ts && cell_ts,size_t i) {
+				cell_feature_ts && cell_ts,size_t j, stat_scope it=stat_scope::catchment_ix) {
 				if (cells.size() == 0)
 					throw runtime_error("no cells to make extract from");
-				verify_cids_exist(cells, catchment_indexes);
+				verify_cids_exist(cells, catchment_indexes,it);
 				vector<double> r; r.reserve(cells.size());
 				bool match_all = catchment_indexes.size() == 0;
 
-				for (const auto& c : cells) {
+				for (size_t i=0;i<cells.size();++i) {
+                    const auto& c = cells[i];
 					if (match_all) {
-						r.push_back(cell_ts(c).value(i));
+						r.push_back(cell_ts(c).value(j));
 					} else {
 						for (auto cid : catchment_indexes) {
-							if (c.geo.catchment_id() == (size_t)cid) { //criteria
-								r.push_back(cell_ts(c).value(i));  //c.env_ts.temperature, could be a feature(c) func return ref to ts
+							if (is_match(c,it,cid,i)) { //criteria
+								r.push_back(cell_ts(c).value(j));  //c.env_ts.temperature, could be a feature(c) func return ref to ts
 								break;
 							}
 						}
