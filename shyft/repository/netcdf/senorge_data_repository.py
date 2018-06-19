@@ -291,11 +291,11 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             return x
 
         def air_temp_conv(T):
-            return T - 273.16  # definition says -273.15, but regression test says -273.16..
+            return T 
 
         def prec_conv(p):
             # return p[1:]
-            return p
+            return p/24. # mm/day -> mm/h
 
         # def prec_acc_conv(p):
         #    return np.clip(p[1:] - p[:-1], 0.0, 1000.0)
