@@ -91,6 +91,9 @@ template<class Archive>
 void shyft::time_series::dd::srep::sintegral_ts::serialize(Archive &ar, const unsigned /*version*/) { ar & ts &ta; }
 
 template<class Archive>
+void shyft::time_series::dd::srep::sderivative_ts::serialize(Archive &ar, const unsigned /*version*/) { ar & ts & dm; }
+
+template<class Archive>
 void shyft::time_series::dd::srep::saccumulate_ts::serialize(Archive &ar, const unsigned /*version*/) { ar & ts &ta; }
 
 template<class Archive>
@@ -113,6 +116,7 @@ void shyft::time_series::dd::srep::skrls_interpolation_ts::serialize(Archive &ar
 
 x_serialize_implement(shyft::time_series::dd::srep::saverage_ts);
 x_serialize_implement(shyft::time_series::dd::srep::sintegral_ts);
+x_serialize_implement(shyft::time_series::dd::srep::sderivative_ts);
 x_serialize_implement(shyft::time_series::dd::srep::saccumulate_ts);
 x_serialize_implement(shyft::time_series::dd::srep::speriodic_ts);
 x_serialize_implement(shyft::time_series::dd::srep::sconvolve_w_ts);
@@ -127,6 +131,7 @@ using shyft::core::core_iarchive;
 
 x_serialize_archive(shyft::time_series::dd::compressed_ts_expression, core_oarchive, core_iarchive);
 x_serialize_archive(shyft::time_series::dd::srep::saverage_ts, core_oarchive, core_iarchive);
+x_serialize_archive(shyft::time_series::dd::srep::sderivative_ts, core_oarchive, core_iarchive);
 x_serialize_archive(shyft::time_series::dd::srep::sintegral_ts, core_oarchive, core_iarchive);
 x_serialize_archive(shyft::time_series::dd::srep::saccumulate_ts, core_oarchive, core_iarchive);
 x_serialize_archive(shyft::time_series::dd::srep::speriodic_ts, core_oarchive, core_iarchive);

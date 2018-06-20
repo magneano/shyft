@@ -611,6 +611,7 @@ __all__ = [] + \
          'create_wind_speed_source_vector_from_np_array',
          'deltahours',
          'deltaminutes',
+         'derivative_method',
          'dtss_finalize',
          # 'exit',
          'extend_fill_policy',

@@ -126,6 +126,9 @@
     <ClCompile Include="time_series_average_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
+    <ClCompile Include="time_series_derivative_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
     <ClCompile Include="time_series_decode_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
