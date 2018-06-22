@@ -212,6 +212,7 @@
 		<Unit filename="time_series_decode_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_derivative_test.cpp" />
 		<Unit filename="time_series_fixup_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
