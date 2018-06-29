@@ -388,6 +388,7 @@ TEST_SUITE("qm") {
         const auto fx_avg = time_series::ts_point_fx::POINT_AVERAGE_VALUE;
         core::calendar utc;
         ta_t ta(utc.time(2017, 1, 1, 0, 0, 0), core::deltahours(24), 4);
+        ta_t tah(utc.time(2017, 1, 1, 0, 0, 0), core::deltahours(24), 6);
         tsv_t historical_data;
         vector<tsv_t> forecast_sets;
         vector<double> weight_sets;
@@ -427,17 +428,19 @@ TEST_SUITE("qm") {
             vector<double> insertvec{ static_cast<double>(std::rand()) / RAND_MAX * 50.0,
                 static_cast<double>(std::rand()) / RAND_MAX * 50.0 ,
                 static_cast<double>(std::rand()) / RAND_MAX * 50.0 ,
+                static_cast<double>(std::rand()) / RAND_MAX * 50.0,
+                static_cast<double>(std::rand()) / RAND_MAX * 50.0,
                 static_cast<double>(std::rand()) / RAND_MAX * 50.0 };
-            historical_data.emplace_back(ta, insertvec, fx_avg);
+            historical_data.emplace_back(tah, insertvec, fx_avg);
         }
 
-        auto historical_order = qm::quantile_index<tsa_t>(historical_data, ta);
+        auto historical_order = qm::quantile_index<tsa_t>(historical_data, tah);
 
         core::utctime interpolation_start(core::no_utctime);
 
         //Act
         auto result = qm::quantile_map_forecast<tsa_t>(forecast_sets, weight_sets,
-            historical_data, ta, interpolation_start);
+            historical_data, tah, tah.time(4),tah.time(4));
 
         //Assert
         for (size_t i = 0; i<num_historical_data; ++i) {

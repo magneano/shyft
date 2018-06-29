@@ -174,13 +174,13 @@ namespace shyft {
         using std::map;
         using std::shared_ptr;
         using std::to_string;
-        
+
         /** when using statistics, we pass indexes, these can either adress catchment id or cell-id */
         enum struct stat_scope {
             cell_ix,
             catchment_ix
         };
-        
+
         /** \brief cell statistics provides ts feature summation over cells
          *
          * Since the cells are different, like different features, based on
@@ -199,7 +199,7 @@ namespace shyft {
 				if (indexes.size() == 0) return;
                 if(it==stat_scope::cell_ix) {
                     for(auto cid:indexes)
-                        if(cid <0 || cid >cells.size())
+                        if(cid <0 || cid >(int)cells.size())
                             throw runtime_error(string("Supplied cell index reference ")+ to_string(cid)+" is ouside valid range 0 .."+to_string(cells.size()));
                 } else {
                     map<int, bool> all_cids;
@@ -212,7 +212,7 @@ namespace shyft {
 			/** returns true if cell matches index_type criteria  */
 			template<typename cell>
 			inline static bool is_match(const cell&c,stat_scope it,int cid,size_t i) {
-                return (it==stat_scope::cell_ix && cid==i) || (it==stat_scope::catchment_ix && c.geo.catchment_id() == (size_t) cid);
+                return (it==stat_scope::cell_ix && cid==int(i)) || (it==stat_scope::catchment_ix && c.geo.catchment_id() == (size_t) cid);
             }
 
             /** \brief average_catchment_feature returns the area-weighted average

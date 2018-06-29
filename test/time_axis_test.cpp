@@ -846,4 +846,58 @@ TEST_CASE("time_axis_map") {
 	//auto ix_map = tat.map(a, b);
 	//FAST_CHECK_EQ(ix_map.size(), b.size());
 }
+TEST_CASE("time_axis_f_slice") {
+    time_axis::fixed_dt a(0,1,10);
+    auto b=a.slice(1,2);
+    FAST_CHECK_EQ(b.time(0),1);
+    FAST_CHECK_EQ(b.time(1),2);
+    FAST_CHECK_EQ(b.size(),2);
+}
+TEST_CASE("time_axis_c_slice") {
+    time_axis::calendar_dt a(make_shared<calendar>(),0,1,10);
+    auto b=a.slice(1,2);
+    FAST_CHECK_EQ(b.time(0),1);
+    FAST_CHECK_EQ(b.time(1),2);
+    FAST_CHECK_EQ(b.size(),2);
+}
+TEST_CASE("time_axis_p_slice") {
+    time_axis::point_dt a(vector<utctime>{0,1,2,3,4,5,6,7,8,9},10);
+    auto b=a.slice(1,2);
+    FAST_CHECK_EQ(b.time(0),1);
+    FAST_CHECK_EQ(b.time(1),2);
+    FAST_CHECK_EQ(b.size(),2);
+    auto c=a.slice(8,2);
+    FAST_CHECK_EQ(c.size(),2);
+    FAST_CHECK_EQ(c.time(0),8);
+    FAST_CHECK_EQ(c.time(1),9);
+}
+TEST_CASE("time_axis_g_slice") {
+    /*fixed */ {
+        time_axis::generic_dt a(time_axis::fixed_dt(0,1,10));
+        auto b=a.slice(1,2);
+        FAST_CHECK_EQ(b.time(0),1);
+        FAST_CHECK_EQ(b.time(1),2);
+        FAST_CHECK_EQ(b.size(),2);
+    }
+    /* calendar*/ {
+        time_axis::generic_dt a(time_axis::calendar_dt(make_shared<calendar>(),0,1,10));
+        auto b=a.slice(1,2);
+        FAST_CHECK_EQ(b.time(0),1);
+        FAST_CHECK_EQ(b.time(1),2);
+        FAST_CHECK_EQ(b.size(),2);
+    }
+    /* point */{
+    time_axis::generic_dt a(time_axis::point_dt(vector<utctime>{0,1,2,3,4,5,6,7,8,9},10));
+    auto b=a.slice(1,2);
+    FAST_CHECK_EQ(b.time(0),1);
+    FAST_CHECK_EQ(b.time(1),2);
+    FAST_CHECK_EQ(b.size(),2);
+    auto c=a.slice(8,2);
+    FAST_CHECK_EQ(c.size(),2);
+    FAST_CHECK_EQ(c.time(0),8);
+    FAST_CHECK_EQ(c.time(1),9);
+    }
+
+}
+
 }
