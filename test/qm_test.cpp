@@ -388,6 +388,7 @@ TEST_SUITE("qm") {
         const auto fx_avg = time_series::ts_point_fx::POINT_AVERAGE_VALUE;
         core::calendar utc;
         ta_t ta(utc.time(2017, 1, 1, 0, 0, 0), core::deltahours(24), 4);
+        ta_t tah(utc.time(2017, 1, 1, 0, 0, 0), core::deltahours(24), 6);
         tsv_t historical_data;
         vector<tsv_t> forecast_sets;
         vector<double> weight_sets;
@@ -427,132 +428,83 @@ TEST_SUITE("qm") {
             vector<double> insertvec{ static_cast<double>(std::rand()) / RAND_MAX * 50.0,
                 static_cast<double>(std::rand()) / RAND_MAX * 50.0 ,
                 static_cast<double>(std::rand()) / RAND_MAX * 50.0 ,
+                static_cast<double>(std::rand()) / RAND_MAX * 50.0,
+                static_cast<double>(std::rand()) / RAND_MAX * 50.0,
                 static_cast<double>(std::rand()) / RAND_MAX * 50.0 };
-            historical_data.emplace_back(ta, insertvec, fx_avg);
+            historical_data.emplace_back(tah, insertvec, fx_avg);
         }
 
-        auto historical_order = qm::quantile_index<tsa_t>(historical_data, ta);
+        auto historical_order = qm::quantile_index<tsa_t>(historical_data, tah);
 
         core::utctime interpolation_start(core::no_utctime);
 
         //Act
+        bool interpolated_quantiles=false;
         auto result = qm::quantile_map_forecast<tsa_t>(forecast_sets, weight_sets,
-            historical_data, ta, interpolation_start);
+            historical_data, tah, tah.time(4),tah.time(4),interpolated_quantiles);
+
 
         //Assert
         for (size_t i = 0; i<num_historical_data; ++i) {
-            if (i < 4) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), -45.2);
-            }
-            else if (i < 7) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 1.5);
-            }
-            else if (i < 11) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 4.7);
-            }
-            else if (i < 16) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 13.4);
-            }
-            else if (i < 26) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 15.1);
-            }
-            else if (i < 32) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 34.1);
-            }
-            else if (i < 35) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 45.1);
-            }
-            else if (i < 45) {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 53.1);
-            }
-            else {
-                FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 83.1);
-            }
+            if (i < 4) { FAST_CHECK_EQ(result[historical_order[0][i]].value(0), -45.2); }
+            else if (i < 7) { FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 1.5);}
+            else if (i < 11) { FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 4.7);}
+            else if (i < 16) { FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 13.4);}
+            else if (i < 26) {FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 15.1);}
+            else if (i < 32) {FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 34.1);}
+            else if (i < 35) {FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 45.1);}
+            else if (i < 45) {FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 53.1);}
+            else { FAST_CHECK_EQ(result[historical_order[0][i]].value(0), 83.1);}
+            
+            if (i < 4) { FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -92.0);}
+            else if (i < 14) {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -42.2);}
+            else if (i < 17) {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -2.3); }
+            else if (i < 21) {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -1.9);}
+            else if (i < 26) {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 2.4);}
+            else if (i < 36) {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 6.5);}
+            else if (i < 42) { FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 15.6); }
+            else if (i < 45) {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 18.2); }
+            else {FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 87.9);}
 
-            if (i < 4) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -92.0);
-            }
-            else if (i < 14) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -42.2);
-            }
-            else if (i < 17) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -2.3);
-            }
-            else if (i < 21) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), -1.9);
-            }
-            else if (i < 26) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 2.4);
-            }
-            else if (i < 36) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 6.5);
-            }
-            else if (i < 42) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 15.6);
-            }
-            else if (i < 45) {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 18.2);
-            }
-            else {
-                FAST_CHECK_EQ(result[historical_order[1][i]].value(1), 87.9);
-            }
+            if (i < 4) { FAST_CHECK_EQ(result[historical_order[2][i]].value(2), -17.2); }
+            else if (i < 14) {FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 0.4);}
+            else if (i < 24) { FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 4.2);}
+            else if (i < 27) { FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 15.3);}
+            else if (i < 33) {FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 17.1);}
+            else if (i < 43) {FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 23.8);}
+            else if (i < 47) {FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 34.4);}
+            else if (i < 52) {FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 43.9);}
+            else {FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 80.2); }
 
-            if (i < 4) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), -17.2);
-            }
-            else if (i < 14) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 0.4);
-            }
-            else if (i < 24) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 4.2);
-            }
-            else if (i < 27) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 15.3);
-            }
-            else if (i < 33) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 17.1);
-            }
-            else if (i < 43) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 23.8);
-            }
-            else if (i < 47) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 34.4);
-            }
-            else if (i < 52) {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 43.9);
-            }
-            else {
-                FAST_CHECK_EQ(result[historical_order[2][i]].value(2), 80.2);
-            }
-
-            if (i < 4) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), -10.0);
-            }
-            else if (i < 14) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 2.9);
-            }
-            else if (i < 24) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 5.6);
-            }
-            else if (i < 27) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 8.9);
-            }
-            else if (i < 33) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 10.2);
-            }
-            else if (i < 39) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 19.1);
-            }
-            else if (i < 49) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 23.4);
-            }
-            else if (i < 52) {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 65.8);
-            }
-            else {
-                FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 71.0);
-            }
+            if (i < 4) { FAST_CHECK_EQ(result[historical_order[3][i]].value(3), -10.0);}
+            else if (i < 14) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 2.9);}
+            else if (i < 24) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 5.6);}
+            else if (i < 27) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 8.9); }
+            else if (i < 33) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 10.2);}
+            else if (i < 39) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 19.1);}
+            else if (i < 49) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 23.4);}
+            else if (i < 52) {FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 65.8);}
+            else { FAST_CHECK_EQ(result[historical_order[3][i]].value(3), 71.0); }
         }
-
+        // then verify that the historica result is the same after the qm-period
+        auto verify_equal_historical_period = [num_historical_data,&historical_data,&tah](const tsv_t &result) {
+            for(size_t t=4;t<tah.size();++t) {
+                for(size_t i=0;i<num_historical_data;++i) {
+                        if( fabs(result[i].value(t)-historical_data[i].value(t))>0.0001) {
+                            INFO("Failed at time step "<<t<< " and historical index "<<i);
+                            FAIL("historical is not identical after(should be if same resolution and interpolation type)");
+                        }
+                }
+            }
+        };
+        verify_equal_historical_period(result);
+        //  just to ensure there is at least chrash coverage (hard to figure out the values)
+        interpolated_quantiles=true;
+        result = qm::quantile_map_forecast<tsa_t>(forecast_sets, weight_sets,
+            historical_data, tah, tah.time(4),tah.time(4),interpolated_quantiles);
+        verify_equal_historical_period(result);
+        result = qm::quantile_map_forecast<tsa_t>(forecast_sets, weight_sets,
+            historical_data, tah, tah.time(3),tah.time(4),interpolated_quantiles);
+        verify_equal_historical_period(result);
     }
 }

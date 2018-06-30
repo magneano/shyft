@@ -103,6 +103,7 @@ namespace shyft {
                 if( r < n ) return r;
                 return std::string::npos;
             }
+            fixed_dt slice(size_t i0,size_t n) const {return fixed_dt(time(i0),dt,n);}
             size_t open_range_index_of( utctime tx, size_t ix_hint=std::string::npos ) const {return n > 0 && ( tx >= t + utctimespan( n * dt ) ) ? n - 1 : index_of( tx );}
             static fixed_dt full_range() {return fixed_dt( min_utctime, max_utctime, 2 );}  //Hmm.
             static fixed_dt null_range() {return fixed_dt( 0, 0, 0 );}
@@ -112,10 +113,10 @@ namespace shyft {
         /** A variant of time_axis that adheres to calendar periods, possibly including DST handling
         *  e.g.: a calendar day might be 23,24 or 25 hour long in a DST calendar.
         *  If delta-t is less or equal to one hour, it's close to as efficient as time_axis
-        *  \note that time-zone calendar semantics only applies to day or larger deltas. controlled by 
+        *  \note that time-zone calendar semantics only applies to day or larger deltas. controlled by
         *        by compile time constant calendar_dt::dt_tz_semantics
         *        the rationale behind this is pure empirical practice at statkraft
-        *        - we could easily provide this as a parameter - 
+        *        - we could easily provide this as a parameter -
         */
         struct calendar_dt : continuous<true> {
 
@@ -216,6 +217,8 @@ namespace shyft {
                     ? static_cast<size_t>((tx - t) / dt)
                     : static_cast<size_t>(cal->diff_units(t, tx, dt));
             }
+
+            calendar_dt slice(size_t i0, size_t n) const {return calendar_dt(cal,time(i0),dt,n);}
 
             size_t open_range_index_of(utctime tx, size_t ix_hint = std::string::npos) const {
                 return tx >= total_period().end && n > 0
@@ -339,6 +342,20 @@ namespace shyft {
                 auto r = lower_bound( t.cbegin(), t.cend(), tx,[]( utctime pt, utctime val ) { return pt <= val; } );
                 return static_cast<size_t>( r - t.cbegin() ) - 1;
             }
+
+            point_dt slice(size_t i0,size_t n) const {
+                //            0 1 2 :3
+                //  0,1:      0 ]
+                //  0,2:      0 1 ]
+                //  0,3       0 1 2 :3
+                //
+                if( i0 + n < t.size() ) {
+                    return point_dt(vector<utctime>(begin(t)+i0,begin(t)+i0+n+1));
+                } else {
+                    return point_dt(vector<utctime>(begin(t)+i0,end(t)),t_end);
+                }
+            }
+
             size_t open_range_index_of( utctime tx, size_t ix_hint = std::string::npos) const {return size() > 0 && tx >= t_end ? size() - 1 : index_of( tx,ix_hint );}
 
             static point_dt null_range() {
@@ -487,6 +504,14 @@ namespace shyft {
                 case POINT:    return p.index_of(t, ix_hint);
                 }
             }
+            generic_dt slice(size_t i0,size_t n) const {
+                switch( gt ) {
+                default:
+                case FIXED:    return generic_dt(f.slice(i0,n));
+                case CALENDAR: return generic_dt(c.slice(i0,n));
+                case POINT:    return generic_dt(p.slice(i0,n));
+                }
+            }
             size_t open_range_index_of(utctime t, size_t ix_hint = std::string::npos) const {
                 switch ( gt ) {
                 default:
@@ -611,6 +636,10 @@ namespace shyft {
 
                 return string::npos;
             }
+            calendar_dt_p slice(int i0,size_t n) const {
+                throw runtime_error("calendar_dt_p.slice(): not yet implemented");
+            }
+
             size_t open_range_index_of( utctime tx , size_t ix_hint = std::string::npos) const {
                 return size() > 0 && tx >= total_period().end ? size() - 1 : index_of( tx, false );
             }
@@ -707,7 +736,7 @@ namespace shyft {
             size_t open_range_index_of( utctime tx, size_t ix_hint = std::string::npos) const {
                 return size() > 0 && tx >= total_period().end ? size() - 1 : index_of( tx, ix_hint, false );
             }
-
+            period_list slice(size_t i0, size_t n) const {return period_list(vector<utcperiod>(begin(p)+i0,begin(p)+i0+n));}
             static period_list null_range() {
                 return period_list();
             }

@@ -10,6 +10,7 @@ namespace expose {
     namespace time_axis {
         using namespace shyft::core;
         using namespace boost::python;
+        namespace py=boost::python;
         using namespace std;
 
         template <class C_,class PyC>
@@ -25,21 +26,28 @@ namespace expose {
                      doc_parameter("i","int","the i'th period, 0..n-1")
                      doc_returns("utctime","int","the start(utctime) of the i'th period of the time-axis")
                 )
-                .def("period",&C_::period,args("i"),
+                .def("period",&C_::period,(py::arg("self"),py::arg("i")),
                      doc_parameters()
                      doc_parameter("i","int","the i'th period, 0..n-1")
                      doc_returns("period","UtcPeriod","the i'th period of the time-axis")
                 )
-                .def("index_of",&C_::index_of,args("t"),
+                .def("index_of",&C_::index_of,(py::arg("self"),py::arg("t")),
                      doc_parameters()
                      doc_parameter("t","int","utctime in seconds 1970.01.01")
                      doc_returns("index","int","the index of the time-axis period that contains t, npos if outside range")
                 )
-                .def("open_range_index_of",&C_::open_range_index_of,args("t"),
+                .def("open_range_index_of",&C_::open_range_index_of,(py::arg("self"),py::arg("t")),
                      "returns the index that contains t, or is before t"
                      doc_parameters()
                      doc_parameter("t","int","utctime in seconds 1970.01.01")
                      doc_returns("index","int","the index the time-axis period that contains t, -npos if before first period n-1, if t is after last period")
+                )
+                .def("slice",&C_::slice,(py::arg("self"),py::arg("start"),py::arg("n")),
+                    doc_intro("returns slice of time-axis as a new time-axis")
+                    doc_parameters()
+                    doc_parameter("start","int","first interval to include")
+                    doc_parameter("n","int","number of intervals to include")
+                    doc_returns("time-axis","TimeAxis","A new time-axis with the specified slice")
                 )
                 .def(self == self)
                 .def(self != self)
@@ -223,23 +231,23 @@ namespace expose {
                 .def("size", &generic_dt::size,
                     doc_returns("n", "int", "number of periods in time-axis")
                 )
-                .def("time", &generic_dt::time, args("i"),
+                .def("time", &generic_dt::time, (py::arg("self"),py::arg("i")),
                     doc_parameters()
                     doc_parameter("i", "int", "the i'th period, 0..n-1")
                     doc_returns("utctime", "int", "the start(utctime) of the i'th period of the time-axis")
                 )
-                .def("period", &generic_dt::period, args("i"),
+                .def("period", &generic_dt::period, (py::arg("self"),py::arg("i")),
                     doc_parameters()
                     doc_parameter("i", "int", "the i'th period, 0..n-1")
                     doc_returns("period", "UtcPeriod", "the i'th period of the time-axis")
                 )
-                .def("index_of", &generic_dt::index_of, (py::arg("t"),py::arg("ix_hint")=string::npos),
+                .def("index_of", &generic_dt::index_of, (py::arg("self"),py::arg("t"),py::arg("ix_hint")=string::npos),
                     doc_parameters()
                     doc_parameter("t", "int", "utctime in seconds 1970.01.01")
                     doc_parameter("ix_hint","int","index-hint to make search in point-time-axis faster")
                     doc_returns("index", "int", "the index of the time-axis period that contains t, npos if outside range")
                 )
-                .def("open_range_index_of", &generic_dt::open_range_index_of, (py::arg("t"), py::arg("ix_hint") = string::npos),
+                .def("open_range_index_of", &generic_dt::open_range_index_of, (py::arg("self"),py::arg("t"), py::arg("ix_hint") = string::npos),
                     "returns the index that contains t, or is before t"
                     doc_parameters()
                     doc_parameter("t", "int", "utctime in seconds 1970.01.01")
