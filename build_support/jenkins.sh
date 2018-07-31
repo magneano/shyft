@@ -39,8 +39,8 @@ cmake ..
 make -j 4 CMAKE_VERBOSE_MAKEFILE=0
 
 # Run tests
-make test
 make install
+make test
 cd ..
 python -c "import shyft; shyft.print_versions()"
 export SHYFT_SKIP_OPENDAP_TEST=1
