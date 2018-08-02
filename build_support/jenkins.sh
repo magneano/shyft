@@ -16,6 +16,9 @@ case $host in
 	export WORKSPACE=/home/jenkins/workspace;
 	export PATH=/home/u40420/projects/cmake/bin:$PATH
 	;;
+    'oslxpsht002p.energycorp.com')
+	export WORKSPACE=/var/lib/jenkins/workspace;
+	;;
     *) echo "Error, no configuration defined for this host (${host})";
        exit 1
        ;;
