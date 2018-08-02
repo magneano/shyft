@@ -151,25 +151,26 @@ namespace shyft {
                 void step(shyft::time_series::utctimespan dt,
                           const P& p,
                           const double T,
-                          const double prec,
+                          const double prec_mm_h,
                           const double /*rad*/,
                           const double /*wind_speed*/,
                           S& s,
                           R& r) const {
                     const double unit_size = p.unit_size;
-
+					const double step_in_days = dt / 86400.0;
+					const double dt_hours = dt/3600.0;
+					const double prec = prec_mm_h * dt_hours;
                     // Redistribute residual, if possible:
                     const double corr_prec = std::max(0.0, prec + s.residual);
                     s.residual = std::min(0.0, prec + s.residual);
 
                     // Simple degree day model physics
-                    const double step_in_days = dt/86400.0;
                     const double snow = T < p.tx ? corr_prec : 0.0;
                     const double rain = T < p.tx ? 0.0 : corr_prec;
 
                     if (s.sca*s.swe < unit_size && snow < snow_tol) {
                         // Set state and response and return
-                        r.outflow = rain + s.sca*(s.swe + s.free_water) + s.residual;
+                        r.outflow = (rain + s.sca*(s.swe + s.free_water) + s.residual)/dt_hours;
                         r.swe = 0.0;
 
                         s.residual = 0.0;
@@ -323,7 +324,7 @@ namespace shyft {
                     if (nnn > 0)
                         nu /= nnn;
 
-                    r.outflow = discharge;// fill in response, incl. cell-area swe, sca
+                    r.outflow = discharge/dt_hours;// mm/hour, fill in response, incl. cell-area swe, sca
                     r.swe = sca*(swe + lwc);
                     r.sca=sca; 
                     s.nu = nu;        // fill in new state at the end of timestep here
