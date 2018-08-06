@@ -187,6 +187,11 @@ struct py_server : server<standard_dtss_dispatcher> {
             unique_lock<mutex> lck(mx);
             return impl.find(search_expression);
         }
+        ts_info get_ts_info(const std::string& ts_url) {
+            scoped_gil_release gil;
+            unique_lock<mutex> lck(mx);
+            return impl.get_ts_info(ts_url);
+        }
         void store_ts(const ts_vector_t&tsv, bool overwrite_on_write, bool cache_on_write) {
             scoped_gil_release gil;
             unique_lock<mutex> lck(mx);
@@ -563,6 +568,13 @@ namespace expose {
                 doc_parameter("search_expression","str","search-expression, to be interpreted by the back-end tss server (usually by callback to python)")
                 doc_returns("ts_info_vector","TsInfoVector","The search result, as vector of TsInfo objects")
                 doc_see_also("TsInfo,TsInfoVector")
+            )
+            .def("get_ts_info",&DtsClient::get_ts_info,(py::arg("self"),py::arg("ts_url")),
+                doc_intro("Get ts information for a time-series from the backend")
+                doc_parameters()
+                doc_parameter("ts_url","str","Time-series url to lookup ts info for")
+                doc_returns("ts_info","TsInfo","A TsInfo object")
+                doc_see_also("TsInfo")
             )
             .def("store_ts", &DtsClient::store_ts,
                 (   py::arg("self"),

@@ -85,6 +85,7 @@ namespace expose {
                 .def_readonly("ae_output",&PTHPSKAllCollector::ae_output,"actual evap mm/h")
                 .def_readonly("pe_output",&PTHPSKAllCollector::pe_output,"pot evap mm/h")
                 .def_readonly("end_reponse",&PTHPSKAllCollector::end_reponse,"end_response, at the end of collected")
+                .def_readonly("avg_charge",&PTHPSKAllCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
             ;
 
             typedef shyft::core::pt_hps_k::discharge_collector PTHPSKDischargeCollector;
@@ -95,6 +96,8 @@ namespace expose {
                 .def_readonly("hps_swe",&PTHPSKDischargeCollector::hps_swe,"hbv snow swe, [mm] over the cell sca.. area, - at the end of timestep")
                 .def_readonly("end_reponse",&PTHPSKDischargeCollector::end_response,"end_response, at the end of collected")
                 .def_readwrite("collect_snow",&PTHPSKDischargeCollector::collect_snow,"controls collection of snow routine")
+                .def_readonly("avg_charge",&PTHPSKDischargeCollector::charge_m3s,"cell charge [m^3/s] for the timestep")
+                
                 ;
             typedef shyft::core::pt_hps_k::null_collector PTHPSKNullCollector;
             class_<PTHPSKNullCollector>("PTHPSKNullCollector","collector that does not collect anything, useful during calibration to minimize memory&maximize speed")

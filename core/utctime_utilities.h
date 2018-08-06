@@ -109,7 +109,8 @@ namespace shyft {
 				return utcperiod(std::max(a.start, b.start), std::min(a.end, b.end));
 			}
 			return utcperiod();
-        }
+        };
+
         namespace time_zone {
             using namespace std;
 

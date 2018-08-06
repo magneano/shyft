@@ -121,7 +121,8 @@ namespace shyft { namespace time_series { namespace dd {
         o_index<krls_interpolation_ts>,
         o_index<qac_ts>,
         o_index<inside_ts>,
-        o_index<decode_ts>
+        o_index<decode_ts>,
+        o_index<derivative_ts>
     >;
 
     namespace srep {
@@ -196,6 +197,15 @@ namespace shyft { namespace time_series { namespace dd {
             x_serialize_decl();// this class needs to serialize time-axis,
         };
         template<> struct _type<integral_ts> { using rep_t = srep::sintegral_ts; };
+
+        struct sderivative_ts {
+            using ts_t = derivative_ts;
+            a_index ts;
+            derivative_method dm;
+            bool operator==(const sderivative_ts& o) const { return ts == o.ts && dm == o.dm; }
+            x_serialize_decl();// this class needs to serialize time-axis,
+        };
+        template<> struct _type<derivative_ts> { using rep_t = srep::sderivative_ts; };
 
         struct saccumulate_ts {
             using ts_t = accumulate_ts;
@@ -405,6 +415,9 @@ namespace shyft { namespace time_series { namespace dd {
             } else if (auto ts = dynamic_cast<integral_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<integral_ts>{ expr.append(srep::_type<integral_ts>::rep_t{ convert(apoint_ts(ts->ts)),ts->ta }) };
+            } else if (auto ts = dynamic_cast<derivative_ts*>(ats.ts.get())) {
+                _m_find_ts_map(ts);
+                return m[ts] = o_index<derivative_ts>{ expr.append(srep::_type<derivative_ts>::rep_t{ convert(apoint_ts(ts->ts)), ts->dm}) };
             } else if (auto ts = dynamic_cast<accumulate_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<accumulate_ts>{ expr.append(srep::_type<accumulate_ts>::rep_t{ convert(apoint_ts(ts->ts)),ts->ta }) };
@@ -558,6 +571,11 @@ namespace shyft { namespace time_series { namespace dd {
             return make_shared<integral_ts>(rx.ta, boost::apply_visitor(*this, rx.ts));
         }
 
+         shared_ptr<derivative_ts> make(o_index<derivative_ts> i) {
+            const auto& rx = expr.at(i);
+            return make_shared<derivative_ts>(boost::apply_visitor(*this, rx.ts),rx.dm);
+        }
+
         shared_ptr<accumulate_ts> make(o_index<accumulate_ts> i) {
             const auto& rx = expr.at(i);
             return make_shared<accumulate_ts>(rx.ta, boost::apply_visitor(*this, rx.ts));
@@ -693,7 +711,7 @@ namespace shyft { namespace time_series { namespace dd {
     /**convinient macro to use for all know types, use as parameter-pack to ts_exp_rep, etc.*/
 #define all_srep_types  srep::sbinop_op_ts, srep::sbinop_ts_scalar, srep::sbin_op_scalar_ts, srep::sabs_ts, srep::saverage_ts, srep::sintegral_ts, srep::saccumulate_ts, \
             srep::stime_shift_ts, srep::speriodic_ts, srep::sconvolve_w_ts, srep::sextend_ts, srep::srating_curve_ts, srep::sice_packing_ts, srep::sice_packing_recession_ts, \
-            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts
+            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts
 
     typedef ts_expression<all_srep_types> compressed_ts_expression;
     typedef ts_expression_compressor<all_srep_types> expression_compressor;
@@ -733,6 +751,7 @@ x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::aref_
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::abs_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::average_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::integral_ts>);
+x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::derivative_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::accumulate_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::time_shift_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::periodic_ts>);

@@ -2,10 +2,10 @@
 export SHYFT_WORKSPACE=${SHYFT_WORKSPACE:=$(readlink --canonicalize --no-newline `dirname ${0}`/../..)}
 # to align the cmake support:
 SHYFT_DEPENDENCIES_DIR=${SHYFT_DEPENDENCIES_DIR:=${SHYFT_WORKSPACE}/shyft_dependencies}
-armadillo_name=armadillo-8.400.0
-dlib_name=dlib-19.11
+armadillo_name=armadillo-8.600.0
+dlib_name=dlib-19.13
 boost_ver=1_67_0
-pybind11_ver=v2.2.2
+pybind11_ver=v2.2.3
 cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
 echo ---------------
 echo Update/build shyft dependencies

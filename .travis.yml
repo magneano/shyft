@@ -3,6 +3,7 @@ dist: trusty
 
 addons:
   apt:
+    - update: true
     sources:
     - ubuntu-toolchain-r-test
     packages:
@@ -66,7 +67,7 @@ script:
   - export LD_LIBRARY_PATH=${SHYFT_DEPENDENCIES_DIR}/lib
   - g++-7 --version
   - python --version
-  - make -j 2 VERBOSE=1   CXX="g++-7" CC="gcc-7" # 3 paralel compiler processes can take up to 5 GB RAM!
+  - make -j 2 VERBOSE=1   CXX="g++-7" CC="gcc-7" # 2 parallel compiler processes can take up some mem
   - make test
   - make install
   - source activate shyft_env

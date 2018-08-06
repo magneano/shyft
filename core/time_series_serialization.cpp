@@ -316,6 +316,14 @@ void shyft::time_series::dd::integral_ts::serialize(Archive & ar, const unsigned
 }
 
 template<class Archive>
+void shyft::time_series::dd::derivative_ts::serialize(Archive & ar, const unsigned int version) {
+	ar
+		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))
+		& core_nvp("ts", ts)
+		;
+}
+
+template<class Archive>
 void shyft::time_series::dd::accumulate_ts::serialize(Archive & ar, const unsigned int version) {
 	ar
 		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))

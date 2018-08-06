@@ -378,6 +378,31 @@ client::find(const std::string& search_expression) {
 	return r;
 }
 
+ts_info
+client::get_ts_info(const std::string & ts_url) {
+    scoped_connect ac(*this);
+    ts_info tsi;
+    do_io_with_repair_and_retry(srv_con[0],
+        [this, &tsi, &ts_url](srv_connection & sc) {
+            auto& io = *(sc.io);
+            msg::write_type(message_type::GET_TS_INFO, io); {
+                msg::write_string(ts_url, io);
+            }
+            auto response_type = msg::read_type(io);
+            if (response_type == message_type::SERVER_EXCEPTION) {
+                auto re = msg::read_exception(io);
+                throw re;
+            } else if (response_type == message_type::GET_TS_INFO) {
+                core_iarchive ia(io, core_arch_flags);
+                ia >> tsi;
+            } else {
+                throw std::runtime_error(std::string("Got unexpected response:") + std::to_string((int)response_type));
+            }
+        }
+    );
+    return tsi;
+}
+
 void
 client::remove(const string & ts_url) {
 	scoped_connect ac(*this);

@@ -6,7 +6,7 @@ set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_tes
     merge_test.cpp mocks.cpp predictor_test.cpp priestley_taylor_test.cpp pt_gs_k_test.cpp pt_hs_k_test.cpp pt_ss_k_test.cpp qm_test.cpp
     region_model_test.cpp routing_test.cpp runner.cpp sceua_test.cpp serialization_test.cpp skaugen_test.cpp time_axis_test.cpp 
     time_series_average_test.cpp time_series_fixup_test.cpp time_series_test.cpp utctime_utilities_test.cpp hbv_physical_snow_test.cpp
-    pt_hps_k_test.cpp test_ice_packing.cpp dtss_stress_test.cpp dtss_mutex_test.cpp time_series_decode_test.cpp
+    pt_hps_k_test.cpp test_ice_packing.cpp dtss_stress_test.cpp dtss_mutex_test.cpp time_series_decode_test.cpp time_series_derivative_test.cpp
 )
 
 set(target "test_shyft")

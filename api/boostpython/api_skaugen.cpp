@@ -37,10 +37,10 @@ namespace expose {
          ;
 
         class_<response>("SkaugenResponse")
-         .def_readwrite("sca",&response::sca,"from snow-routine in [m3/s]")
-         .def_readwrite("swe",&response::swe,"from snow-routine in [m3/s]")
-         .def_readwrite("outflow",&response::outflow,"from snow-routine in [m3/s]")
-         .def_readwrite("total_stored_water",&response::total_stored_water,"def. as sca*(swe+lwc)")
+         .def_readwrite("sca",&response::sca,"snow-covered area in fraction")
+         .def_readwrite("swe",&response::swe,"snow water equivalient [mm] over cell-area")
+         .def_readwrite("outflow",&response::outflow,"from snow-routine in [mm/h] over cell-area")
+         .def_readwrite("total_stored_water",&response::swe,"same as swe(deprecated)")
          ;
 
         typedef  calculator<parameter,state,response> SkaugenCalculator;

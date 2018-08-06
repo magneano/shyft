@@ -178,6 +178,23 @@ class Calendar(unittest.TestCase):
         assert p_null.diff_units(utc, utc.DAY) == 0
         assert api.UtcPeriod(t3, t0).diff_units(utc, utc.MONTH) == -3
 
+    def test_UtcPeriod_intersection(self):
+        utc = api.Calendar()
+        t0 = utc.time(2018, 1, 1, 0, 0, 0)
+        t1 = utc.time(2018, 1, 2, 0, 0, 0)
+        t2 = utc.time(2018, 1, 3, 0, 0, 0)
+        t3 = utc.time(2018, 1, 4, 0, 0, 0)
+
+        p0 = api.UtcPeriod(t0, t2)
+        p1 = api.UtcPeriod(t1, t3)
+        p2 = api.UtcPeriod(t0, t1)
+        p3 = api.UtcPeriod(t2, t3)
+
+        assert api.UtcPeriod.intersection(p0, p1) == api.UtcPeriod(t1, t2)
+        assert not api.UtcPeriod.intersection(p0, p3).valid()
+        assert not api.UtcPeriod.intersection(p2, p3).valid()
+        assert api.intersection(p0, p1) == api.UtcPeriod(t1, t2)
+
     def test_swig_python_time(self):
         """
         This particular test is here to point out a platform specific bug detected

@@ -271,7 +271,230 @@ namespace shyft{
 			}
 			return make_interval(integral_value<ts_src<time_axis::generic_dt>>, ts->time_axis(), ts, ta);
 		}
+		/** helpers */
+		static inline utctimespan fixed_timestep(const time_axis::fixed_dt& ta) {
+            return ta.dt;
+        }
+        static inline utctimespan fixed_timestep(const time_axis::point_dt& ta) {
+            return utctimespan{0};
+        }
+        static inline utctimespan fixed_timestep(const time_axis::calendar_dt& ta) {
+            return ta.dt<time_axis::calendar_dt::dt_tz_semantics?ta.dt:utctimespan{0};
+        }
+		static inline utctimespan fixed_timestep(const time_axis::generic_dt& ta) {
+            if(ta.gt==time_axis::generic_dt::FIXED) {
+                return ta.f.dt;
+            } else if(ta.gt==time_axis::generic_dt::CALENDAR && ta.c.dt<time_axis::calendar_dt::dt_tz_semantics){
+                return ta.c.dt;
+            }
+            return utctimespan{0};
+        }
+        
+        /**We need a temporary slice of a time-axis */
+        template <class TA>
+        struct ta_slice {
+            const TA& ta;
+            size_t i0;
+            size_t n;
+            ta_slice(const TA&ta,size_t i0,size_t n):ta(ta),i0(i0),n(n){}
+            size_t size() const {return n;}
+            utcperiod period(size_t i) const {return ta.period(i0+i);}
+            utctime time(size_t i) const {return ta.time(i0+i);}
+        };
+        
+        template <class TA>
+        static inline utctimespan fixed_timestep(const ta_slice<TA>& ta) {
+            return fixed_timestep(ta.ta);
+        }
 
+        /** */
+        template <class TA>
+        void derivative_fx(const TA& ta,vector<double>& v,derivative_method dm) {
+            if(v.size()<2) {
+                if(v.size())
+                    v.front()=isfinite(v.front())?0.0:nan;// flat or nan
+            } else {
+                auto dt=fixed_timestep(ta);                 // if fixed interval(really) ->highspeed
+                if(dt) {
+                    switch(dm) {
+                        case derivative_method::default_diff:
+                        case derivative_method::center_diff:{// maybe average_diff is better name
+                        double v0=v[0];
+                        v[0]= isfinite(v0)?(isfinite(v[1])? (v[1]-v0)/(2*dt) : 0.0) : nan;// first value special case
+                        for(size_t i=1;i+1<v.size();++i) {
+                            double v1=v[i];
+                            if(isfinite(v1)) {
+                                if(isfinite(v0)) {
+                                    if(isfinite(v[i+1])) {
+                                        v[i] = (v[i+1] - v0)/(2*dt);
+                                    } else {
+                                        v[i] = (v1 - v0)/(2*dt);
+                                    }
+                                } else {
+                                    if(isfinite(v[i+1])) {
+                                        v[i] = (v[i+1] - v1)/(2*dt);
+                                    } else {
+                                        v[i] = 0.0;
+                                    }
+                                }
+                            } else {
+                                v[i]=nan;
+                            }
+                            v0=v1;
+                        }
+                        v.back()=isfinite(v.back())?(isfinite(v0)?(v.back() - v0)/(2*dt):0.0):nan;// last value special case
+                        
+                        }break;
+                        case derivative_method::forward_diff:{// center forward diff
+                        for(size_t i=0;i+1<v.size();++i) {
+                            v[i]= isfinite(v[i])?(isfinite(v[i+1])?(v[i+1]-v[i])/dt:0.0):nan;
+                        }
+                        v.back()=isfinite(v.back())?0.0:nan;
+                        } break;
+                        case derivative_method::backward_diff:{// center backward diff
+                        for(size_t i=v.size()-1;i>0;--i) {
+                            v[i]= isfinite(v[i])?(isfinite(v[i-1])?(v[i]-v[i-1])/dt:0.0):nan;
+                        }
+                        v.front()=isfinite(v.front())?0.0:nan;
+                        } break;
+                    }
+                } else { // variable intervals
+                    switch(dm) {
+                        case derivative_method::default_diff:
+                        case derivative_method::center_diff:{// maybe average_diff is better name  
+                        double v0=v[0];
+                        auto p0=ta.period(0);
+                        auto p1=ta.period(1);
+                        v[0]= isfinite(v0)?(isfinite(v[1])?(v[1]-v[0])/(p1.end - p0.start):0.0):nan;// first value special case
+                        for(size_t i=1;i+1<v.size();++i) {
+                            p1=ta.period(i);
+                            auto v1=v[i];
+                            auto p2=ta.period(i+1);
+                            auto v2=v[i+1];
+                            if(isfinite(v1)){
+                                if(isfinite(v0)) {// got left valid value
+                                    if(isfinite(v2)) { // got right valid value
+                                        v[i] = 2*(v2-v0)/((p2.start+p2.end) - (p0.start+p0.end));
+                                    } else { // right is nan, finish flat last half
+                                        v[i] = (v1-v0)/(p1.end - p0.start);
+                                    }
+                                } else if(isfinite(v2)) {// valid right side, nan on the left
+                                    v[i] = (v2-v1)/(p2.end - p1.start);
+                                } else { // both sides nan, flat 
+                                    v[i] = 0.0; 
+                                }
+                            } else {
+                                v[i] = nan;
+                            }
+                            v0=v1;
+                            p0=p1;
+                        }
+                        // we got p0,v0, 
+                        p1=ta.period(v.size()-1);
+                        auto v1=v.back();
+                        if(isfinite(v1)) {
+                            if(isfinite(v0)) {
+                                v.back() = (v1-v0)/(p1.end-p0.start);
+                            } else {
+                                v.back() = 0.0;
+                            }
+                        } else {
+                            v.back()=nan;
+                        }
+                            
+                        }break;
+                        case derivative_method::forward_diff:{// center forward diff
+                            auto p0 = ta.period(0);
+                            auto v0 = v[0];
+                            for(size_t i=0;i<v.size()-1;++i) {
+                                auto p1=ta.period(i+1);
+                                auto v1=v[i+1];
+                                if(isfinite(v0)) {
+                                    if(isfinite(v1)) {
+                                        v[i] = 2*(v1 - v0)/ ((p1.start+p1.end) - (p0.start+p0.end));
+                                    } else {
+                                        v[i] = 0.0; // flat out
+                                    }
+                                } else {
+                                    v[i]=nan;
+                                }
+                                p0=p1;
+                                v0=v1;
+                            }
+                            v.back()=isfinite(v.back())?0.0:nan;// flat out last step.
+                        } break;
+                        case derivative_method::backward_diff:{// center backward diff
+                            auto p0 = ta.period(0);
+                            auto v0 = v[0];
+                            v.front()=isfinite(v.front())?0.0:nan;
+                            for(size_t i=1;i<v.size();++i) {
+                                auto p1=ta.period(i);
+                                auto v1=v[i];
+                                if(isfinite(v1)) {
+                                    if(isfinite(v0)) {
+                                        v[i] = 2*(v1 - v0)/ ((p1.start+p1.end) - (p0.start+p0.end));
+                                    } else {
+                                        v[i] = 0.0; // flat out
+                                    }
+                                } else {
+                                    v[i]=nan;
+                                }
+                                p0=p1;
+                                v0=v1;
+                            }
+                        } break;
+                    }
+                }
+            }
+        }
+        
+        std::vector<double> derivative_ts::values() const {
+            if(!ts) throw runtime_error("derivative of null ts attempted");
+            auto v = ts->values();
+            if(ts->point_interpretation()==POINT_INSTANT_VALUE) {
+                for(size_t i=0;i+1<v.size();++i) {
+                    v[i]= (v[i+1]-v[i])/(ts->time(i+1)-ts->time(i));
+                }
+                if(v.size())
+                    v[v.size()-1] = nan;
+            } else {  // implement dm for stair-case
+                derivative_fx(ts->time_axis(),v,dm);
+            }
+            return v;
+        }
+        double derivative_ts::value(size_t i) const {
+            if(!ts) throw runtime_error("derivative of null ts attempted");
+            if(ts->point_interpretation()==POINT_INSTANT_VALUE) {
+                if(i+1<ts->size()) {
+                    return (ts->value(i+1)-ts->value(i))/(ts->time_axis().period(i).timespan());
+                } else {
+                    return nan;
+                }
+            } else {
+                vector<double> v;v.reserve(3);
+                size_t i0=i;
+                if(i>0){ v.push_back(ts->value(i-1));i0=i-1;}
+                v.push_back(ts->value(i));
+                if(i+1<ts->size()) v.push_back(ts->value(i+1));
+                //const auto & ta = ts->time_axis();
+                ta_slice<decltype(ts->time_axis())> ta(ts->time_axis(),i0,v.size());
+                derivative_fx(ta,v,dm);
+                return v[i>0?1:0];
+            }
+            return nan;
+        }
+
+        double derivative_ts::value_at(utctime t) const {
+            if(!ts) throw runtime_error("derivative of null ts attempted");
+            size_t ix=ts->index_of(t); // easy, just figure out the ix of the period
+            if(ix == string::npos)
+                return nan;
+            return value(ix);// and forward it to the value method.
+        }
+        
+        apoint_ts apoint_ts::derivative(derivative_method dm) const {
+            return apoint_ts(make_shared<derivative_ts>(ts,dm));
+        }
 		// implement popular ct for apoint_ts to make it easy to expose & use
 		apoint_ts::apoint_ts(const time_axis::generic_dt& ta, double fill_value, ts_point_fx point_fx)
 			:ts(std::make_shared<gpoint_ts>(ta, fill_value, point_fx)) {

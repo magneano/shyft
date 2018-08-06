@@ -228,7 +228,7 @@ namespace expose {
                 doc_note("the self point interpretation policy is used when calculating the true average")
             )
             .def("accumulate", &ats_vector::accumulate, args("ta"),
-                doc_intro("create a new  vector of ts where each i'th value is the ")
+                doc_intro("create a new  vector of ts where each i'th element is the ")
                 doc_intro("    integral f(t) *dt, from t0..ti,")
                 doc_intro("given the specified time-axis ta")
                 doc_parameters()
@@ -237,6 +237,14 @@ namespace expose {
                 doc_notes()
                 doc_note("the self point interpretation policy is used when calculating the accumulated values")
             )
+            .def("derivative", &ats_vector::derivative, (py::arg("self"),py::arg("method")=derivative_method::default_diff),
+                doc_intro("create a new  vector of ts where each i'th element is the ")
+                doc_intro("    derivative of f(t)")
+                doc_parameters()
+                doc_parameter("method","derivative_method","what derivative_method variant to use")
+                doc_returns("tsv","TsVector","where each member is the derivative of the source")
+            )
+            
 			.def("time_shift", &ats_vector::time_shift,args("delta_t"),
 				doc_intro("create a new vector of ts that is a the time-shift'ed  version of self")
 				doc_parameters()
@@ -683,6 +691,17 @@ namespace expose {
                 doc_notes()
                 doc_note("the self point interpretation policy is used when calculating the accumulated values")
             )
+            .def("derivative",&apoint_ts::derivative,(py::arg("self"),py::arg("method")=derivative_method::default_diff),
+                 doc_intro("Compute the derivative of the ts, according to the method specified.")
+                 doc_intro("For linear(POINT_INSTANT_VALUE), it is always the derivative of the straight line between points,")
+                 doc_intro(" - using nan for the interval starting at the last point until end of time-axis.")
+                 doc_intro("Default for stair-case(POINT_AVERAGE_VALUE) is the average derivative over each time-step,")
+                 doc_intro(" - using 0 as rise for the first/last half of the intervals at the boundaries.")
+                 doc_intro("  here you can influence the method used, selecting .forward_diff, .backward_diff")
+                 doc_parameters()
+                 doc_parameter("method","derivative_method","default value gives center/average derivative .(DEFAULT|FORWARD|BACKWARD|CENTER)")
+                 doc_returns("derivative","TimeSeries","The derivative ts")
+             )
 			.def("time_shift", &apoint_ts::time_shift,(py::arg("self"),py::arg("delta_t")),
 				doc_intro("create a new ts that is a the time-shift'ed  version of self")
 				doc_parameters()
@@ -1725,6 +1744,17 @@ namespace expose {
             .value("USE_NAN", time_series::convolve_policy::USE_NAN)
             .export_values()
             ;
+        enum_<time_series::dd::derivative_method>(
+            "derivative_method",
+            doc_intro("Ref. the .derivative time-series function, this defines how to compute the")
+            doc_intro("derivative of a given time-series")
+            )
+            .value("DEFAULT",time_series::dd::derivative_method::default_diff)
+            .value("FORWARD",time_series::dd::derivative_method::forward_diff)
+            .value("BACKWARD",time_series::dd::derivative_method::backward_diff)
+            .value("CENTER",time_series::dd::derivative_method::center_diff)
+            .export_values()
+        ;
         class_<time_series::point> ("Point", "A timeseries point specifying utctime t and value v")
             .def(init<utctime,double>(args("t","v")))
             .def_readwrite("t",&time_series::point::t)

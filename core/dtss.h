@@ -248,6 +248,7 @@ struct server : dlib::server_iostream {
     void set_can_remove(bool can_remove) { this->can_remove = can_remove; }
 
     ts_info_vector_t do_find_ts(const std::string& search_expression);
+    ts_info do_get_ts_info(const std::string & ts_url);
 
     std::string extract_url(const apoint_ts&ats) const {
         auto rts = dynamic_pointer_cast<aref_ts>(ats.ts);
@@ -401,6 +402,28 @@ inline ts_info_vector_t server<ContainerDispatcher>::do_find_ts(const std::strin
         return find_ts_cb(search_expression);
     } else {
         return ts_info_vector_t();
+    }
+}
+
+
+template < class ContainerDispatcher >
+inline ts_info server<ContainerDispatcher>::do_get_ts_info(const std::string & ts_name) {
+    // 1. filter shyft://<container>/
+    auto pattern = extract_shyft_url_container(ts_name);
+    if ( pattern.size() > 0 ) {
+        // assume it is a shyft url -> look for query flags
+        auto queries = extract_shyft_url_query_parameters(ts_name);
+        auto container_query_it = queries.find(ContainerDispatcher::container_query);
+        if ( ! queries.empty() && container_query_it != queries.end() ) {
+            auto container_query = container_query_it->second;
+             filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+            return internal(pattern, container_query).get_ts_info(extract_shyft_url_path(ts_name), queries);
+        } else {
+            filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+            return internal(pattern).get_ts_info(extract_shyft_url_path(ts_name), queries);
+        }
+    } else {
+        return ts_info{};
     }
 }
 
@@ -763,6 +786,14 @@ inline void server<ContainerDispatcher>::on_connect(
                 msg::write_type(message_type::FIND_TS, out);
                 core_oarchive oa(out,core_arch_flags);
                 oa << find_result;
+            } break;
+            case message_type::GET_TS_INFO: {
+                std::string ts_url;
+                ts_url = msg::read_string(in);
+                auto result = do_get_ts_info(ts_url);
+                msg::write_type(message_type::GET_TS_INFO, out);
+                core_oarchive oa(out, core_arch_flags);
+                oa << result;
             } break;
             case message_type::STORE_TS: {
                 ts_vector_t rtsv;

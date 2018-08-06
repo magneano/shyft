@@ -146,7 +146,7 @@ namespace shyft {
         struct ice_packing_recession_parameters;  // fwd
         struct inside_parameter; // fwd
         struct bit_decoder;//fwd
-        
+        struct derivative_ts; // fwd api
 		/** \brief Enumerates fill policies for time-axis extension.
 		 */
 		enum extend_ts_fill_policy {
@@ -162,6 +162,15 @@ namespace shyft {
 			EPS_RHS_FIRST,  /**< Split at the first value of the rhs ts. */
 			EPS_VALUE,      /**< Split at a given time-value. */
 		};
+        
+        /** \brief 
+         */
+        enum class derivative_method:int8_t {
+            default_diff,
+            forward_diff,
+            backward_diff,
+            center_diff
+        };
 
         /** \brief  apoint_ts, a value-type conceptual ts.
          *
@@ -263,6 +272,7 @@ namespace shyft {
                 utctime split_at, double fill_value ) const;
             apoint_ts average(const gta_t& ta) const;
             apoint_ts integral(gta_t const &ta) const;
+            apoint_ts derivative(derivative_method dm=derivative_method::default_diff) const;
             apoint_ts accumulate(const gta_t& ta) const;
             apoint_ts time_shift(utctimespan dt) const;
             apoint_ts max(double a) const;
@@ -528,6 +538,63 @@ namespace shyft {
 
         };
 
+        /** \brief The derivative_ts is used for providing ts derivate values over a time-axis
+        *
+        * Given a any ts, concrete, or an expression, provide the estimated 1'th order derivate on the
+        * intervals as provided by the time-series time-axis.
+        *
+        * The estimated 1'st order derivate is calculated based on the assumption that
+        * the f(t) represented of the time-series is and  estimate for the underlying signal.
+        * 
+        * stair-case: 
+        *    Then the signal f(t) is assumed to be the true-average over the non-nan area of the interval
+        *    and the 1'st order derivate estimate is created using a straight line between the 
+        *    midpoint of each stair-case segment.
+        *    
+        *   This can lead to anomalies a the beginning and the end of the derived time-series,
+        *    since the neighbouring points after and before the beginning and the end _might_
+        *    change the value, if they later are added into the computation source.
+        * 
+        * 
+        *  linear-between-points:
+        *     The signal f(t) is assumed to have a best estimated value equal to the straight line between the points
+        *     The 1'st order derivate is thus simply the 1'st order derivate of this straight line.
+        *     The resulting time-axis is exactly equal to the source time-axis,
+        *     and the resulting point-interpretation is stair-case (assuming constant derivate estimate over the interval)
+        *
+        * using the f(t) interpretation of the supplied ts (linear or stair case).
+        *
+        * The \ref ts_point_fx is always POINT_AVERAGE_VALUE for the result ts.
+        *
+        * \note left and right hand side of intervals with nans assume constant value the last half segment.
+        *
+        */
+        struct derivative_ts :ipoint_ts {
+            std::shared_ptr<ipoint_ts> ts;///< time-series to differentiate
+            derivative_method dm;///<derivative_method specification
+            // useful constructors
+            derivative_ts(const apoint_ts& ats,derivative_method dm=derivative_method::default_diff) : ts(ats.ts),dm(dm) {}
+            derivative_ts(apoint_ts&& ats,derivative_method dm=derivative_method::default_diff) :ts(std::move(ats.ts)),dm(dm) {}
+            derivative_ts( const std::shared_ptr<ipoint_ts> &ts,derivative_method dm=derivative_method::default_diff): ts(ts),dm(dm) {}
+            // std copy ct and assign
+            derivative_ts()=default;
+            // implement ipoint_ts contract:
+            virtual ts_point_fx point_interpretation() const { return ts_point_fx::POINT_AVERAGE_VALUE; }
+            virtual void set_point_interpretation(ts_point_fx /* point_interpretation*/) { ; }
+            virtual const gta_t& time_axis() const { return ts->time_axis(); }
+            virtual utcperiod total_period() const { return ts?time_axis().total_period():utcperiod{}; }
+            virtual size_t index_of(utctime t) const { return ts?string::npos:ts->index_of(t); }
+            virtual size_t size() const { return ts?ts->size():0; }
+            virtual utctime time(size_t i) const { return ts->time(i); };
+            virtual double value(size_t i) const;
+            virtual double value_at(utctime t) const;
+            virtual std::vector<double> values() const ;
+            virtual bool needs_bind() const { return ts->needs_bind();}
+            virtual void do_bind() {ts->do_bind();}
+            x_serialize_decl();
+
+        };
+        
         /** \brief The accumulate_ts is used for providing accumulated(integrated) ts values over a time-axis
         *
         * Given a any ts, concrete, or an expression, provide the true accumulated values,
@@ -1932,6 +1999,9 @@ namespace shyft {
             ats_vector accumulate(gta_t const&ta) const {
                 ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.accumulate(ta)); return r;
             }
+            ats_vector derivative(derivative_method dm) const {
+                ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.derivative(dm)); return r;
+            }            
             ats_vector time_shift(utctimespan delta_t) const {
                 ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.time_shift(delta_t)); return r;
             }
@@ -2018,6 +2088,7 @@ namespace shyft {
 x_serialize_export_key(shyft::time_series::dd::ipoint_ts);
 x_serialize_export_key(shyft::time_series::dd::gpoint_ts);
 x_serialize_export_key(shyft::time_series::dd::average_ts);
+x_serialize_export_key(shyft::time_series::dd::derivative_ts);
 x_serialize_export_key(shyft::time_series::dd::integral_ts);
 x_serialize_export_key(shyft::time_series::dd::accumulate_ts);
 x_serialize_export_key(shyft::time_series::dd::time_shift_ts);
@@ -2027,7 +2098,7 @@ x_serialize_export_key(shyft::time_series::dd::abin_op_scalar_ts);
 x_serialize_export_key(shyft::time_series::dd::abin_op_ts);
 x_serialize_export_key(shyft::time_series::dd::abin_op_ts_scalar);
 x_serialize_export_key(shyft::time_series::dd::aref_ts);
-x_serialize_export_key(shyft::time_series::convolve_w_ts<shyft::time_series::dd::apoint_ts>); // oops need this from core
+x_serialize_export_key(shyft::time_series::convolve_w_ts<shyft::time_series::dd::apoint_ts>);
 x_serialize_export_key(shyft::time_series::dd::convolve_w_ts);
 x_serialize_export_key(shyft::time_series::rating_curve_ts<shyft::time_series::dd::apoint_ts>);
 x_serialize_export_key(shyft::time_series::dd::rating_curve_ts);
