@@ -444,6 +444,7 @@ __all__ = [] + \
          'CELL_CHARGE',
          'CacheStats',
          'Calendar',
+         'time',
          'CatchmentPropertyType',
          'CellEnvironment',
          'CellEnvironmentConstRHumWind',
