@@ -151,25 +151,26 @@ namespace shyft {
                 void step(shyft::time_series::utctimespan dt,
                           const P& p,
                           const double T,
-                          const double prec,
+                          const double prec_mm_h,
                           const double /*rad*/,
                           const double /*wind_speed*/,
                           S& s,
                           R& r) const {
                     const double unit_size = p.unit_size;
-
+					const double step_in_days = to_seconds(dt)/86400.0;
+					const double dt_hours = to_seconds(dt)/3600.0;
+					const double prec = prec_mm_h * dt_hours;
                     // Redistribute residual, if possible:
                     const double corr_prec = std::max(0.0, prec + s.residual);
                     s.residual = std::min(0.0, prec + s.residual);
 
                     // Simple degree day model physics
-                    const double step_in_days = to_seconds(dt)/86400.0;
                     const double snow = T < p.tx ? corr_prec : 0.0;
                     const double rain = T < p.tx ? 0.0 : corr_prec;
 
                     if (s.sca*s.swe < unit_size && snow < snow_tol) {
                         // Set state and response and return
-                        r.outflow = rain + s.sca*(s.swe + s.free_water) + s.residual;
+                        r.outflow = (rain + s.sca*(s.swe + s.free_water) + s.residual)/dt_hours;
                         r.swe = 0.0;
 
                         s.residual = 0.0;
@@ -188,7 +189,7 @@ namespace shyft {
                         return;
                     }
 
-                    // pick out the current state into local variables that will be updated
+                    // pick out the current state into local variables that will be updated 
                     // to form the response and new state at end of the function
                     const double alpha_0 = p.alpha_0;
                     double swe = s.swe;
@@ -205,11 +206,11 @@ namespace shyft {
                     }
 
                     // 0. handling (new) snow, refreeze and potmelt this time-step.
-                    //   total_new_snow = snow + refreeze - pot_melt
+                    //   total_new_snow = snow + refreeze - pot_melt    
                     //                     lwc   -= refreeze  .. adjust the lwc according to refreeze
                     //               pot_melt = left after reducing snow+refreeze mass that is new to this time-step
                     //                                 so that it can melt the remaining snowpack
-                    double total_new_snow = snow; /// binds to @ cell_area
+                    double total_new_snow = snow; /// binds to @ cell_area 
                     double lwc = s.free_water;  // Conditional value
                     const double total_storage = swe + lwc; // Conditional value
 
@@ -236,12 +237,12 @@ namespace shyft {
                         sca = 1.0; // now this is the new sca
                         swe = nnn*unit_size; // this is the new swe
                     }
-
+                    
                     //
                     // 2. Melting
                     //
                     if (pot_melt > unit_size) {
-                        unsigned long u = lrint(pot_melt/unit_size); // pot-melt for snow-package sca
+                        unsigned long u = lrint(pot_melt/unit_size); // pot-melt for snow-package sca 
                         if (nnn < u + 2) { // sih: this should most likely be nnn <= u
                             // the entire snowpack melts
                             nnn = 0;
@@ -253,7 +254,7 @@ namespace shyft {
                         } else {
                             // only parts of the snowpack melts
                             // and the sca is reduced.
-                            //  as a consequence we need to recompute the shape
+                            //  as a consequence we need to recompute the shape 
                             //  and reduce the volume.
                             const double rel_red_sca = stat.sca_rel_red(u, nnn, nu, alpha);
                             const double sca_scale_factor = 1.0 - rel_red_sca;
@@ -286,7 +287,7 @@ namespace shyft {
                     //
 
                     if (s.sca*s.swe > sca*swe) { // (Unconditional) melt
-                        // sih to preserve mass when sca changes: lwc += std::max(0.0, s.swe*s.sca - swe*sca)/sca
+                        // sih to preserve mass when sca changes: lwc += std::max(0.0, s.swe*s.sca - swe*sca)/sca 
                         lwc += std::max(0.0, s.swe - swe); // Add melted water to free water in snow
                     }
                     lwc *= std::min(1.0, s.sca/sca); // Scale lwc (preserve total free water when sca increases)
@@ -316,16 +317,16 @@ namespace shyft {
                         s.residual = 0.0;
                     // More residual than discharge - get rid of as much as possible and zero out the runoff
                     }
-
+                    
                     //
                     // 5. finale, set state to updated state, fill in response
                     //
                     if (nnn > 0)
                         nu /= nnn;
 
-                    r.outflow = discharge;// fill in response, incl. cell-area swe, sca
+                    r.outflow = discharge/dt_hours;// mm/hour, fill in response, incl. cell-area swe, sca
                     r.swe = sca*(swe + lwc);
-                    r.sca=sca;
+                    r.sca=sca; 
                     s.nu = nu;        // fill in new state at the end of timestep here
                     s.alpha = alpha;
                     s.sca = sca;

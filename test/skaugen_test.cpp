@@ -73,7 +73,7 @@ TEST_CASE("test_melt") {
     // Model input
     utctimespan dt = seconds(24*60*60);
     double temp = -10.0;
-    double prec = 10.0;
+    double prec = 10.0/24.0;
     double radiation = 0.0;
     double wind_speed = 0.0;
     std::vector<std::pair<double, double>> tp(10, std::pair<double, double>(temp, prec));
@@ -92,18 +92,18 @@ TEST_CASE("test_melt") {
     tp = std::vector<std::pair<double, double>>(1, std::pair<double, double>{10.0, 0.0}); // No precip, but 10.0 degrees for one day
 	for_each(tp.begin(), tp.end(), [&dt, &p, &model, &radiation, &wind_speed, &s, &r, &agg_outflow](std::pair<double, double> pair) {
             model.step(dt, p, pair.first, pair.second, radiation, wind_speed, s, r);
-            agg_outflow += r.outflow;
+            agg_outflow += r.outflow*24.0;// dt=24h, r.outflow is in mm/h
         });
     const double total_water_after_melt = s.sca*(s.swe + s.free_water);
     TS_ASSERT_LESS_THAN(total_water_after_melt , total_water); // Less water after melt due to runoff
-    TS_ASSERT(r.outflow + s.free_water >= 1.0); // Some runoff or free water in snow
-    TS_ASSERT_DELTA(r.outflow + s.sca*(s.free_water + s.swe), total_water, 1.0e-6);
+    TS_ASSERT(r.outflow*24.0 + s.free_water >= 1.0); // Some runoff or free water in snow
+    TS_ASSERT_DELTA(r.outflow*24.0 + s.sca*(s.free_water + s.swe), total_water, 1.0e-6);
 
     // One hundred melt events, that should melt everything
     tp = std::vector<std::pair<double, double>>(100, std::pair<double, double>(10.0, 0.0));
     for_each(tp.begin(), tp.end(), [&dt , &p, &model, &radiation, &wind_speed, &s, &r, &agg_outflow] (std::pair<double, double> pair) {
             model.step(dt, p, pair.first, pair.second, radiation, wind_speed, s, r);
-            agg_outflow += r.outflow;
+            agg_outflow += r.outflow*24.0;// mm/h *24h-> mm
         });
 
     TS_ASSERT_DELTA(s.sca, 0.0, 1.0e-6);
@@ -139,7 +139,7 @@ TEST_CASE("test_lwc") {
     // Model input
     utctimespan dt = seconds(24*60*60);
     double temp = -10.0;
-    double prec = 10.0;
+    double prec = 10.0/24.0;
     double radiation = 0.0;
     double wind_speed = 0.0;
     std::vector<std::pair<double, double>> tp(10, std::pair<double, double>(temp, prec));
@@ -154,7 +154,7 @@ TEST_CASE("test_lwc") {
     TS_ASSERT_DELTA(s.free_water, 0.0, 1.0e-6);  // No free water when dry snow precip
     model.step(dt, p, 10.0, 0.0, radiation, wind_speed, s, r);
     TS_ASSERT(s.free_water <= s.swe*max_water_fraction);  // Can not have more free water in the snow than the capacity of the snowpack
-    tp = std::vector<std::pair<double, double>>(5, std::pair<double, double>(10.0, 0.0));
+    tp = std::vector<std::pair<double, double>>(5, std::pair<double, double>(2.0, 0.0));
     for_each(tp.begin(), tp.end(), [&dt , &p, &model, &radiation, &wind_speed, &s, &r] (std::pair<double, double> pair) {
             model.step(dt, p, pair.first, pair.second, radiation, wind_speed, s, r);
         });
