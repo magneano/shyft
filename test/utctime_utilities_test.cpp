@@ -16,9 +16,9 @@ TEST_CASE("test_utctime") {
     TS_ASSERT(c.time(y_null)==no_utctime);
     TS_ASSERT(c.time(YMDhms::max())==max_utctime);
     TS_ASSERT(c.time(YMDhms::min())==min_utctime);
-
-    TS_ASSERT_EQUALS(0L,c.time(unixEra));
-    YMDhms r=c.calendar_units(utctime(0L));
+    utctime t0{seconds(0)};
+    TS_ASSERT_EQUALS(t0,c.time(unixEra));
+    YMDhms r=c.calendar_units(t0);
     TS_ASSERT_EQUALS(r,unixEra);
 }
 TEST_CASE("test_utcperiod") {
@@ -57,9 +57,9 @@ TEST_CASE("test_utcperiod_trim") {
     utctime t3=utc.time(2018,4,1,0,0,0);
 
     TS_ASSERT_EQUALS(utcperiod(t0,t1).trim(utc,utc.MONTH,trim_policy::TRIM_IN),utcperiod(t0,t1));
-    TS_ASSERT_EQUALS(utcperiod(t0,t1+1).trim(utc,utc.MONTH,trim_policy::TRIM_IN),utcperiod(t0,t1));
-    TS_ASSERT_EQUALS(utcperiod(t1-1,t2+1).trim(utc,utc.MONTH,trim_policy::TRIM_OUT),utcperiod(t0,t3));
-    
+    TS_ASSERT_EQUALS(utcperiod(t0,t1+seconds(1)).trim(utc,utc.MONTH,trim_policy::TRIM_IN),utcperiod(t0,t1));
+    TS_ASSERT_EQUALS(utcperiod(t1-seconds(1),t2+seconds(1)).trim(utc,utc.MONTH,trim_policy::TRIM_OUT),utcperiod(t0,t3));
+
     //diff_units test
     TS_ASSERT_EQUALS(utcperiod(t0,t3).diff_units(utc,utc.MONTH),3);
 }
@@ -86,7 +86,7 @@ TEST_CASE("test_calendar_trim") {
 TEST_CASE("test_calendar_timezone") {
     YMDhms unixEra(1970,01,01,00,00,00);
     calendar cet(deltahours(1));
-    TS_ASSERT_EQUALS(deltahours(-1),cet.time(unixEra));
+    TS_ASSERT_EQUALS(utctime(deltahours(-1)),cet.time(unixEra));
 }
 
 TEST_CASE("test_calendar_to_string") {
@@ -99,6 +99,10 @@ TEST_CASE("test_calendar_to_string") {
     TS_ASSERT_EQUALS(cet.to_string(t),string("2012-05-08T14:16:44+02"));
     TS_ASSERT_EQUALS(osl.to_string(t),string("2012-05-08T13:16:44+01"));
     TS_ASSERT_EQUALS(xxx.to_string(t),string("2012-05-08T09:46:44-02:30"));
+    t=utc.time(1960,1,2,3,4,5,6);
+    YMDhms c=utc.calendar_units(t);
+    auto s=utc.to_string(t);
+    TS_ASSERT_EQUALS(s,string("1960-01-02T03:04:05.000006Z"));
 }
 
 TEST_CASE("test_calendar_day_of_year") {

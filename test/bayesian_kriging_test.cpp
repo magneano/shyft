@@ -5,7 +5,7 @@
 #include "core/time_series.h"
 #include "core/geo_point.h"
 #include <iomanip>
-
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
 using namespace std;
 namespace shyfttest {
 
@@ -102,7 +102,7 @@ using namespace shyft::core;
 using namespace shyft;
 
 typedef shyfttest::xpts_t xpts_t;
-std::vector<utctime> ctimes{ 0, 3600 };
+std::vector<utctime> ctimes{ _t(0), _t(3600) };
 typedef std::vector<shyft::time_series::point> point_vector_t;
 
 void build_sources_and_dests(const size_t num_sources_x, const size_t num_sources_y,
@@ -123,7 +123,7 @@ void build_sources_and_dests(const size_t num_sources_x, const size_t num_source
 	std::default_random_engine re;
     vector<utctime> times;times.reserve(ts_size);
     for (size_t l = 0; l < ts_size; ++l)
-        times.emplace_back(l*dt);
+        times.emplace_back(utctime(l*dt));
     times.emplace_back(shyft::core::max_utctime);
     time_axis::point_dt dta(times);
     geo_point p0(x_min,y_min,0.0);
@@ -201,7 +201,7 @@ TEST_CASE("test_build_covariance_matrices") {
 	const time_axis::point_dt time_axis(ctimes);
 	SourceList sources;
 	DestinationList destinations;
-	build_sources_and_dests(3, 3, 15, 15, 2, 10, time_axis, false, sources, destinations);
+	build_sources_and_dests(3, 3, 15, 15, 2, seconds(10), time_axis, false, sources, destinations);
 	arma::mat K, k;
 	utils::build_covariance_matrices(begin(sources), end(sources), begin(destinations), end(destinations), params, K, k);
 	TS_ASSERT_EQUALS(K.n_rows, (size_t)9);
@@ -228,7 +228,7 @@ TEST_CASE("test_build_elevation_matrices") {
 	const time_axis::point_dt time_axis(ctimes);
 	SourceList sources;
 	DestinationList destinations;
-	build_sources_and_dests(3, 3, 15, 15, 2, 10, time_axis, false, sources, destinations);
+	build_sources_and_dests(3, 3, 15, 15, 2, seconds(10), time_axis, false, sources, destinations);
 	arma::mat S_e, D_e;
 	utils::build_elevation_matrices(begin(sources), end(sources), begin(destinations), end(destinations), S_e, D_e);
 	TS_ASSERT_EQUALS(S_e.n_cols, (size_t)2);
@@ -247,7 +247,7 @@ TEST_CASE("test_interpolation") {
 	size_t n_s = 3;
 	size_t n_d = 9;
 	size_t n_times = 2;
-	shyft::time_series::utctime dt = 10;
+	auto dt = seconds(10);
 	vector<utctime> times; times.reserve(n_times);
 	for (size_t i = 0; i < n_times; ++i)
 		times.emplace_back(dt*i);
@@ -282,7 +282,7 @@ TEST_CASE("test_performance") {
     size_t n_s = 5;//(int)sqrt(5100);
     size_t n_d = 12;//(int)sqrt(3100);
     size_t n_times = 24;
-    shyft::time_series::utctime dt = 3600;
+    auto dt = seconds(3600);
     vector<utctime> times; times.reserve(n_times);
     for (size_t i = 0; i < n_times; ++i)
         times.emplace_back(dt*i);

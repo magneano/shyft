@@ -3,7 +3,7 @@ export SHYFT_WORKSPACE=${SHYFT_WORKSPACE:=$(readlink --canonicalize --no-newline
 # to align the cmake support:
 SHYFT_DEPENDENCIES_DIR=${SHYFT_DEPENDENCIES_DIR:=${SHYFT_WORKSPACE}/shyft_dependencies}
 armadillo_name=armadillo-8.600.0
-dlib_name=dlib-19.13
+dlib_name=dlib-19.15
 boost_ver=1_67_0
 pybind11_ver=v2.2.3
 cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
@@ -97,7 +97,7 @@ if [ ! -d miniconda/bin ]; then
     fi
 
     conda install numpy
-    conda create -n shyft_env python=3.6 pyyaml numpy libgfortran netcdf4 gdal matplotlib requests nose coverage pip shapely  pyproj
+    conda create -n shyft_env python=3.6 pyyaml numpy libgfortran netcdf4 cftime gdal matplotlib requests nose coverage pip shapely  pyproj
     ln -s ${SHYFT_WORKSPACE}/miniconda/include/python3.6m ${SHYFT_WORKSPACE}/miniconda/include/python3.6
     ln -s ${SHYFT_WORKSPACE}/miniconda/envs/shyft_env/include/python3.6m ${SHYFT_WORKSPACE}/miniconda/envs/shyft_env/include/python3.6 
 fi;

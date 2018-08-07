@@ -1,10 +1,10 @@
 #include "test_pch.h"
 #include "core/hbv_snow.h"
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
 
 using namespace shyft::core;
 using namespace shyft::core::hbv_snow;
 using namespace std;
-
 using SnowModel = calculator<parameter, state>;
 TEST_SUITE("hbv_snow") {
 TEST_CASE("test_integral_calculations") {
@@ -29,8 +29,8 @@ TEST_CASE("test_mass_balance_at_snowpack_reset") {
     parameter p(s, a);
     state state;
     response r;
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.04;
     double temperature = 1.0;
     double sca = 1.0;
@@ -52,8 +52,8 @@ TEST_CASE("test_mass_balance_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.6;
@@ -83,8 +83,8 @@ TEST_CASE("test_snow_distr_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.15;
@@ -103,8 +103,8 @@ TEST_CASE("test_snow_uniform_distr_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.15;
@@ -123,8 +123,8 @@ TEST_CASE("test_snow_skewed_distr_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.15;
@@ -145,8 +145,8 @@ TEST_CASE("test_mass_balance_rain_no_snow") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = p.tx;
     double sca = 0.0;
@@ -170,8 +170,8 @@ TEST_CASE("test_mass_balance_melt_no_precip") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.0;
     double temperature = 3.0;
     double sca = 0.5;

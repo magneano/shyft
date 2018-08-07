@@ -11,7 +11,8 @@ namespace shyfttest {
         geo_point p;
         double v;
         geo_point mid_point() const { return p; }
-        double value(utctime t) const {
+        template<class T>
+        double value(T t) const {
             return v ;
         }
     };

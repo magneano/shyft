@@ -21,7 +21,9 @@ namespace prediction {
 namespace ta = shyft::time_axis;
 namespace ts = shyft::time_series;
 using utctime=shyft::core::utctime;
-
+using shyft::core::to_seconds;
+using shyft::core::to_seconds64;
+using shyft::core::seconds;
 
 /** \brief A time-series predictor based on the krls algorithm with a rbf kernel, with dt-normalizing.
  * \detail This predictor normalizes time-axes as to reduce the span in the time dimension.
@@ -147,7 +149,7 @@ public:
         scalar_type diff_v, mse = 0.;
         std::size_t dim = std::min(offset + count*stride, ts.size());
         krls_sample_type x;
-        const scalar_type scaling_f = 1./_dt;  // compute time scaling factor
+        const scalar_type scaling_f = 1./to_seconds(_dt);  // compute time scaling factor
         // training iteration
         core::utctime tp;
         scalar_type pv;
@@ -160,7 +162,7 @@ public:
                 pv = ts.value(i);
 
                 if ( ! std::isnan(pv) ) {
-                    x(0) = static_cast<scalar_type>(tp*scaling_f);  // NB: utctime -> double conversion !!!
+                    x(0) = static_cast<scalar_type>(to_seconds(tp)*scaling_f);  // NB: utctime -> double conversion !!!
                     _krls.train(x, pv);
 
                     diff_v = pv - _krls(x);
@@ -193,11 +195,11 @@ public:
     ) const {
         std::vector<scalar_type> predictions;
         predictions.reserve(ta.size());
-        const scalar_type scaling_f = 1./_dt;  // compute time scaling factor
+        const scalar_type scaling_f = 1./to_seconds(_dt);  // compute time scaling factor
 
         krls_sample_type x_sample;
         for ( std::size_t i = 0, dim = ta.size(); i < dim; ++i ) {
-            x_sample(0) = static_cast<scalar_type>(ta.time(i)*scaling_f);  // NB: utctime -> double conversion !!!
+            x_sample(0) = static_cast<scalar_type>(to_seconds(ta.time(i))*scaling_f);  // NB: utctime -> double conversion !!!
             predictions.emplace_back(_krls(x_sample));
         }
 
@@ -230,7 +232,7 @@ public:
     scalar_type predict(
         const core::utctime t
     ) const {
-        krls_sample_type x_sample{ t*1./_dt };  // NB: utctime -> double conversion !!!
+        krls_sample_type x_sample{ to_seconds(t)/to_seconds(_dt) };  // NB: utctime -> double conversion !!!
         return _krls(x_sample);
     }
     /** \brief Compute the mean-squared error (_mse_) over the time-series.
@@ -258,7 +260,7 @@ public:
         std::size_t nan_count = 0u;
         scalar_type mse = 0.;
         std::size_t dim = std::min(offset + count*stride, ts.size());
-        const scalar_type scaling_f = 1./_dt;  // compute time scaling factor
+        const scalar_type scaling_f = 1./to_seconds(_dt);  // compute time scaling factor
 
         utctime tp;
         scalar_type pv;
@@ -268,7 +270,7 @@ public:
             pv = ts.value(i);
 
             if ( ! std::isnan(pv) ) {
-                x_sample(0) = static_cast<scalar_type>(tp*scaling_f);  // NB: utctime -> double conversion !!!
+                x_sample(0) = static_cast<scalar_type>(to_seconds(tp)*scaling_f);  // NB: utctime -> double conversion !!!
                 scalar_type diff_v = pv - _krls(x_sample);
                 mse += diff_v * diff_v;
             } else {
@@ -301,7 +303,7 @@ public:
         const std::size_t points
     ) const {
         std::vector<scalar_type> mse_vec( ts.size(), 0. );
-        const scalar_type scaling_f = 1./_dt;  // compute time scaling factor
+        const scalar_type scaling_f = 1./to_seconds(_dt);  // compute time scaling factor
 
         std::size_t count;
         scalar_type ts_v;
@@ -315,7 +317,7 @@ public:
                 ts_v = ts.value(j);
                 if ( ! std::isnan(ts_v) ) {
                     count += 1;
-                    x_sample(0) = static_cast<scalar_type>(scaling_f*ts.time(j));
+                    x_sample(0) = static_cast<scalar_type>(scaling_f*to_seconds(ts.time(j)));
                     // -----
                     diff_v = ts_v - _krls(x_sample);
                     mse_vec[i] += diff_v*diff_v;
@@ -347,10 +349,10 @@ public:
         using dlib::serialize;
 
         std::basic_ostringstream<char> stream{ std::ios_base::out | std::ios_base::binary };
-        
+
         int8_t point_fx_tmp = static_cast<int8_t>(this->_predicted_point_fx);
 
-        serialize(this->_dt, stream);
+        serialize(to_seconds64(this->_dt), stream);//TODO: ensure backward compatible reader, then write us
         serialize(point_fx_tmp, stream);
         serialize(this->_krls, stream);
 
@@ -366,8 +368,8 @@ public:
         std::basic_istringstream<char> stream{ blob, std::ios_base::in | std::ios_base::binary };
 
         int8_t point_fx_tmp = 0;
-
-        deserialize(predictor._dt, stream);
+        int64_t dt_sec;
+        deserialize(dt_sec, stream);predictor._dt=seconds(dt_sec);//TODO: if needed, version backward compat read
         deserialize(point_fx_tmp, stream);
         deserialize(predictor._krls, stream);
 

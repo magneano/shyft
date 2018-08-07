@@ -342,7 +342,7 @@ namespace shyft {
                 gs.step(state.gs, response.gs, period.start, period.timespan(), parameter.gs,
                         temp, rad, prec, wind_speed_accessor.value(i), rel_hum,forest_fraction,altitude);
                 response.gm_melt_m3s = glacier_melt::step(parameter.gm.dtf, temp, cell_area_m2*response.gs.sca, glacier_area_m2);
-                response.pt.pot_evapotranspiration = pt.potential_evapotranspiration(temp, rad, rel_hum)*calendar::HOUR; //mm/s -> mm/h
+                response.pt.pot_evapotranspiration = pt.potential_evapotranspiration(temp, rad, rel_hum)*to_seconds(calendar::HOUR); //mm/s -> mm/h
                 response.ae.ae = actual_evapotranspiration::calculate_step(
                                   state.kirchner.q,
                                   response.pt.pot_evapotranspiration,

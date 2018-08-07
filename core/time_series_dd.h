@@ -162,8 +162,8 @@ namespace shyft {
 			EPS_RHS_FIRST,  /**< Split at the first value of the rhs ts. */
 			EPS_VALUE,      /**< Split at a given time-value. */
 		};
-        
-        /** \brief 
+
+        /** \brief
          */
         enum class derivative_method:int8_t {
             default_diff,
@@ -293,10 +293,12 @@ namespace shyft {
 
             apoint_ts min_max_check_linear_fill(double min_x,double max_x,utctimespan max_dt) const;
             apoint_ts min_max_check_ts_fill(double min_x,double max_x,utctimespan max_dt,const apoint_ts& cts) const;
+            apoint_ts min_max_check_linear_fill(double min_x,double max_x,int64_t max_dt) const{return min_max_check_linear_fill(min_x,max_x,seconds(max_dt));};
+            apoint_ts min_max_check_ts_fill(double min_x,double max_x,int64_t max_dt,const apoint_ts& cts) const {return min_max_check_ts_fill(min_x,max_x,seconds(max_dt),cts);};
 
             apoint_ts inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const;
             apoint_ts decode(int start_bit,int n_bits) const;
-            
+
             apoint_ts merge_points(const apoint_ts& o);
             //-- in case the underlying ipoint_ts is a gpoint_ts (concrete points)
             //   we would like these to be working (exception if it's not possible,i.e. an expression)
@@ -522,7 +524,7 @@ namespace shyft {
                 if (i>ta.size())
                     return nan;
                 size_t ix_hint = (i*ts->size()) / ta.size();// assume almost fixed delta-t.
-                utctimespan tsum = 0;
+                utctimespan tsum {0};
                 return accumulate_value(*ts, ta.period(i), ix_hint,tsum, ts->point_interpretation() == ts_point_fx::POINT_INSTANT_VALUE);
             }
             virtual double value_at(utctime t) const {
@@ -545,17 +547,17 @@ namespace shyft {
         *
         * The estimated 1'st order derivate is calculated based on the assumption that
         * the f(t) represented of the time-series is and  estimate for the underlying signal.
-        * 
-        * stair-case: 
+        *
+        * stair-case:
         *    Then the signal f(t) is assumed to be the true-average over the non-nan area of the interval
-        *    and the 1'st order derivate estimate is created using a straight line between the 
+        *    and the 1'st order derivate estimate is created using a straight line between the
         *    midpoint of each stair-case segment.
-        *    
+        *
         *   This can lead to anomalies a the beginning and the end of the derived time-series,
         *    since the neighbouring points after and before the beginning and the end _might_
         *    change the value, if they later are added into the computation source.
-        * 
-        * 
+        *
+        *
         *  linear-between-points:
         *     The signal f(t) is assumed to have a best estimated value equal to the straight line between the points
         *     The 1'st order derivate is thus simply the 1'st order derivate of this straight line.
@@ -594,7 +596,7 @@ namespace shyft {
             x_serialize_decl();
 
         };
-        
+
         /** \brief The accumulate_ts is used for providing accumulated(integrated) ts values over a time-axis
         *
         * Given a any ts, concrete, or an expression, provide the true accumulated values,
@@ -696,7 +698,7 @@ namespace shyft {
         struct time_shift_ts:ipoint_ts {
             std::shared_ptr<ipoint_ts> ts;
             gta_t ta;
-            utctimespan dt=0;// despite ta time-axis, we need it
+            utctimespan dt{0};// despite ta time-axis, we need it
 
             time_shift_ts()=default;
 
@@ -1270,7 +1272,7 @@ namespace shyft {
                     const double qbf = ipr_param.recession_minimum;
                     const double alpha = ipr_param.alpha;
 
-                    return qbf + (qs - qbf) * std::exp(-alpha * (t - ts));
+                    return qbf + (qs - qbf) * std::exp(-alpha * to_seconds(t - ts));
                 } else {
                     return flow_ts(t);
                 }
@@ -1369,7 +1371,7 @@ namespace shyft {
             if(!std::isfinite(a) && !std::isfinite(b)) return true;
             return fabs(a-b) <= abs_e;
         }
-        
+
         /** \brief quality and correction parameters
          *
          *  Controls how we consider the quality of the time-series,
@@ -1477,17 +1479,17 @@ namespace shyft {
             }
 
             bool equal(const inside_parameter& o, double abs_e=1e-9) const {
-                return nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e) 
-                && nan_equal(nan_x,o.nan_x,abs_e) && nan_equal(x_inside,o.x_inside,abs_e) 
+                return nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e)
+                && nan_equal(nan_x,o.nan_x,abs_e) && nan_equal(x_inside,o.x_inside,abs_e)
                 && nan_equal(x_outside,o.x_outside,abs_e);
             }
             // binary serialization, so no x_serialize_decl();
         };
 
         /** \brief The inside_ts maps a value range into 1.0 and 0.0
-         * 
+         *
          * The inside_ts provide needed function to transform the source time-series
-         * into a sequence of is_inside_value and is_outside_value 
+         * into a sequence of is_inside_value and is_outside_value
          * based on a range-criteria [min .. max >
          */
         struct inside_ts:ipoint_ts {
@@ -1534,10 +1536,10 @@ namespace shyft {
         constexpr R bitmask(unsigned int const onecount) {
             return static_cast<R>(-(onecount != 0)) & (static_cast<R>(-1) >> ((sizeof(R) * CHAR_BIT) - onecount));
         }
-        
+
         /** \brief  bit_decoder
          *
-         *  helper class for decoding bits of integers 
+         *  helper class for decoding bits of integers
          *  into numbers that can play a mathematical/statistical
          *  role in time-series computations.
          *  It is typically used as building block for
@@ -1568,7 +1570,7 @@ namespace shyft {
              *  x > 2<<52 -> nan (ref https://en.wikipedia.org/wiki/Double-precision_floating-point_format)
              *  else:
              *    return bit decoded value of start-bit plus n-bits as unsigned number casted to double
-             * 
+             *
              */
             inline double decode(double x) const {
                 if(!isfinite(x))return shyft::nan;
@@ -1579,11 +1581,11 @@ namespace shyft {
             bool operator==(const bit_decoder&o) const {return start_bit==o.start_bit && bit_mask==o.bit_mask;}
             // binary serialization, so no x_serialize_decl();
         };
-        
+
         /** \brief The inside_ts maps a value range into 1.0 and 0.0
-         * 
+         *
          * The decode_ts provide needed function to transform the source time-series
-         * into a sequence of is_inside_value and is_outside_value 
+         * into a sequence of is_inside_value and is_outside_value
          * based on a range-criteria [min .. max >
          */
         struct decode_ts:ipoint_ts {
@@ -1624,7 +1626,7 @@ namespace shyft {
 
             x_serialize_decl();
         };
-        
+
         /** The iop_t represent the basic 'binary' operation,
          *   a stateless function that takes two doubles and returns the binary operation.
          *   E.g.: a+b
@@ -1944,6 +1946,9 @@ namespace shyft {
                 for (auto const &ts : *this ) r.push_back(ts(t));
                 return r;
             }
+			vector<double> values_at_time_i(int64_t t) const {
+				return values_at_time(seconds(t));
+			}
             ats_vector percentiles(gta_t const &ta,vector<int> const& percentile_list) const {
                 ats_vector r;r.reserve(percentile_list.size());
                 auto rp= shyft::time_series::calculate_percentiles(ta,deflate_ts_vector<gts_t>(*this),percentile_list);
@@ -2001,7 +2006,7 @@ namespace shyft {
             }
             ats_vector derivative(derivative_method dm) const {
                 ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.derivative(dm)); return r;
-            }            
+            }
             ats_vector time_shift(utctimespan delta_t) const {
                 ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.time_shift(delta_t)); return r;
             }

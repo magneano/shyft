@@ -2,11 +2,10 @@
 #define _USE_MATH_DEFINES
 #include "core/time_series.h"
 #include "core/time_axis.h"
-#include "api/api.h"
 #include "core/time_series_dd.h"
 #include "core/time_series_statistics.h"
 #include "core/time_series_merge.h"
-
+using namespace shyft::core;
 
 TEST_SUITE("ts_merge") {
     TEST_CASE("vector_merge") {
@@ -185,7 +184,7 @@ TEST_SUITE("ts_merge") {
         ts_t obs_ts(ta_t(t0,dt,n_dt_fc*n_fc+fc_steps),0.0,point_fx);
         for(size_t i=0;i<obs_ts.size();++i)
             obs_ts.set(i,i+1.5*cos(3.1415*i/240.0));
-        auto  ns=time_series::nash_sutcliffe(fc,obs_ts,0,deltahours(1),6);
+        auto  ns=time_series::nash_sutcliffe(fc,obs_ts,seconds(0),deltahours(1),6);
         FAST_CHECK_LE(ns,1.0);
         FAST_CHECK_GE(ns,0.99996);
         cout<<"ns:"<<ns<<endl;

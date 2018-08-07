@@ -3,6 +3,7 @@
 
 
 using namespace shyft::core::skaugen;
+using namespace shyft::core;
 typedef calculator<parameter, state, response> SkaugenModel;
 TEST_SUITE("skaugen") {
 TEST_CASE("test_accumulation") {
@@ -28,7 +29,7 @@ TEST_CASE("test_accumulation") {
     state s(nu, alpha, sca, swe, free_water, residual, nnn);
 
     // Model input
-    shyft::time_series::utctimespan dt = 60*60;
+    utctimespan dt = seconds(60*60);
     double temp = -10.0;
     double prec = 10.0;
     double radiation = 0.0;
@@ -70,7 +71,7 @@ TEST_CASE("test_melt") {
     state s(nu, alpha, sca, swe, free_water, residual, nnn);
 
     // Model input
-    shyft::time_series::utctimespan dt = 24*60*60;
+    utctimespan dt = seconds(24*60*60);
     double temp = -10.0;
     double prec = 10.0;
     double radiation = 0.0;
@@ -136,7 +137,7 @@ TEST_CASE("test_lwc") {
     state s(nu, alpha, sca, swe, free_water, residual, nnn);
 
     // Model input
-    shyft::time_series::utctimespan dt = 24*60*60;
+    utctimespan dt = seconds(24*60*60);
     double temp = -10.0;
     double prec = 10.0;
     double radiation = 0.0;
@@ -184,11 +185,11 @@ TEST_CASE("skaugen_meltdown") {
 
 ('2017-07-18T03:00:00Z', 0.0)]
 
- 
+
 
  State at the start of the interval where SWE drops to zero
 
- 
+
 
  [{'swe': 32.1},
 
@@ -204,11 +205,11 @@ TEST_CASE("skaugen_meltdown") {
 
 {'num_units': 321}]
 
- 
+
 
  State at the end of the interval where SWE drops to zero
 
- 
+
 
  [{'swe': 0.0},
 
@@ -224,11 +225,11 @@ TEST_CASE("skaugen_meltdown") {
 
 {'num_units': 0}]
 
- 
+
 
  Input at the timestep where SWE drops to zero
 
- 
+
 
 [{'precipitation': 0.0010356738461072955},
 
@@ -263,7 +264,7 @@ TEST_CASE("skaugen_meltdown") {
     state s(nu, alpha, sca, swe, free_water, residual, nnn);
 
     // Model input
-    shyft::time_series::utctimespan dt = 3*3600;
+    utctimespan dt = seconds(3*3600);
     double temp = 4.891358376624782;
     double prec = 0.0010356738461072955;
     double radiation = 0.0042811137986584116;
@@ -275,6 +276,6 @@ TEST_CASE("skaugen_meltdown") {
     response r;
     model.step(dt, p, temp, prec, radiation, wind_speed, s, r);
     TS_ASSERT(true);
-    
-}    
+
+}
 }

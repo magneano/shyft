@@ -48,6 +48,44 @@ using namespace boost::serialization;
 using namespace shyft::core;
 
 //-- utctime_utilities.h
+namespace boost{ namespace archive {
+template<class Archive>
+void load(Archive& ar, utctime& tp, unsigned) {
+	utctimespan::rep dt;
+	ar & dt;//make_nvp("t_utc_us", dt);
+	tp = utctime(utctimespan(dt));
+}
+
+template<class Archive>
+void save(Archive& ar, utctime const& tp, unsigned) {
+	utctimespan::rep dt=tp.count();
+	ar & dt;//make_nvp("t_utc_us",dt);
+}
+
+template<class Archive>
+void serialize(Archive & ar, utctime& tp, unsigned version) {
+	boost::serialization::split_free(ar, tp, version);
+}
+#if 0
+template<class Archive>
+void load(Archive& ar, utctimespan& tp, unsigned) {
+	utctimespan::rep dt;// = tp.count();
+	ar & dt;//make_nvp("dt_us", dt);
+	tp = utctimespan(dt);
+}
+
+template<class Archive>
+void save(Archive& ar, utctimespan const& tp, unsigned) {
+	utctimespan::rep dt = tp.count();
+	ar & dt;//make_nvp("dt_us", dt);
+}
+
+template<class Archive>
+void serialize(Archive & ar, utctimespan& tp, unsigned version) {
+	boost::serialization::split_free(ar, tp, version);
+}
+#endif
+}}
 
 template<class Archive>
 void shyft::core::utcperiod::serialize(Archive & ar, const unsigned int version) {
@@ -277,6 +315,8 @@ x_serialize_implement(shyft::core::routing_info);
 x_serialize_implement(shyft::core::geo_cell_data);
 
 //-- export utctime_utilities
+x_serialize_implement(shyft::core::utctime);
+//x_serialize_implement(shyft::core::utctimespan);
 x_serialize_implement(shyft::core::utcperiod);
 x_serialize_implement(shyft::core::time_zone::tz_info_t);
 x_serialize_implement(shyft::core::time_zone::tz_table);
@@ -312,7 +352,22 @@ x_serialize_implement(shyft::core::hbv_stack::state);
 // 4. Then include the archive supported
 //
 // repeat template instance for each archive class
-
+namespace boost {
+namespace archive {
+namespace sc = shyft::core;
+// instantiate archive templates
+template void load<binary_iarchive>(binary_iarchive& ar, sc::utctime& tp, unsigned) ;
+template void save<binary_oarchive>(binary_oarchive& ar, sc::utctime const& tp, unsigned) ;
+template void serialize<binary_iarchive>(binary_iarchive & ar, sc::utctime& tp, unsigned version) ;
+template void serialize<binary_oarchive>(binary_oarchive & ar, sc::utctime& tp, unsigned version) ;
+#if 0
+template void load<binary_iarchive>(binary_iarchive& ar, sc::utctimespan& tp, unsigned) ;
+template void save<binary_oarchive>(binary_oarchive& ar, sc::utctimespan const& tp, unsigned);
+template void serialize<binary_iarchive>(binary_iarchive & ar, sc::utctimespan& tp, unsigned version);
+template void serialize<binary_oarchive>(binary_oarchive & ar, sc::utctimespan& tp, unsigned version);
+#endif
+}
+}
 x_arch(shyft::core::utcperiod);
 x_arch(shyft::core::time_zone::tz_info_t);
 x_arch(shyft::core::time_zone::tz_table);

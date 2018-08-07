@@ -1,7 +1,6 @@
 /** This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
 See file COPYING for more details **/
 #include "boostpython_pch.h"
-
 #include "core/utctime_utilities.h"
 #include "core/time_axis.h"
 #include "core/time_series.h"
@@ -9,6 +8,7 @@ See file COPYING for more details **/
 #include "api/api.h"
 #include "core/time_series_dd.h"
 #include "py_convertible.h"
+
 
 namespace expose {
     using namespace shyft;
@@ -63,7 +63,7 @@ namespace expose {
 	static string nice_str(const shared_ptr<time_series::dd::average_ts>&b) { return "average(" + nice_str(apoint_ts(b->ts)) + "," + nice_str(b->ta) + ")"; }
 	static string nice_str(const shared_ptr<time_series::dd::integral_ts>&b) { return "integral(" + nice_str(apoint_ts(b->ts)) + "," + nice_str(b->ta) + ")"; }
 	static string nice_str(const shared_ptr<time_series::dd::accumulate_ts>&b) { return "accumulate(" + nice_str(apoint_ts(b->ts)) + "," + nice_str(b->ta) + ")"; }
-	static string nice_str(const shared_ptr<time_series::dd::time_shift_ts>&b) { return "time_shift(" + nice_str(apoint_ts(b->ts)) + "," + to_string(b->dt) + ")"; }
+	static string nice_str(const shared_ptr<time_series::dd::time_shift_ts>&b) { return "time_shift(" + nice_str(apoint_ts(b->ts)) + "," + to_string(to_seconds(b->dt)) + ")"; }
 	static string nice_str(const shared_ptr<time_series::dd::periodic_ts>&b) { return "periodic_ts("+nice_str(b->ts.ta) + ")"; }
 	static string nice_str(const shared_ptr<time_series::dd::convolve_w_ts>&b) { return "convolve_w_ts(" + nice_str(b->ts_impl.ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::extend_ts>&b) { return "extend_ts(" + nice_str(b->lhs)+","+nice_str(b->rhs)+",..)"; }
@@ -175,8 +175,13 @@ namespace expose {
             .def("values_at",&ats_vector::values_at_time,args("t"),
                  doc_intro("Computes the value at specified time t for all time-series")
                  doc_parameters()
-                 doc_parameter("t","int","seconds since epoch 1970 UTC")
+                 doc_parameter("t","utctime","seconds since epoch 1970 UTC")
             )
+			.def("values_at", &ats_vector::values_at_time_i, args("t"),
+				doc_intro("Computes the value at specified time t for all time-series")
+				doc_parameters()
+				doc_parameter("t", "int", "seconds since epoch 1970 UTC")
+			)
             .def("percentiles",&ats_vector::percentiles,args("time_axis","percentiles"),
                 doc_intro("Calculate the percentiles, NIST R7, excel,R definition, of the timeseries")
                 doc_intro("over the specified time-axis.")
@@ -251,7 +256,7 @@ namespace expose {
                 doc_parameter("delta_t","int","number of seconds to time-shift, positive values moves forward")
 				doc_returns("tsv","TsVector",	"a new time-series, that appears as time-shifted version of self")
 			)
-            .def("extend_ts", &ats_vector::extend_ts, (py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(0), py::arg("fill_value") = shyft::nan),
+            .def("extend_ts", &ats_vector::extend_ts, (py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(seconds(0)), py::arg("fill_value") = shyft::nan),
                 doc_intro("create a new ats_vector where all time-series are extended by ts")
                 doc_parameters()
                 doc_parameter("ts", "TimeSeries", "time-series to extend each time-series in self with")
@@ -261,7 +266,7 @@ namespace expose {
                 doc_parameter("fill_value", "float", "value to fill any gap with if fill_policy == EPF_FILL")
                 doc_returns("new_ts_vec" ,"TsVector", "a new time-series vector where all time-series in self have been extended by ts")
             )
-            .def("extend_ts", &ats_vector::extend_vec, (py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(0), py::arg("fill_value") = shyft::nan),
+            .def("extend_ts", &ats_vector::extend_vec, (py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(seconds(0)), py::arg("fill_value") = shyft::nan),
                 doc_intro("create a new ats_vector where all ts' are extended by the matching ts from ts_vec")
                 doc_parameters()
                 doc_parameter("ts_vec", "TsVector", "time-series vector to extend time-series in self with")
@@ -458,10 +463,101 @@ namespace expose {
             ;
     }
 
-
+    using shyft::core::utctime;
+    using shyft::core::seconds;
     BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(point_ts_overloads     ,shyft::api::TsFactory::create_point_ts,4,5);
     BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(time_point_ts_overloads,shyft::api::TsFactory::create_time_point_ts,3,4);
+    extern utctime  x_kwarg_utctime(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw);
+    template<class T>
+	static T x_arg(const py::tuple& args, size_t i) {
+		if (py::len(args) + 1 < (int)i)
+			throw std::runtime_error("missing arg #" + std::to_string(i));
+		py::object o = args[i];
+		py::extract<T> xtract_arg(o);
+		return xtract_arg();
+	}
+    
+    template<class T>
+    static T  x_kwarg(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw) {
+        if (py::len(args)  > (int)i) {
+            return x_arg<T>(args,i);
+        }
+        if(kwargs.has_key(kw)) {
+            py::object o = kwargs[kw];
+            py::extract<T> xtract_arg(o);
+            return xtract_arg();
+        }
+        throw std::runtime_error("missing kw arg #" + std::string(kw) );
+	}
+    static vector<utctime>  x_kwarg_utctime_vector(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw) {
+        py::object o;
+        if (py::len(args)  > (int)i) {
+            o = args[i];
+        } else if(kwargs.has_key(kw)) {
+            o = kwargs[kw];
+        } else {
+            throw std::runtime_error("missing kw arg #" + std::string(kw) );
+        }
 
+        py::extract<vector<utctime>> xtract_utctime_vector(o);
+        if(xtract_utctime_vector.check()) {
+            return xtract_utctime_vector();
+        }
+        // TODO: this does not work, since py do a convertible lookup above, that fails
+        py::extract<vector<int64_t>> xtract_int64_vector(o);
+        if(xtract_int64_vector.check()) {
+            auto v= xtract_int64_vector();
+            vector<utctime> r;r.reserve(v.size());
+            for(const auto &vi:v)r.emplace_back(seconds(vi));
+            return r;
+        }
+        throw std::runtime_error("Expected UtcTimeVector, or Int64Vector  for kw arg #" + std::string(kw) );
+	}
+	
+    template<class T>
+    static T  x_kwarg_default(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw,const T& default_value) {
+        if (py::len(args)  > (int)i) {
+            return x_arg<T>(args,i);
+        }
+        if(kwargs.has_key(kw)) {
+            py::object o = kwargs[kw];
+            py::extract<T> xtract_arg(o);
+            return xtract_arg();
+        }
+        return default_value;
+	}
+    using shyft::core::utcperiod;
+
+    /** helper to ensure we can take any time-rep as input args */
+    struct ts_factory_ext {
+        
+        static shyft::api::TsFactory x_self(const py::tuple& args) {
+			if (py::len(args) == 0)
+				throw std::runtime_error("self is null in UtcTime");
+			py::object self = args[0];
+			py::extract<shyft::api::TsFactory> xtract_self(self);
+			return xtract_self();
+		}
+		
+        static py::object create_point_ts(const py::tuple& args, const py::dict& kwargs) {
+            auto self=x_self(args);
+            size_t n=x_kwarg<int>(args,kwargs,1,"n");
+            auto  t= x_kwarg_utctime(args,kwargs,2,"t");
+            auto dt=x_kwarg_utctime(args,kwargs,3,"dt");
+            auto v = x_kwarg<vector<double>>(args,kwargs,4,"values");
+            auto ct= x_kwarg_default<shyft::time_series::ts_point_fx>(args,kwargs,5,"interpretation",shyft::time_series::POINT_INSTANT_VALUE);
+            return py::object(self.create_point_ts(n,t,dt,v,ct));
+        }
+        static py::object create_time_point_ts(const py::tuple& args, const py::dict& kwargs) {
+            auto self=x_self(args);
+            auto p=x_kwarg<utcperiod>(args,kwargs,1,"period");
+            auto  t= x_kwarg_utctime_vector(args,kwargs,2,"times");
+            auto v = x_kwarg<vector<double>>(args,kwargs,3,"values");
+            auto ct= x_kwarg_default<shyft::time_series::ts_point_fx>(args,kwargs,4,"interpretation",shyft::time_series::POINT_INSTANT_VALUE);
+            return py::object(self.create_time_point_ts(p,t,v,ct));
+        }
+    };
+    
     static void TsFactory() {
         class_<shyft::api::TsFactory>("TsFactory",
 			doc_intro("TsFactory is used in specific contexts, to create point time-series that exposes the ITimeSeriesOfPoint interface, using the internal ts-implementations")
@@ -470,8 +566,26 @@ namespace expose {
 			,
 			init<>(py::arg("self"))
 			)
-            .def("create_point_ts",&shyft::api::TsFactory::create_point_ts,point_ts_overloads())//args("n","tStart","dt","values","interpretation"),"returns a new fixed interval ts from specified arguments")
-            .def("create_time_point_ts",&shyft::api::TsFactory::create_time_point_ts,time_point_ts_overloads())//args("period","times","values","interpretation"),"return a point ts from specified arguments")
+            .def("create_point_ts",raw_function(ts_factory_ext::create_point_ts,4),
+                doc_intro("creates a fixed interval time-series based on input parameters")
+                doc_parameters()
+                doc_parameter("n","int","number of points in time-series")
+                doc_parameter("t","utctime","start of first point, as seconds since epoch")
+                doc_parameter("dt","utctime","interval, in seconds")
+                doc_parameter("values","DoubleVector","values as DoubleVector")
+                doc_parameter("interpretation","ts_point_fx","point interpretation, default POINT_INSTANT_VALUE, other value is POINT_AVERAGE_VALUE ")
+                doc_returns("ts","TimeSeries","constructed time-series")
+            )
+            .def("create_time_point_ts",raw_function(ts_factory_ext::create_time_point_ts,3),
+                 //args("period","times","values","interpretation"),"return a point ts from specified arguments")
+                doc_intro("creates a variable interval time-series based on input parameters")
+                doc_parameters()
+                doc_parameter("period","utcperiod"," where .start should be equal to the first point in the supplied time-vector,t, and .end should be the end-time of the last interval")
+                doc_parameter("times","UtcTimeVector","start time of each interval")
+                doc_parameter("values","DoubleVector","values as DoubleVector, one for each interval")
+                doc_parameter("interpretation","ts_point_fx","point interpretation, default POINT_INSTANT_VALUE, other value is POINT_AVERAGE_VALUE ")
+                doc_returns("ts","TimeSeries","constructed time-series")
+             )
             ;
     }
 
@@ -511,6 +625,13 @@ namespace expose {
             .def(vector_indexing_suite<TsBindInfoVector>())
             ;
         py_api::iterable_converter().from_python<TsBindInfoVector>();
+        
+        apoint_ts (apoint_ts::*min_max_check_linear_fill_t)(double ,double ,utctimespan ) const = &apoint_ts::min_max_check_linear_fill;
+        apoint_ts  (apoint_ts::*min_max_check_ts_fill_t)(double,double,utctimespan,const apoint_ts& ) const=&apoint_ts::min_max_check_ts_fill;
+        apoint_ts  (apoint_ts::*min_max_check_linear_fill_i)(double,double ,int64_t ) const= &apoint_ts::min_max_check_linear_fill;
+        apoint_ts  (apoint_ts::*min_max_check_ts_fill_i)(double,double,int64_t ,const apoint_ts&) const =&apoint_ts::min_max_check_ts_fill;
+
+        
 		class_<apoint_ts>("TimeSeries",
                 doc_intro("A time-series providing mathematical and statistical operations and functionality.")
                 doc_intro("")
@@ -654,9 +775,9 @@ namespace expose {
 			.def(self - self)
 			.def(double() - self)
 			.def(self - double())
-
 			.def(-self)
             .def(operator!(self))
+            .def(self==self)
             .def("abs", &apoint_ts::abs,(py::arg("self")),
                 doc_intro("create a new ts, abs(self")
                 doc_returns("ts", "TimeSeries", "a new time-series expression, that will provide the abs-values of self.values")
@@ -1026,7 +1147,7 @@ namespace expose {
                 doc_intro(">>> plt.legend()")
                 doc_intro(">>> plt.show()")
             )
-            .def("extend", &apoint_ts::extend, (py::arg("self"), py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(0), py::arg("fill_value") = shyft::nan),
+            .def("extend", &apoint_ts::extend, (py::arg("self"), py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(seconds(0)), py::arg("fill_value") = shyft::nan),
                 doc_intro("create a new time-series that is self extended with ts")
                 doc_parameters()
                 doc_parameter("ts", "TimeSeries", "time-series to extend self with, only values after both the start of self, and split_at is used")
@@ -1050,7 +1171,7 @@ namespace expose {
             .def("min",min_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains the min of self and ts_other")
             .def("max",max_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains the max of self and number for each time-step")
             .def("max",max_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains the max of self and ts_other")
-            .def("min_max_check_linear_fill",&apoint_ts::min_max_check_linear_fill,
+            .def("min_max_check_linear_fill",min_max_check_linear_fill_i,
                  (py::arg("self"),py::arg("v_min"),py::arg("v_max"),py::arg("dt_max")=shyft::core::max_utctime),
                  doc_intro("Create a min-max range checked ts with linear-fill-values if value is NaN or outside range")
                  doc_parameters()
@@ -1059,7 +1180,26 @@ namespace expose {
                  doc_parameter("dt_max","int","maximum time-range in seconds allowed for interpolating values, default= max_utctime")
                  doc_returns("min_max_check_linear_fill","TimeSeries","Evaluated on demand time-series with NaN, out of range values filled in")
             )
-            .def("min_max_check_ts_fill",&apoint_ts::min_max_check_ts_fill,
+            .def("min_max_check_ts_fill",min_max_check_ts_fill_i,
+                 (py::arg("self"),py::arg("v_min"),py::arg("v_max"),py::arg("dt_max"),py::arg("cts")),
+                 doc_intro("Create a min-max range checked ts with cts-filled-in-values if value is NaN or outside range")
+                 doc_parameters()
+                 doc_parameter("v_min","float","minimum range, values < v_min are considered NaN. v_min==NaN means no lower limit")
+                 doc_parameter("v_max","float","maximum range, values > v_max are considered NaN. v_max==NaN means no upper limit")
+                 doc_parameter("dt_max","int","maximum time-range in seconds allowed for interpolating values")
+                 doc_parameter("cts","TimeSeries","time-series that keeps the values to be filled in at points that are NaN or outside min-max-limits")
+                 doc_returns("min_max_check_ts_fill","TimeSeries","Evaluated on demand time-series with NaN, out of range values filled in")
+            )
+            .def("min_max_check_linear_fill",min_max_check_linear_fill_t,
+                 (py::arg("self"),py::arg("v_min"),py::arg("v_max"),py::arg("dt_max")=shyft::core::max_utctime),
+                 doc_intro("Create a min-max range checked ts with linear-fill-values if value is NaN or outside range")
+                 doc_parameters()
+                 doc_parameter("v_min","float","minimum range, values < v_min are considered NaN. v_min==NaN means no lower limit")
+                 doc_parameter("v_max","float","maximum range, values > v_max are considered NaN. v_max==NaN means no upper limit")
+                 doc_parameter("dt_max","int","maximum time-range in seconds allowed for interpolating values, default= max_utctime")
+                 doc_returns("min_max_check_linear_fill","TimeSeries","Evaluated on demand time-series with NaN, out of range values filled in")
+            )
+            .def("min_max_check_ts_fill",min_max_check_ts_fill_t,
                  (py::arg("self"),py::arg("v_min"),py::arg("v_max"),py::arg("dt_max"),py::arg("cts")),
                  doc_intro("Create a min-max range checked ts with cts-filled-in-values if value is NaN or outside range")
                  doc_parameters()
@@ -1463,6 +1603,13 @@ namespace expose {
             doc_intro("Parameter pack controlling ice packing computations.")
             doc_intro("See `TimeSeries.ice_packing` for usage."),
             init<core::utctimespan, double>((py::arg("self"), py::arg("threshold_window"), py::arg("threshold_temperature")),
+                doc_intro("Defines a paramter pack for ice packing detection.")
+                doc_intro("")
+                doc_parameters()
+                doc_parameter("threshold_window", "utctime", "Positive,  seconds for the lookback window.")
+                doc_parameter("threshold_temperature", "float", "Floating point threshold temperature."))
+            )
+            .def(init<int64_t, double>((py::arg("self"), py::arg("threshold_window"), py::arg("threshold_temperature")),
                 doc_intro("Defines a paramter pack for ice packing detection.")
                 doc_intro("")
                 doc_parameters()

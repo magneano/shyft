@@ -327,9 +327,9 @@ class ShyftApi(unittest.TestCase):
         dt = api.deltahours(1)
         tsf = api.TsFactory()
         times = api.UtcTimeVector()
-        times.push_back(start + 1 * dt)
-        times.push_back(start + 3 * dt)
-        times.push_back(start + 4 * dt)
+        times.append(start + 1 * dt)
+        times.append(start + 3 * dt)
+        times.append(start + 4 * dt)
 
         values = api.DoubleVector()
         values.push_back(1.0)

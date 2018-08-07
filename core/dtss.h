@@ -76,7 +76,7 @@ using std::make_unique;
 // ========================================
 
 
-/** 
+/**
  */
 template < class ... CIMPLs >  /* Container Implementations */
 struct container_wrapper {
@@ -372,8 +372,8 @@ struct utcperiod_hasher {
         using boost::hash_value;
         using boost::hash_combine;
         std::size_t seed=0;
-        hash_combine(seed,hash_value(k.start));
-        hash_combine(seed,hash_value(k.end));
+        hash_combine(seed,hash_value(k.start.count()));
+        hash_combine(seed,hash_value(k.end.count()));
         return seed;
     }
 };
@@ -541,7 +541,7 @@ inline void server<ContainerDispatcher>::do_merge_store_ts(const ts_vector_t& ts
         }
     }
 
-    // 
+    //
     // 2. finally write the merged result back to whatever store is there
     //
     do_store_ts(tsv_store, false, cache_on_write);

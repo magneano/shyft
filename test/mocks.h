@@ -45,10 +45,11 @@ namespace shyfttest {
 			}
 
 			template<class R>
-			void collect(const shyft::core::utctime time, const R& response) {
-				evap.emplace_back(time, response.pt.pot_evapotranspiration);
-				snow_storage.emplace_back(time, response.gs.storage);
-				avg_discharge.emplace_back(time, response.kirchner.q_avg);
+			void collect(size_t ix, const R& response) {
+			    auto t= shyft::core::utctime(shyft::core::seconds(ix));
+				evap.emplace_back(t, response.pt.pot_evapotranspiration);
+				snow_storage.emplace_back(t, response.gs.storage);
+				avg_discharge.emplace_back(t, response.kirchner.q_avg);
 			}
 
 			template<class R>
@@ -67,10 +68,11 @@ namespace shyfttest {
 			}
 
 			template<class R>
-			void collect(const shyft::core::utctime time, const R& response) {
-				evap.emplace_back(time, response.pt.pot_evapotranspiration);
-				snow_storage.emplace_back(time, response.us.storage);
-				avg_discharge.emplace_back(time, response.kirchner.q_avg);
+			void collect(size_t ix, const R& response) {
+			    auto t= shyft::core::utctime(shyft::core::seconds(ix));
+				evap.emplace_back(t, response.pt.pot_evapotranspiration);
+				snow_storage.emplace_back(t, response.us.storage);
+				avg_discharge.emplace_back(t, response.kirchner.q_avg);
 			}
 
 			template<class R>
@@ -320,7 +322,7 @@ namespace shyfttest {
 			double v_special;
 			mutable int get_count;
 
-			Source(geo_point p, double v) : point(p), v(v), t_special(0), v_special(v), get_count(0) {}
+			Source(geo_point p, double v) : point(p), v(v), t_special(utctime_0), v_special(v), get_count(0) {}
 
 			geo_point mid_point() const { return point; }
 
@@ -330,7 +332,10 @@ namespace shyfttest {
 				get_count++;
 				return t == t_special ? v_special : v;
 			}
-
+            double value(size_t ix) const {
+				get_count++;
+				return utctime(seconds(ix)) == t_special ? v_special : v;
+			}
 			// For testing
 			void set_value(double vx) { v = vx; }
 

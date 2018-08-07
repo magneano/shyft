@@ -232,7 +232,7 @@ namespace shyft {
 
                 response.gm_melt_m3s = glacier_melt::step(parameter.gm.dtf,temp,cell_area_m2*state.snow.sca,glacier_area_m2);// m3/s, that is, how much flow from the snow free glacier parts
 
-                response.pt.pot_evapotranspiration = pt.potential_evapotranspiration(temp, rad, rel_hum)*calendar::HOUR;// mm/s -> mm/h, interpreted as over the entire area(!)
+                response.pt.pot_evapotranspiration = pt.potential_evapotranspiration(temp, rad, rel_hum)*to_seconds(calendar::HOUR);// mm/s -> mm/h, interpreted as over the entire area(!)
                 response.ae.ae = actual_evapotranspiration::calculate_step(state.kirchner.q, response.pt.pot_evapotranspiration,
                                     parameter.ae.ae_scale_factor,std::max(state.snow.sca,glacier_fraction),  // a evap only on non-snow/non-glac area
                                     period.timespan());

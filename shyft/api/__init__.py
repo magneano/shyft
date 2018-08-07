@@ -59,7 +59,7 @@ Calendar.__str__ = lambda self: "Calendar('{0}')".format(self.tz_info.name())
 
 def ShowUtcTime(v):
     utc = Calendar()
-    return "[" + ",".join([cal.to_string(t) for t in v]) + "]"
+    return "[" + ",".join([utc.to_string(t) for t in v]) + "]"
 
 
 UtcTimeVector.size = lambda self: len(self)
@@ -87,7 +87,7 @@ def percentiles(tsv:TsVector,time_axis:TimeAxis,percentile_list:IntVector)->TsVe
 TargetSpecificationVector.size = lambda self: len(self)
 
 # fix bw. stl name
-UtcTimeVector.push_back = lambda self, x: self.append(x)
+#UtcTimeVector.push_back = lambda self, x: self.append(x)
 IntVector.push_back = lambda self, x: self.append(x)
 DoubleVector.push_back = lambda self, x: self.append(x)
 StringVector.push_back = lambda self, x: self.append(x)
@@ -376,6 +376,8 @@ def ts_vector_values_at_time(tsv:TsVector, t:int):
         tsv = TsVector()
         for ts in list_of_ts:
             tsv.append(ts)
+    if not isinstance(t, time):
+        t = time(t)
     return tsv.values_at(t).to_numpy()
 
 #ts_vector_values_at_time.__doc__ = TsVector.values_at.__doc__.replace('DoubleVector','ndarray').replace('TsVector','TsVector or list(TimeSeries)')
@@ -425,7 +427,8 @@ __all__ = [] + \
          'KalmanBiasPredictor_update_with_forecast',
          'np_array',
          'nice_ta_string',
-         'StrGeoCellData'] + \
+         'StrGeoCellData',
+         'ConcatData'] + \
         ['ABS_DIFF',
          'ALLOW_ANY_MISSING',
          'ALLOW_INITIAL_MISSING',

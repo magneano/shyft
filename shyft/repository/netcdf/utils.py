@@ -487,7 +487,7 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
             if ta.timeaxis_type == api.TimeAxisType.FIXED:
                 dt = ta.time(1) - ta.time(0)
                 n = int(idx_end - idx_start)
-                time_axis[key] = api.TimeAxis(int(ta.time_points[idx_start]), dt, n)
+                time_axis[key] = api.TimeAxis(int(ta.time_points[idx_start]), int(dt), n)
             else:
                 time_points = api.UtcTimeVector(ta.time_points[idx_start:idx_end].tolist())
                 t_end = ta.time_points[idx_end]

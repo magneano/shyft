@@ -43,7 +43,7 @@ TEST_CASE("test_call_stack") {
     utctime t1 = t0 + n_ts_points*dt;
     shyfttest::create_time_series(temp, prec, rel_hum, wind_speed, radiation, t0, dt, n_ts_points);
 
-    utctime model_dt = deltahours(24);
+    auto model_dt = deltahours(24);
     vector<utctime> times;
     for (utctime i=t0; i <= t1; i += model_dt)
         times.emplace_back(i);
@@ -212,8 +212,9 @@ TEST_CASE("test_mass_balance") {
     for(size_t i=0;i<10000;i++) {
         pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
     }
-    TS_ASSERT_DELTA(rc.avg_discharge.value(0)*dt*1000/cell_area + rc.ae_output.value(0), prec.value(0),0.0000001);
-	TS_ASSERT_DELTA(rc.snow_outflow.value(0)*dt * 1000 / cell_area, prec.value(0), 0.0000001);//verify snow out is m3/s
+    auto dt_s=to_seconds(dt);
+    TS_ASSERT_DELTA(rc.avg_discharge.value(0)*dt_s*1000/cell_area + rc.ae_output.value(0), prec.value(0),0.0000001);
+	TS_ASSERT_DELTA(rc.snow_outflow.value(0)*dt_s * 1000 / cell_area, prec.value(0), 0.0000001);//verify snow out is m3/s
     SUBCASE("direct_response_on_reservoir_only") {
         // verify that when it rains, verify that only rsv.fraction * precip_mm *cell_area goes directly to response.
         // case 1: no snow-covered area, close to zero in kirchner q, expect all rain directly
@@ -223,13 +224,13 @@ TEST_CASE("test_mass_balance") {
         state.gs.lwc=0.0;// no snow, should have direct response, 3 mm/h, over the cell_area
         state.gs.acc_melt=-1;// should be no snow, should go straight through
         pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
-        FAST_CHECK_EQ(rc.avg_discharge.value(0)*dt*1000.0/cell_area, doctest::Approx(0.5*prec.value(0)).epsilon(0.001));
+        FAST_CHECK_EQ(rc.avg_discharge.value(0)*dt_s*1000.0/cell_area, doctest::Approx(0.5*prec.value(0)).epsilon(0.001));
         state.gs.lwc=1.0;
         state.gs.acc_melt=300.0;
         temp.v[0]=-10.0;//it's cold
         pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
         TS_ASSERT_DELTA(rc.snow_sca.value(0),0.96,0.01);// almost entirely covered by snow, so we should have 0.04 of rain direct response
-        FAST_CHECK_EQ((rc.avg_discharge.value(0)*dt*1000.0/cell_area),doctest::Approx((ltf.reservoir())*prec.value(0)).epsilon(0.05));
+        FAST_CHECK_EQ((rc.avg_discharge.value(0)*dt_s*1000.0/cell_area),doctest::Approx((ltf.reservoir())*prec.value(0)).epsilon(0.05));
         temp.v[0]=10.0;// heat is on, melt snow, .9 should end up in kirchner it's cold
         //state.gs.sdc_melt_mean=10.0;
         state.gs.acc_melt=5.0;//simulate early autumn, melt out everything

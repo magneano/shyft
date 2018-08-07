@@ -340,7 +340,7 @@ namespace shyft {
                     const double min_albedo = p.min_albedo;
                     const double max_albedo = p.max_albedo;
                     const double albedo_range = max_albedo - min_albedo;
-                    const double dt_in_days = dt/double(calendar::DAY);
+                    const double dt_in_days = to_seconds(dt)/to_seconds(calendar::DAY);
                     const double slow_albedo_decay_rate = (0.5 * albedo_range *
                             dt_in_days/p.slow_albedo_decay_rate);
                     const double fast_albedo_decay_rate = pow(2.0,
@@ -424,12 +424,12 @@ namespace shyft {
 
                     if (T > 0.0 && snow < hbv_physical_snow::tol) {
                         for (auto &eff: effect) {
-                            eff += rain * T * water_heat/(double)dt;
+                            eff += rain * T * water_heat/to_seconds(dt);
                         }
                     }
                     if (T <= 0.0 && rain < hbv_physical_snow::tol)
                         for (size_t i=0; i<I.size(); ++i) {
-                            effect[i] += snow*p.s[i]*T*ice_heat/(double)dt;
+                            effect[i] += snow*p.s[i]*T*ice_heat/to_seconds(dt);
                         }
                     //TODO: Should the snow distribution be included here?
                 //        effect += snow*T*ice_heat/(double)dt;
@@ -439,7 +439,7 @@ namespace shyft {
                             double iso_effect = (effect[i] - BB0 + turb *
                                     (T + 1.7 * (vapour_pressure - 6.12)));
                             s.iso_pot_energy[i] += (iso_effect *
-                                    (double)dt/melt_heat);
+                                    to_seconds(dt)/melt_heat);
                         }
                     }
 
@@ -467,7 +467,7 @@ namespace shyft {
 
                     vector<double> energy;
                     for (auto eff : effect) {
-                        energy.push_back(eff * (double)dt);
+                        energy.push_back(eff * to_seconds(dt));
                     }
                     if (delta_sh > 0.0) {
                         //TODO: Should this condition be removed when we allow refreeze?
