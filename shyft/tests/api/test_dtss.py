@@ -5,7 +5,6 @@ import unittest
 from contextlib import closing
 
 import numpy as np
-from time import sleep
 from numpy.testing import assert_array_almost_equal
 
 from shyft.api import Calendar

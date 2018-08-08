@@ -260,7 +260,7 @@ TEST_CASE("dtss_connection_stress") {
     bool ok=true;
     try {
         cs=client.get_cache_stats(); // should work! with retry
-    } catch(const runtime_error &re) {
+    } catch(const runtime_error &) {
         ok=false;
     }
     FAST_CHECK_EQ(ok,true);
