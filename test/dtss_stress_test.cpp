@@ -209,6 +209,7 @@ TEST_CASE("dtss_stress") {
     auto cs =srv.get_cache_stats();
     srv.clear();
     FAST_CHECK_GT(x.size(),0);
+    fs::remove_all(tmpdir);
 }
 #define DTSS_MANUAL_SPLIT_TEST 0
 #if DTSS_MANUAL_SPLIT_TEST
