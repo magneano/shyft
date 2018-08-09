@@ -73,7 +73,7 @@ class WXRepository(GeoTsRepository):
         """
         wx_repo = self.wx_repo
         if self.allow_year_shift and utc_period is not None:
-            d_t = int((utc_period.start - wx_repo.time[0])//(365 * 24 * 3600)) * 365 * 24 * 3600
+            d_t = (utc_period.start - int(wx_repo.time[0]))//(365 * 24 * 3600) * 365 * 24 * 3600
             utc_start_shifted = utc_period.start - d_t
             utc_end_shifted = utc_period.end - d_t
             utc_period_shifted = api.UtcPeriod(utc_start_shifted, utc_end_shifted)

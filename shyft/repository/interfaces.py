@@ -297,10 +297,10 @@ class ForecastSelectionCriteria(object):
                    "'forecasts_that_intersect_period' selection criteria should be of type api.UtcPeriod.")
         elif k == 'latest_available_forecasts':
            if not all([isinstance(v, dict), isinstance(v['number_of_forecasts'], int),
-                       isinstance(v['forecasts_older_than'], int)]):
+                       isinstance(v['forecasts_older_than'], (int, api.time))]):
                raise ForecastSelectionCriteriaError(
                    "'latest_available_forecasts' selection criteria should be of type dict with keys "
-                   "'number_of_forecasts' and 'forecasts_older_than' and values of type int.")
+                   "'number_of_forecasts' and 'forecasts_older_than' and values of type int or api.time.")
         elif k == 'forecasts_at_reference_times':
            if not isinstance(v, list):
                raise ForecastSelectionCriteriaError(
