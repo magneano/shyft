@@ -485,8 +485,8 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err, allow_shorter_pe
             if not allow_shorter_period:
                 raise err("Found time axis that does not cover utc_period.")
             else:
-                period_start = max(ta.time_points[0], utc_period.start)
-                period_end = min(ta.time_points[-1] - point_type, utc_period.end)
+                period_start = max(ta.time_points[0], int(utc_period.start))
+                period_end = min(ta.time_points[-1] - point_type, int(utc_period.end))
         else:
             period_start = utc_period.start
             period_end = utc_period.end
