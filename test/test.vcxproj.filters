@@ -147,7 +147,10 @@
     <ClCompile Include="dtss_test.cpp">
       <Filter>dtss</Filter>
     </ClCompile>
-        <ClCompile Include="dtss_db_test.cpp">
+    <ClCompile Include="dtss_db_test.cpp">
+      <Filter>dtss</Filter>
+    </ClCompile>
+    <ClCompile Include="dtss_url_test.cpp">
       <Filter>dtss</Filter>
     </ClCompile>
   </ItemGroup>

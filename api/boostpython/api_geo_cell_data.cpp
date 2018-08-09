@@ -39,15 +39,31 @@ namespace expose {
         )
         .def(init<geo_point,double,int,py::optional<double,const land_type_fractions&,routing_info>>(
          (py::arg("self"),py::arg("mid_point"),py::arg("area"),py::arg("catchment_id"),py::arg("radiation_slope_factor"),py::arg("land_type_fractions"),py::arg("routing_info")),
-         "constructs a GeoCellData with all parameters specified"))
-        .def("mid_point",&geo_cell_data::mid_point,"returns the mid_point",return_value_policy<copy_const_reference>())
-        .def("catchment_id",&geo_cell_data::catchment_id,"returns the catchment_id")
-        .def("set_catchment_id",&geo_cell_data::catchment_id,args("catchment_id"),"set the catchment_id")
-        .def("radiation_slope_factor",&geo_cell_data::radiation_slope_factor,"radiation slope factor")
-        .def("land_type_fractions_info",&geo_cell_data::land_type_fractions_info,"land_type_fractions",return_value_policy<copy_const_reference>())
-        .def("set_land_type_fractions",&geo_cell_data::set_land_type_fractions,args("ltf"),"set new LandTypeFractions")
+         doc_intro("Constructs a GeoCellData with all parameters specified")
+         doc_parameters()
+         doc_parameter("mid_point","GeoPoint","specifies the x,y,z mid-point of the cell-area")
+         doc_parameter("area","float","area in unit [m^2]")
+         doc_parameter("catchment_id","int","catchment-id that this cell is a part of")
+         doc_parameter("radiation_slope_factor","float","aspect dependent factor used to calculate the effective radiation for this cell,range 0.0..1.0")
+         doc_parameter("land_type_fractions","LandTypeFractions","specifies the fractions of glacier, forrest, lake and reservoirs for this cell")
+         doc_parameter("routing_info","RoutingInfo","Specifies the destination routing network-node and velocity for this cell")
+            
+        )
+            
+        )
+        .def("mid_point",&geo_cell_data::mid_point,(py::arg("self")),"returns the mid_point",return_value_policy<copy_const_reference>())
+        .def("catchment_id",&geo_cell_data::catchment_id,(py::arg("self")),"returns the current catchment_id")
+        .def("set_catchment_id",&geo_cell_data::set_catchment_id,(py::arg("self"),py::arg("catchment_id")),
+             doc_intro("Set the catchment_id to specified value")
+             doc_intro("Note: Only use this method *before* a region-model is created")
+             doc_parameters()
+             doc_parameter("catchment_id","int","Catchment-id for this cell")
+            )
+        .def("radiation_slope_factor",&geo_cell_data::radiation_slope_factor,(py::arg("self")),"radiation slope factor")
+        .def("land_type_fractions_info",&geo_cell_data::land_type_fractions_info,(py::arg("self")),"land_type_fractions",return_value_policy<copy_const_reference>())
+        .def("set_land_type_fractions",&geo_cell_data::set_land_type_fractions,(py::arg("self"),py::arg("ltf")),"set new LandTypeFractions")
         .def_readwrite("routing_info",&geo_cell_data::routing,"the routing information for the cell keep destination id and hydrological distance to destination")
-        .def("area",&geo_cell_data::area,"returns the area in m^2")
+        .def("area",&geo_cell_data::area,(py::arg("self")),"returns the area in m^2")
         ;
     }
 }

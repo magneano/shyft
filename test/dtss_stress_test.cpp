@@ -209,6 +209,7 @@ TEST_CASE("dtss_stress") {
     auto cs =srv.get_cache_stats();
     srv.clear();
     FAST_CHECK_GT(x.size(),0);
+    fs::remove_all(tmpdir);
 }
 #define DTSS_MANUAL_SPLIT_TEST 0
 #if DTSS_MANUAL_SPLIT_TEST
@@ -259,7 +260,7 @@ TEST_CASE("dtss_connection_stress") {
     bool ok=true;
     try {
         cs=client.get_cache_stats(); // should work! with retry
-    } catch(const runtime_error &re) {
+    } catch(const runtime_error &) {
         ok=false;
     }
     FAST_CHECK_EQ(ok,true);
