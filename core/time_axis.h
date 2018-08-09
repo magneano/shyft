@@ -75,7 +75,9 @@ namespace shyft {
             utctime t;
             utctimespan dt;
             size_t n;
-            fixed_dt( utctime start=no_utctime, utctimespan deltat=0, size_t n_periods=0 ) : t( start ), dt( deltat ), n( n_periods ) {}
+            fixed_dt( utctime start=no_utctime, utctimespan deltat=utctimespan{0}, size_t n_periods=0 ) : t( start ), dt( deltat ), n( n_periods ) {}
+            fixed_dt( int64_t start,int64_t dt,size_t n_periods):t{seconds{start}},dt{seconds{dt}},n{n_periods}{}
+            fixed_dt( utctime start,int64_t dt,size_t n_periods):t{start},dt{seconds{dt}},n{n_periods}{}
             utctimespan delta() const {return dt;}//BW compat
             utctime start() const {return t;} //BW compat
             size_t size() const {return n;}
@@ -98,15 +100,17 @@ namespace shyft {
             }
 
             size_t index_of( utctime tx ) const {
-                if( tx < t || dt == 0 ) return std::string::npos;
+                if( tx < t || dt == utctimespan{0} ) return std::string::npos;
                 size_t r = ( tx - t ) / dt;
                 if( r < n ) return r;
                 return std::string::npos;
             }
+            size_t index_of(int64_t tx) const {return index_of(seconds{tx});}
+            size_t open_range_index_of( int64_t tx, size_t ix_hint=std::string::npos ) const {return open_range_index_of(seconds{tx},ix_hint);}
             fixed_dt slice(size_t i0,size_t n) const {return fixed_dt(time(i0),dt,n);}
             size_t open_range_index_of( utctime tx, size_t ix_hint=std::string::npos ) const {return n > 0 && ( tx >= t + utctimespan( n * dt ) ) ? n - 1 : index_of( tx );}
             static fixed_dt full_range() {return fixed_dt( min_utctime, max_utctime, 2 );}  //Hmm.
-            static fixed_dt null_range() {return fixed_dt( 0, 0, 0 );}
+            static fixed_dt null_range() {return fixed_dt( no_utctime, utctimespan{0}, 0 );}
             x_serialize_decl();
         };
 
@@ -120,7 +124,7 @@ namespace shyft {
         */
         struct calendar_dt : continuous<true> {
 
-            static constexpr utctimespan dt_tz_semantics = 3600*24; // tz-semantics only applies to >= day
+            static constexpr utctimespan dt_tz_semantics = seconds(3600*24); // tz-semantics only applies to >= day
 
             shared_ptr<calendar> cal;
             utctime t;
@@ -143,6 +147,14 @@ namespace shyft {
                 t( t ),
                 dt( dt ),
                 n( n ) { }
+            calendar_dt(const shared_ptr< calendar> & cal,
+                int64_t t,
+                int64_t dt,
+                size_t n)
+                : cal( cal ),
+                t( seconds{t} ),
+                dt( seconds{dt} ),
+                n( n ) { }    
             calendar_dt(const calendar_dt & c)
                 : cal( c.cal ),
                 t( c.t ),
@@ -188,13 +200,13 @@ namespace shyft {
             utcperiod total_period() const {
                 return n == 0
                     ? utcperiod(min_utctime, min_utctime)  // maybe just a non-valid period?
-                    : utcperiod(t, dt < dt_tz_semantics ? t + n*dt : cal->add(t, dt, long(n)));
+                    : utcperiod(t, dt < dt_tz_semantics ? utctime{t + n*dt} : cal->add(t, dt, long(n)));
             }
 
             utctime time(size_t i) const {
                 if ( i < n ) {
                     return dt < dt_tz_semantics
-                        ? t + i * dt
+                        ? t + int64_t(i) * dt
                         : cal->add(t, dt, long(i));
                 }
                 throw out_of_range("calendar_dt.time(i)");
@@ -225,6 +237,8 @@ namespace shyft {
                     ? n - 1
                     : index_of( tx );
             }
+            size_t index_of(int64_t tx) const {return index_of(seconds{tx});}
+            size_t open_range_index_of( int64_t tx, size_t ix_hint=std::string::npos ) const {return open_range_index_of(seconds{tx},ix_hint);}
 
             static calendar_dt null_range() {
                 return calendar_dt();
@@ -312,7 +326,7 @@ namespace shyft {
                 throw std::out_of_range( "point_dt.period(i)" );
             }
 
-            size_t index_of( utctime tx, size_t ix_hint = std::string::npos ) const {
+            size_t index_of( utctime tx, size_t ix_hint  ) const {
                 if( t.size() == 0 || tx < t[0] || tx >= t_end ) return std::string::npos;
                 if( tx >= t.back() ) return t.size() - 1;
 
@@ -342,6 +356,7 @@ namespace shyft {
                 auto r = lower_bound( t.cbegin(), t.cend(), tx,[]( utctime pt, utctime val ) { return pt <= val; } );
                 return static_cast<size_t>( r - t.cbegin() ) - 1;
             }
+            size_t index_of( utctime tx) const {return index_of(tx,std::string::npos);}
 
             point_dt slice(size_t i0,size_t n) const {
                 //            0 1 2 :3
@@ -357,6 +372,8 @@ namespace shyft {
             }
 
             size_t open_range_index_of( utctime tx, size_t ix_hint = std::string::npos) const {return size() > 0 && tx >= t_end ? size() - 1 : index_of( tx,ix_hint );}
+            size_t index_of(int64_t tx) const {return index_of(seconds{tx});}
+            size_t open_range_index_of( int64_t tx, size_t ix_hint=std::string::npos ) const {return open_range_index_of(seconds{tx},ix_hint);}
 
             static point_dt null_range() {
                 return point_dt();
@@ -392,12 +409,32 @@ namespace shyft {
             generic_dt(utctime t0, utctimespan dt, size_t n)
                 : gt(FIXED),
                   f(t0, dt, n) { }
+             generic_dt(utctime t0, utctimespan dt, utctimespan n)
+                : gt(FIXED),
+                  f(t0, dt, to_seconds64(n)) { }
+                  
+            generic_dt(int64_t t0, int64_t dt, size_t n)
+                : gt(FIXED),
+                  f(seconds{t0}, seconds{dt}, n) { }
+            generic_dt(utctime t0, int64_t dt, size_t n)
+                : gt(FIXED),
+                  f(t0, seconds{dt}, n) { }
+                  
             generic_dt(const shared_ptr<calendar> & cal, utctime t, utctimespan dt, size_t n)
                 : gt(CALENDAR),
                   c(cal, t, dt, n) { }
+            generic_dt(const shared_ptr<calendar> & cal, int64_t t, int64_t dt, size_t n)
+                : gt(CALENDAR),
+                  c(cal, seconds{t}, seconds{dt}, n) { }
+            generic_dt(const shared_ptr<calendar> & cal, utctime t, int64_t dt, size_t n)
+                : gt(CALENDAR),
+                  c(cal, t, seconds{dt}, n) { }
             generic_dt(const vector<utctime> & t, utctime t_end)
                 : gt(POINT),
                   p(t, t_end) { }
+            generic_dt(const vector<utctime> & t, int64_t t_end)
+                : gt(POINT),
+                  p(t, from_seconds(t_end)) { }
             explicit generic_dt(const vector<utctime> & all_points)
                 : gt(POINT),
                   p(all_points) { }
@@ -520,6 +557,8 @@ namespace shyft {
                 case POINT:    return p.open_range_index_of(t, ix_hint);
                 }
             }
+            size_t index_of(int64_t tx,size_t ix_hint=std::string::npos) const {return index_of(seconds{tx},ix_hint);}
+            size_t open_range_index_of( int64_t tx, size_t ix_hint=std::string::npos ) const {return open_range_index_of(seconds{tx},ix_hint);}
 
             x_serialize_decl();
         };
@@ -643,6 +682,8 @@ namespace shyft {
             size_t open_range_index_of( utctime tx , size_t ix_hint = std::string::npos) const {
                 return size() > 0 && tx >= total_period().end ? size() - 1 : index_of( tx, false );
             }
+            size_t index_of(int64_t tx) const {return index_of(seconds{tx});}
+            size_t open_range_index_of( int64_t tx, size_t ix_hint=std::string::npos ) const {return open_range_index_of(seconds{tx},ix_hint);}
         };
 
 
@@ -1017,7 +1058,7 @@ namespace shyft {
                 size_t n = static_cast<size_t>(a.cal->diff_units(pa.start, pb.end, a.dt, remainder));
 
                 // no offset
-                if ( remainder == 0 ) {
+                if ( remainder == utctimespan{0} ) {
                     if ( span_a.start != span_a.end ) {  // non-empty
                         if ( span_b.start != span_b.end ) {  // non-empty
                             return generic_dt(calendar_dt(a.get_calendar(), span_a.start, a.dt, n));
@@ -1196,11 +1237,11 @@ namespace shyft {
                 utctime t0 = max( pa.start, pb.start );
                 return fixed_dt( t0, a.dt, ( min( pa.end, pb.end ) - t0 ) / a.dt );
             } if( a.dt > b.dt ) {
-                if( ( a.dt % b.dt ) != 0 ) throw std::runtime_error( "combine(fixed_dt a,b) needs dt to align" );
+                if( ( a.dt.count() % b.dt.count() ) != 0 ) throw std::runtime_error( "combine(fixed_dt a,b) needs dt to align" );
                 utctime t0 = max( pa.start, pb.start );
                 return fixed_dt( t0, b.dt, ( min( pa.end, pb.end ) - t0 ) / b.dt );
             } else {
-                if( ( b.dt % a.dt ) != 0 )
+                if( ( b.dt.count() % a.dt.count() ) != 0 )
                     throw std::runtime_error( "combine(fixed_dt a,b) needs dt to align" );
                 utctime t0 = max( pa.start, pb.start );
                 return fixed_dt( t0, a.dt, ( min( pa.end, pb.end ) - t0 ) / a.dt );
@@ -1329,10 +1370,10 @@ namespace shyft {
             while( ia < ea && ib < eb ) {  // while both do have contributions
                 utcperiod p_ia = intersection( a.period( ia ), tp );
                 utcperiod p_ib = intersection( b.period( ib ), tp );
-                if( p_ia.timespan() == 0 ) {++ia; continue;}  // no contribution from a, skip to next a
-                if( p_ib.timespan() == 0 ) {++ib; continue;}  // no contribution from b, skip to next b
+                if( p_ia.timespan() == utctimespan{0} ) {++ia; continue;}  // no contribution from a, skip to next a
+                if( p_ib.timespan() == utctimespan{0} ) {++ib; continue;}  // no contribution from b, skip to next b
                 utcperiod p_i = intersection( p_ia, p_ib );  // compute the intersection
-                if( p_i.timespan() == 0 ) {  // no overlap|intersection
+                if( p_i.timespan() == utctimespan{0} ) {  // no overlap|intersection
                     if( p_ia.start < p_ib.start ) ++ia;  //advance the left-most interval
                     else if( p_ib.start < p_ia.start ) ++ib;
                     else {++ia; ++ib;} //TODO: should not be possible ? since it's not overlapping start cant be equal(except one is empty period)
@@ -1414,8 +1455,8 @@ namespace shyft {
 
 			time_axis_map(time_axis::fixed_dt const& src, time_axis::fixed_dt const&m) :src(src), m(m) {}
 			inline size_t src_index(size_t im) const {
-				auto r = utctime((utctime(im)*m.dt + m.t - src.t) / src.dt);// (mis)using utctime as signed int64 here
-				if (r < 0 || r >= (utctime)src.n)
+				auto r = (im*m.dt + (m.t - src.t)).count() / src.dt.count();// (mis)using utctime as signed int64 here
+				if (r < 0 || r >= src.n)
 					return std::string::npos;
 				return size_t(r);
 			}
@@ -1460,12 +1501,12 @@ namespace shyft {
 
 		/** return true if fixed time-axis a and b can be merged into one time-axis */
 		inline bool can_merge(const fixed_dt&a, const fixed_dt&b) {
-			return a.dt == b.dt && a.dt != 0 && a.n > 0 && b.n > 0 && continuous_merge(a.total_period(), b.total_period());
+			return a.dt == b.dt && a.dt != utctimespan{0} && a.n > 0 && b.n > 0 && continuous_merge(a.total_period(), b.total_period());
 		}
 
 		/** return true if calendar time-axis a and b can be merged into one time-axis */
 		inline bool can_merge(const calendar_dt& a, const calendar_dt& b) {
-			return a.dt == b.dt && a.dt != 0 && a.n > 0 && b.n > 0
+			return a.dt == b.dt && a.dt != utctimespan{0} && a.n > 0 && b.n > 0
 				&& equal_calendars(a.cal, b.cal)
 				&& continuous_merge(a.total_period(), b.total_period());
 		}
@@ -1501,7 +1542,7 @@ namespace shyft {
 			if (!continuous_merge(a_p, b_p)) throw runtime_error(string("attempt to merge disjoint non-overlapping time-axis"));
 			merge_info r;
 			if (a_p.start > b_p.start) { // a starts after b, so b contribute before a starts
-				r.b_n = b.index_of(a_p.start - 1)+1;
+				r.b_n = b.index_of(a_p.start - utctimespan{1})+1;
 			}
 			if (a_p.end < b_p.end) { // a ends before b ends, so b extends the result
 				r.a_i = b.index_of(a_p.end); // check if b.time(i) is >= a_p.end, if not increment i.

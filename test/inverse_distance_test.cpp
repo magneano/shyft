@@ -4,7 +4,7 @@
 
 #include "api/api.h"
 #include "core/time_series_dd.h"
-
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
 using namespace shyft::core;
 using namespace shyfttest::idw;
 using shyft::time_series::dd::gta_t;
@@ -21,7 +21,7 @@ TEST_CASE("test_temperature_model") {
 
 	geo_point p1(1000, 1000, 100);
 	Source   s1(p1, 10);
-	utctime  t0 = 3600L * 24L * 365L * 44L;
+	auto  t0 = _t(3600L * 24L * 365L * 44L);
 
 	gc.add(s1, t0);
 	TS_ASSERT_DELTA(gc.compute(), p.default_gradient(), TEST_EPS); // should give default gradient if just one point
@@ -84,7 +84,7 @@ TEST_CASE("test_radiation_model") {
 
 	geo_point p1(1000, 1000, 100);
 	Source   s1(p1, 10);
-	utctime  t0 = 3600L * 24L * 365L * 44L;
+	utctime  t0 = _t(3600L * 24L * 365L * 44L);
 
 	gc.add(s1, t0);
 	TS_ASSERT_DELTA(gc.compute(), 1.0, TEST_EPS); // should give 1.0 gradient if just one point
@@ -117,7 +117,7 @@ TEST_CASE("test_precipitation_model") {
 
 	geo_point p1(1000, 1000, 100);
 	Source   s1(p1, 10);
-	utctime  t0 = 3600L * 24L * 365L * 44L;
+	utctime  t0 = _t(3600L * 24L * 365L * 44L);
 
 	gc.add(s1, t0);
 	TS_ASSERT_DELTA(gc.compute(), p.precipitation_scale_factor(), TEST_EPS);// should give 1.0 gradient if just one point
@@ -147,8 +147,8 @@ TEST_CASE("test_one_source_one_dest_calculation") {
 	//
 	// Arrange
 	//
-	utctime Tstart = 3600L * 24L * 365L * 44L;
-	utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
 	int n = 1; // 24*10;
 	const int nx = 1;
 	const int ny = 1;
@@ -178,8 +178,8 @@ TEST_CASE("test_two_sources_one_dest_calculation") {
 	//
 	// Arrange
 	//
-	utctime Tstart = 3600L * 24L * 365L * 44L;
-	utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
 	int n = 1;
 	const int nx = 1;
 	const int ny = 1;
@@ -217,8 +217,8 @@ TEST_CASE("test_using_finite_sources_only") {
 	//
 	// Arrange
 	//
-	utctime Tstart = 3600L * 24L * 365L * 44L;
-	utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
 	int n = 1;
 	const int nx = 1;
 	const int ny = 1;
@@ -256,8 +256,8 @@ TEST_CASE("test_eliminate_far_away_sources") {
 	//
 	// Arrange
 	//
-	utctime Tstart = 3600L * 24L * 365L * 44L;
-	utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
 	int n = 1;
 	const int nx = 1;
 	const int ny = 1;
@@ -294,8 +294,8 @@ TEST_CASE("test_using_up_to_max_sources") {
 	//
 	// Arrange
 	//
-	utctime Tstart = 3600L * 24L * 365L * 44L;
-	utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
 	int n = 1;
 	const int nx = 1;
 	const int ny = 1;
@@ -331,8 +331,8 @@ TEST_CASE("test_handling_different_sources_pr_timesteps") {
 	//
 	// Arrange
 	//
-	utctime Tstart = 3600L * 24L * 365L * 44L;
-	utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
 	int n = 2; // 24*10;
 	const int nx = 1;
 	const int ny = 1;
@@ -371,8 +371,8 @@ TEST_CASE("test_handling_different_sources_pr_timesteps") {
 }
 TEST_CASE("interpolation_ts_nan_outside_defined_period") {
     using namespace shyft;
-    utctime Tstart = calendar().time(2000, 1, 1);
-    utctimespan dt = 3600L;
+	auto Tstart = _t(3600L * 24L * 365L * 44L);
+	auto dt = seconds(3600L);
     size_t n=4;
     ta::fixed_dt ta(Tstart, dt, n);
     api::a_region_environment re;
@@ -398,8 +398,8 @@ TEST_CASE("test_performance") {
     //
     // Arrange
     //
-    utctime Tstart = calendar().time(2000, 1, 1);
-    utctimespan dt = 3600L;
+    auto Tstart = calendar().time(2000, 1, 1);
+    utctimespan dt = seconds(3600L);
 #ifdef _DEBUG
     int n = 4;// just speed up test.
 #else
@@ -479,7 +479,7 @@ TEST_CASE("test_temperature_gradient_model") {
 	s.emplace_back(p1, t1);
 	s.emplace_back(p2, t2);
 	s.emplace_back(p3, t3);
-	utctime tx = calendar().time(YMDhms(2000, 1, 1));
+	utctime tx = calendar().time(2000, 1, 1);
 	sc.add(s[0], tx);
 	TS_ASSERT_DELTA(sc.compute(), p.default_gradient(), 0.000001); // with one point, default should be returned
 	sc.add(s[1], tx);

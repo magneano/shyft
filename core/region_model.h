@@ -315,7 +315,7 @@ namespace shyft {
             region_env_t region_env;///< the region environment (shallow-copy?) as passed to the interpolation/run_interpolation
             std::vector<state_t> initial_state; ///< the initial state, set explicit, or by the first call to .set_states(..) or run_cells()
             routing::river_network river_network;///< the routing river_network, can be empty
-            
+
             /** \brief compute and return number of catchments inspecting call cells.geo.catchment_id() */
             size_t number_of_catchments() const { return cix_to_cid.size(); }
             /** \brief provide a copy of computed cids to python */
@@ -372,7 +372,7 @@ namespace shyft {
 			    if(ta.gt == generic_dt::generic_type::FIXED)
                     return ta.f;
                 if(ta.gt == generic_dt::generic_type::CALENDAR) {
-                    if(ta.c.dt <= 86400)
+                    if(ta.c.dt <= seconds(86400))
                         return timeaxis_t(ta.c.t,ta.c.dt,ta.c.n);
 			    }
 			    throw runtime_error("region-model routine requires a fixed-delta-t type of TimeAxis");
@@ -951,9 +951,9 @@ namespace shyft {
                 }
                 return r;
             }
-            
+
             /** check if all values in cell.env_ts for selected calculation-filter is non-nan,
-             * i.e. valid numbers 
+             * i.e. valid numbers
              */
             bool is_cell_env_ts_ok() {
                 for(const auto& c: *cells) {

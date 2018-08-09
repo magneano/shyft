@@ -15,13 +15,18 @@ namespace expose {
 
         template <class C_,class PyC>
         PyC& e_time_axis_std(PyC& c) {
+                size_t (C_::*index_of_i)(int64_t) const = &C_::index_of;
+                size_t (C_::*open_range_index_of_i)( int64_t,size_t) const =&C_::open_range_index_of;
+                size_t (C_::*index_of_t)(utctime) const = &C_::index_of;
+                size_t (C_::*open_range_index_of_t)( utctime, size_t) const =&C_::open_range_index_of;
+
                 return c.def("total_period",&C_::total_period,
                      doc_returns("total_period","UtcPeriod","the period that covers the entire time-axis")
                 )
                 .def("size",&C_::size,
                      doc_returns("n","int","number of periods in time-axis")
                 )
-                .def("time",&C_::time,args("i"),
+                .def("time",&C_::time,(py::arg("self"),py::arg("i")),
                      doc_parameters()
                      doc_parameter("i","int","the i'th period, 0..n-1")
                      doc_returns("utctime","int","the start(utctime) of the i'th period of the time-axis")
@@ -31,12 +36,23 @@ namespace expose {
                      doc_parameter("i","int","the i'th period, 0..n-1")
                      doc_returns("period","UtcPeriod","the i'th period of the time-axis")
                 )
-                .def("index_of",&C_::index_of,(py::arg("self"),py::arg("t")),
+                .def("index_of",index_of_t,(py::arg("self"),py::arg("t")),
                      doc_parameters()
-                     doc_parameter("t","int","utctime in seconds 1970.01.01")
+                     doc_parameter("t","utcime","utctime in seconds 1970.01.01")
                      doc_returns("index","int","the index of the time-axis period that contains t, npos if outside range")
                 )
-                .def("open_range_index_of",&C_::open_range_index_of,(py::arg("self"),py::arg("t")),
+                .def("index_of",index_of_i,(py::arg("self"),py::arg("t")),
+                     doc_parameters()
+                     doc_parameter("t","utcime","utctime in seconds 1970.01.01")
+                     doc_returns("index","int","the index of the time-axis period that contains t, npos if outside range")
+                )
+                .def("open_range_index_of",open_range_index_of_t,(py::arg("self"),py::arg("t")),
+                     "returns the index that contains t, or is before t"
+                     doc_parameters()
+                     doc_parameter("t","utctime","utctime in seconds 1970.01.01")
+                     doc_returns("index","int","the index the time-axis period that contains t, -npos if before first period n-1, if t is after last period")
+                )
+                .def("open_range_index_of",open_range_index_of_i,(py::arg("self"),py::arg("t")),
                      "returns the index that contains t, or is before t"
                      doc_parameters()
                      doc_parameter("t","int","utctime in seconds 1970.01.01")
@@ -57,6 +73,13 @@ namespace expose {
 
         static void e_fixed_dt() {
             using namespace shyft::time_axis;
+            constexpr const char *doc_ct=                        
+                        doc_intro("creates a time-axis with n intervals, fixed delta_t, starting at start")
+                        doc_parameters()
+                        doc_parameter("start","int","utc-time 1970 utc based")
+                        doc_parameter("delta_t","int","number of seconds delta-t, length of periods in the time-axis")
+                        doc_parameter("n","int","number of periods in the time-axis");
+
             auto f_dt=class_<fixed_dt>("TimeAxisFixedDeltaT",
                     doc_intro("A time-axis is a set of ordered non-overlapping periods,")
                     doc_intro("and this class implements a fixed delta-t time-axis by")
@@ -65,12 +88,13 @@ namespace expose {
                     doc_see_also("TimeAxisCalendarDeltaT,TimeAxisByPoints,TimeAxis")
                 )
                 .def(init<utctime,utctimespan,long>(args("start","delta_t","n"),
-                        doc_intro("creates a time-axis with n intervals, fixed delta_t, starting at start")
-                        doc_parameters()
-                        doc_parameter("start","int","utc-time 1970 utc based")
-                        doc_parameter("delta_t","int","number of seconds delta-t, length of periods in the time-axis")
-                        doc_parameter("n","int","number of periods in the time-axis")
-                    )
+                    doc_ct)
+                )
+                .def(init<int64_t,int64_t,long>(args("start","delta_t","n"),
+                    doc_ct)
+                )
+                .def(init<utctime,int64_t,long>(args("start","delta_t","n"),
+                    doc_ct)
                 )
                 //.def(init<npy_int64,npy_int64,npy_int64>(args("start","delta_t","n"),"creates a timeaxis with n intervals, fixed delta_t, starting at start"))
 
@@ -140,13 +164,22 @@ namespace expose {
                 e_time_axis_std<point_dt>(p_dt);
         }
 
-        static std::vector<utctime> time_axis_extract_time_points(shyft::time_axis::generic_dt const&ta) {
-            std::vector<utctime> r;r.reserve(ta.size() + 1);
+        static std::vector<int64_t> time_axis_extract_time_points(shyft::time_axis::generic_dt const&ta) {
+            std::vector<int64_t> r;r.reserve(ta.size() + 1);
             for (size_t i = 0;i < ta.size();++i) {
-                r.emplace_back(ta.time(i));
+                r.emplace_back( to_seconds64(ta.time(i)) );
             }
             if (ta.size())
-                r.emplace_back(ta.total_period().end);
+                r.emplace_back( to_seconds64(ta.total_period().end) );
+            return r;
+        }
+        static std::vector<utctime> time_axis_extract_time_points_as_utctime(shyft::time_axis::generic_dt const&ta) {
+            std::vector<utctime> r;r.reserve(ta.size() + 1);
+            for (size_t i = 0;i < ta.size();++i) {
+                r.emplace_back( ta.time(i) );
+            }
+            if (ta.size())
+                r.emplace_back(ta.total_period().end );
             return r;
         }
 
@@ -159,7 +192,11 @@ namespace expose {
             .value("POINT",generic_dt::generic_type::POINT)
             .export_values()
             ;
-
+            size_t (generic_dt::*index_of_i)(int64_t,size_t) const = &generic_dt::index_of;
+            size_t (generic_dt::*open_range_index_of_i)( int64_t, size_t) const =&generic_dt::open_range_index_of;
+            size_t (generic_dt::*index_of_t)(utctime,size_t) const = &generic_dt::index_of;
+            size_t (generic_dt::*open_range_index_of_t)( utctime, size_t) const =&generic_dt::open_range_index_of;
+            
             auto g_dt=class_<generic_dt>("TimeAxis",
                     doc_intro("A time-axis is a set of ordered non-overlapping periods,")
                     doc_intro("and TimeAxis provides the most generic implementation of this.")
@@ -172,6 +209,30 @@ namespace expose {
                 .def(init<utctime,utctimespan,long>(args("start","delta_t","n"),
                         doc_intro("creates a time-axis with n intervals, fixed delta_t, starting at start")
                         doc_parameters()
+                        doc_parameter("start","utctime","utc-time 1970 utc based")
+                        doc_parameter("delta_t","utctime","number of seconds delta-t, length of periods in the time-axis")
+                        doc_parameter("n","int","number of periods in the time-axis")
+                    )
+                )
+                .def(init<utctime,utctimespan,utctimespan>(args("start","delta_t","n"),
+                        doc_intro("creates a time-axis with n intervals, fixed delta_t, starting at start")
+                        doc_parameters()
+                        doc_parameter("start","utctime","utc-time 1970 utc based")
+                        doc_parameter("delta_t","utctime","number of seconds delta-t, length of periods in the time-axis")
+                        doc_parameter("n","int","number of periods in the time-axis")
+                    )
+                )
+                .def(init<utctime,int64_t,long>(args("start","delta_t","n"),
+                        doc_intro("creates a time-axis with n intervals, fixed delta_t, starting at start")
+                        doc_parameters()
+                        doc_parameter("start","utctime","utc-time 1970 utc based")
+                        doc_parameter("delta_t","int","number of seconds delta-t, length of periods in the time-axis")
+                        doc_parameter("n","int","number of periods in the time-axis")
+                    )
+                )
+                .def(init<int64_t,int64_t,long>(args("start","delta_t","n"),
+                        doc_intro("creates a time-axis with n intervals, fixed delta_t, starting at start")
+                        doc_parameters()
                         doc_parameter("start","int","utc-time 1970 utc based")
                         doc_parameter("delta_t","int","number of seconds delta-t, length of periods in the time-axis")
                         doc_parameter("n","int","number of periods in the time-axis")
@@ -181,12 +242,37 @@ namespace expose {
                         doc_intro("creates a calendar time-axis")
                         doc_parameters()
                         doc_parameter("calendar","Calendar","specifies the calendar to be used, keeps the time-zone and dst-arithmetic rules")
+                        doc_parameter("start","utctime","utc-time 1970 utc based")
+                        doc_parameter("delta_t","utctime","number of seconds delta-t, length of periods in the time-axis")
+                        doc_parameter("n","int","number of periods in the time-axis")
+                    )
+                )
+                .def(init<shared_ptr<calendar>,int64_t,int64_t,long>(args("calendar","start","delta_t","n"),
+                        doc_intro("creates a calendar time-axis")
+                        doc_parameters()
+                        doc_parameter("calendar","Calendar","specifies the calendar to be used, keeps the time-zone and dst-arithmetic rules")
                         doc_parameter("start","int","utc-time 1970 utc based")
                         doc_parameter("delta_t","int","number of seconds delta-t, length of periods in the time-axis")
                         doc_parameter("n","int","number of periods in the time-axis")
                     )
                 )
+                .def(init<shared_ptr<calendar>,utctime,int64_t,long>(args("calendar","start","delta_t","n"),
+                        doc_intro("creates a calendar time-axis")
+                        doc_parameters()
+                        doc_parameter("calendar","Calendar","specifies the calendar to be used, keeps the time-zone and dst-arithmetic rules")
+                        doc_parameter("start","utctime","utc-time 1970 utc based")
+                        doc_parameter("delta_t","int","number of seconds delta-t, length of periods in the time-axis")
+                        doc_parameter("n","int","number of periods in the time-axis")
+                    )
+                )
                 .def(init<const vector<utctime>&,utctime>(args("time_points","t_end"),
+                        doc_intro("creates a time-axis by specifying the time_points and t-end of the last interval")
+                        doc_parameters()
+                        doc_parameter("time_points","UtcTimeVector","ordered set of unique utc-time points, the start of each consecutive period")
+                        doc_parameter("t_end","time","the end of the last period in time-axis, utc-time 1970 utc based, must be > time_points[-1]")
+                    )
+                )
+                .def(init<const vector<utctime>&,int64_t>(args("time_points","t_end"),
                         doc_intro("creates a time-axis by specifying the time_points and t-end of the last interval")
                         doc_parameters()
                         doc_parameter("time_points","UtcTimeVector","ordered set of unique utc-time points, the start of each consecutive period")
@@ -241,13 +327,26 @@ namespace expose {
                     doc_parameter("i", "int", "the i'th period, 0..n-1")
                     doc_returns("period", "UtcPeriod", "the i'th period of the time-axis")
                 )
-                .def("index_of", &generic_dt::index_of, (py::arg("self"),py::arg("t"),py::arg("ix_hint")=string::npos),
+                .def("index_of", index_of_t, (py::arg("self"),py::arg("t"),py::arg("ix_hint")=string::npos),
                     doc_parameters()
                     doc_parameter("t", "int", "utctime in seconds 1970.01.01")
                     doc_parameter("ix_hint","int","index-hint to make search in point-time-axis faster")
                     doc_returns("index", "int", "the index of the time-axis period that contains t, npos if outside range")
                 )
-                .def("open_range_index_of", &generic_dt::open_range_index_of, (py::arg("self"),py::arg("t"), py::arg("ix_hint") = string::npos),
+                .def("open_range_index_of", open_range_index_of_t, (py::arg("self"),py::arg("t"), py::arg("ix_hint") = string::npos),
+                    "returns the index that contains t, or is before t"
+                    doc_parameters()
+                    doc_parameter("t", "int", "utctime in seconds 1970.01.01")
+                    doc_parameter("ix_hint", "int", "index-hint to make search in point-time-axis faster")
+                    doc_returns("index", "int", "the index the time-axis period that contains t, npos if before first period n-1, if t is after last period")
+                )
+                .def("index_of", index_of_i, (py::arg("self"),py::arg("t"),py::arg("ix_hint")=string::npos),
+                    doc_parameters()
+                    doc_parameter("t", "int", "utctime in seconds 1970.01.01")
+                    doc_parameter("ix_hint","int","index-hint to make search in point-time-axis faster")
+                    doc_returns("index", "int", "the index of the time-axis period that contains t, npos if outside range")
+                )
+                .def("open_range_index_of", open_range_index_of_i, (py::arg("self"),py::arg("t"), py::arg("ix_hint") = string::npos),
                     "returns the index that contains t, or is before t"
                     doc_parameters()
                     doc_parameter("t", "int", "utctime in seconds 1970.01.01")
@@ -263,8 +362,15 @@ namespace expose {
                 doc_intro("Extract all time_axis.period(i).start plus time_axis.total_period().end into a UtcTimeVector")
                 doc_parameters()
                 doc_parameter("time_axis","TimeAxis","time-axis to extract all time-points from")
+                doc_returns("time_points","Int64Vector","all time_axis.period(i).start plus time_axis.total_period().end")
+            );
+            def("time_axis_extract_time_points_as_utctime", time_axis_extract_time_points_as_utctime, args("time_axis"),
+                doc_intro("Extract all time_axis.period(i).start plus time_axis.total_period().end into a UtcTimeVector")
+                doc_parameters()
+                doc_parameter("time_axis","TimeAxis","time-axis to extract all time-points from")
                 doc_returns("time_points","UtcTimeVector","all time_axis.period(i).start plus time_axis.total_period().end")
             );
+
         }
 
     }

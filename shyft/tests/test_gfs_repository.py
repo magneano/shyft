@@ -23,7 +23,7 @@ class GFSDataRepositoryTestCase(unittest.TestCase):
         epsg, bbox, bpoly = self.epsg_bbox
         dem_file = path.join(shyftdata_dir, "netcdf", "etopo180.nc")
         n_hours = 30
-        t0 = self.start_date + api.deltahours(7)
+        t0 = self.start_date + api.deltahours(7) - api.deltahours(24)
         period = api.UtcPeriod(t0, t0 + api.deltahours(n_hours))
             
         repos = GFSDataRepository(epsg=epsg, dem_file=dem_file, padding=5000.0, utc=t0) #//epsg, dem_file, padding=5000., utc=None

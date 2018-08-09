@@ -143,7 +143,7 @@ class RegionModel(unittest.TestCase):
     def test_model_initialize_and_run(self):
         num_cells = 20
         model_type = pt_gs_k.PTGSKModel
-        model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells)
+        model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells,num_catchments=1)
         self.assertEqual(model.size(), num_cells)
         self.verify_state_handler(model)
         # demo of feature for threads
@@ -329,6 +329,22 @@ class RegionModel(unittest.TestCase):
         model.cells[0].env_ts.temperature.set(10,float('nan'))
         adjust_result = model.adjust_state_to_target_flow(30.0, cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
         assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
+
+    def test_model_clone_with_catchment_parameters(self):
+        """ Verify we can copy an opt-model from full model including catchment specific parameters"""
+        m = self.build_model(pt_gs_k.PTGSKModel, pt_gs_k.PTGSKParameter, model_size=20, num_catchments=2)
+        p2=pt_gs_k.PTGSKParameter()
+        p2.kirchner.c1 = 2.3
+        m.set_catchment_parameter(2, p2)
+        self.assertTrue(m.has_catchment_parameter(2))
+        self.assertFalse(m.has_catchment_parameter(1))
+        o = pt_gs_k.create_opt_model_clone(m, True)  # this is how to create an opt-model, with catchm. spec params
+        self.assertTrue(o.has_catchment_parameter(2))
+        self.assertFalse(o.has_catchment_parameter(1))
+        o = pt_gs_k.create_opt_model_clone(m, False) # default, only region param is copied(for opt-purposes)
+        self.assertFalse(o.has_catchment_parameter(2))
+        self.assertFalse(o.has_catchment_parameter(1))
+
 
 
     def test_optimization_model(self):

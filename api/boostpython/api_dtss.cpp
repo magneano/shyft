@@ -4,6 +4,7 @@ See file COPYING for more details **/
 #include <mutex>
 #include "core/time_series_dd.h"
 #include "core/dtss.h"
+#include "core/dtss_url.h"
 #include "core/dtss_client.h"
 
 // also consider policy: from https://www.codevate.com/blog/7-concurrency-with-embedded-python-in-a-multi-threaded-c-application
@@ -670,10 +671,127 @@ namespace expose {
 
     }
 
+    /** \brief Helper function to expose `shyft_url` accepting a Python dictionary with queries.
+     */
+    std::string shyft_url_fn(const std::string & container, const std::string & ts_path, const py::dict & py_queries) {
+        
+        std::map<std::string, std::string> queries{};
+
+        // create a iterator over the list of python objects (actually tuples) in the py::dict
+        py::stl_input_iterator<py::object> begin(py_queries.items()), end;
+        std::for_each(begin, end, [&queries](const py::object & obj) {
+            // extract the two tuple elements into our std::map
+            queries[py::extract<std::string>(obj[0])] = py::extract<std::string>(obj[1]);
+        });
+        return shyft::dtss::shyft_url(container, ts_path, queries);
+    }
+    /** \brief Helper function to expose `extract_shyft_url_query_parameters` returning a Python dictionary with queries.
+    */
+    py::dict extract_shyft_url_query_parameters_fn(const std::string & url) {
+        py::dict py_queries{};
+        for ( auto [key, value] : shyft::dtss::extract_shyft_url_query_parameters(url) )
+            py_queries[key] = value;
+        return py_queries;
+    }
+
+    void url_utils() {
+        def("shyft_url", shyft_url_fn, (py::arg("container"), py::arg("ts_path"), py::arg("queries") = py::dict{}),
+            doc_intro("Construct a SHyFT URL from a container, a TS-path, and an optional collection of query flags.")
+            doc_intro("")
+            doc_intro("Query keys and values are always urlencoded. The separating `?`, `&`, and `=` are not encoded.")
+            doc_parameters()
+            doc_parameter("container", "str", "SHyFT TS container.")
+            doc_parameter("ts_path", "str", "Time-series path.")
+            doc_parameter("queries", "Dict[str,str]", "Optional mapping from query keys to values. Defaults to an empty dictionary.")
+            doc_returns("url", "str", "Constructed SHyFT URL.")
+            doc_see_also("shyft_url, urlencode, extract_shyft_url_container, extract_shyft_url_path, extract_shyft_url_query_parameters")
+        );
+
+        def("extract_shyft_url_container", shyft::dtss::extract_shyft_url_container, (py::arg("url")),
+            doc_intro("Extract the container part from a SHyFT URL.")
+            doc_parameters()
+            doc_parameter("url", "str", "SHyFT URL to extract container from.")
+            doc_returns("container", "str", "Container part of `url`, if the string is invalid as a SHyFT URL\n\t"
+                "an empty string is retuned instead.")
+            doc_see_also("shyft_url")
+        );
+        def("extract_shyft_url_path", shyft::dtss::extract_shyft_url_path, (py::arg("url")),
+            doc_intro("Extract the time-series path part from a SHyFT URL.")
+            doc_parameters()
+            doc_parameter("url", "str", "SHyFT URL to extract the TS-path from.")
+            doc_returns("ts_path", "str", "TS-path part of `url`, if the string is invalid as a SHyFT URL\n\t"
+                "an empty string is retuned instead.")
+            doc_see_also("shyft_url")
+        );
+        def("extract_shyft_url_query_parameters", extract_shyft_url_query_parameters_fn, (py::arg("url")),
+            doc_intro("Extract query parameters from a SHyFT URL.")
+            doc_intro("")
+            doc_intro("The query string is assumed to be on the format `?key1=value1&key2=value2&key3=&key4=value4`.")
+            doc_intro("This will be parsed into a map with four keys: `key1` through `key4`, where `key3` have a")
+            doc_intro("empty string value, while the rest have respectivly values `value1`, `value2`, and `value4`.")
+            doc_intro("")
+            doc_intro("Both query keys and values are assumed to be urlencoded, thus urlencode is called on every")
+            doc_intro("key and every value.")
+            doc_parameters()
+            doc_parameter("url", "str", "SHyFT URL to extract the TS-path from.")
+            doc_returns("queries", "Dict[str,str]", "A dict with all queries defined in `url`. The dictionary is\n\t"
+                "empty if `url` is invalid as a SHyFT URL.")
+            doc_see_also("shyft_url, urldecode")
+        );
+
+        def("urlencode", shyft::dtss::urlencode, (py::arg("text"), py::arg("space_pluss") = true),
+            doc_intro("Percent-encode a string for use in URLs.")
+            doc_intro("")
+            doc_intro("All characters designated as reserved in RFC3986 (Jan. 2005), sec. 2.2 are always percent")
+            doc_intro("encoded, while all character explitily stated as unreserved (RFC3986, Jan. 2005, sec. 2.3)")
+            doc_intro("are never percent encoded. Space characters are encoded as `+` characters, while all other")
+            doc_intro("characters are precent-encoded.")
+            doc_intro("")
+            doc_intro("The implementation only handles 8-bit character values. The behavior for multibyte characters")
+            doc_intro("is unspecified.")
+            doc_intro("")
+            doc_intro("The reverse operation of this is `urldecode`.")
+            doc_parameters()
+            doc_parameter("text", "str", "Text string to encode.")
+            doc_parameter("percent_plus", "bool",
+                "When true the `SP` character (ASCII 0x20) is encoded as `+` instead of its\n\t"
+                "percent encoding `%20`. Defaults to true.")
+            doc_returns("encoded", "str", "Percent-encoded representation if the input.")
+            doc_see_also("urldecode")
+        );                                         
+        def("urldecode", shyft::dtss::urldecode, (py::arg("encoded"), py::arg("space_pluss") = true),
+            doc_intro("Decode a percent-encoded string to its original representation.")
+            doc_intro("")
+            doc_intro("All characters designated as unreserved in RFC3986 (Jan. 2005), sec. 2.3 are always passed")
+            doc_intro("through unmodified, except where they are encountered while parsing a percent-encoded value.")
+            doc_intro("")
+            doc_intro("The implementation only handles 8-bit character values. The behavior for multibyte characters")
+            doc_intro("is unspecified.")
+            doc_intro("Additionally it is undefined if characters outside the range `0-9A-Fa-f` are encountered as")
+            doc_intro("one of the two characters immidiatly succeeding a percent-sign.")
+            doc_intro("")
+            doc_intro("This is the reverse operation of `urlencode`.")
+            doc_parameters()
+            doc_parameter("encoded", "str", "Text string to decode.")
+            doc_parameter("percent_plus", "bool",
+                "When true `+` characters are decoded to `SP` characters (ASCII 0x20). When this\n\t"
+                "is true and a `+` is encountered and exception is thrown. The default value is true.")
+            doc_returns("text", "str", "Original representation of the encoded input.")
+            doc_intro("")
+            doc_intro("Raises\n------\n")
+            doc_intro("RuntimeError")
+            doc_intro("\tThrown if unencoded characters outside the unreserved range is encountered,")
+            doc_intro("\tincludes `+` when the `percent_plus` argument is false. The exception message")
+            doc_intro("\tcontains the character and its location in the string.")
+            doc_see_also("urlencode")
+        );
+    }
+
     void dtss() {
         dtss_messages();
         dtss_server();
         dtss_client();
         dtss_cache_stats();
+        url_utils();
     }
 }

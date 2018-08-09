@@ -56,7 +56,7 @@ class TimeAxis(unittest.TestCase):
         A point time axis takes n+1 points do describe n-periods, where
         each period is defined as [ point_i .. point_i+1 >
         """
-        all_points = api.UtcTimeVector([t for t in range(self.t, self.t + (self.n + 1)*self.d, self.d)])
+        all_points = api.UtcTimeVector([t for t in range(int(self.t), int(self.t + (self.n + 1)*self.d), int(self.d))])
         tap = api.TimeAxisByPoints(all_points)
         self.assertEqual(tap.size(), self.ta.size())
         for i in range(self.ta.size()):

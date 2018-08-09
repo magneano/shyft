@@ -1,10 +1,10 @@
 #include "test_pch.h"
 #include "core/hbv_snow.h"
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
 
 using namespace shyft::core;
 using namespace shyft::core::hbv_snow;
 using namespace std;
-
 using SnowModel = calculator<parameter, state>;
 TEST_SUITE("hbv_snow") {
 TEST_CASE("test_integral_calculations") {
@@ -29,8 +29,8 @@ TEST_CASE("test_mass_balance_at_snowpack_reset") {
     parameter p(s, a);
     state state;
     response r;
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.04;
     double temperature = 1.0;
     double sca = 1.0;
@@ -52,8 +52,8 @@ TEST_CASE("test_mass_balance_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.6;
@@ -83,8 +83,8 @@ TEST_CASE("test_snow_distr_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.15;
@@ -103,8 +103,8 @@ TEST_CASE("test_snow_uniform_distr_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.15;
@@ -123,8 +123,8 @@ TEST_CASE("test_snow_skewed_distr_at_snowpack_buildup") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = -1.0;
     double sca = 0.15;
@@ -145,8 +145,8 @@ TEST_CASE("test_mass_balance_rain_no_snow") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.15;
     double temperature = p.tx;
     double sca = 0.0;
@@ -163,6 +163,40 @@ TEST_CASE("test_mass_balance_rain_no_snow") {
     TS_ASSERT_DELTA(state.swe, 0.0, 1.0e-8);
 }
 
+TEST_CASE("test_mass_balance_rain_no_snow_24h_step") {
+	vector<double> s = { 1.0, 1.0, 1.0, 1.0, 1.0 };
+	vector<double> a = { 0.0, 0.25, 0.5, 0.75, 1.0 };
+	parameter p(s, a);
+	state state;
+	response r;
+
+	utctime t0 = seconds(0);
+	utctime t1 = seconds(3600*24); // One day
+	double precipitation = 0.15;
+	double temperature = p.tx;
+	double sca = 0.0;
+	double swe = 0.0;
+	state.swe = swe;
+	state.sca = sca;
+	state.distribute(p);
+	double total_water_before = precipitation + swe;
+	SnowModel snow_model(p);
+	snow_model.step(state, r, t0, t1, precipitation, temperature);
+	double total_water_after = state.swe + r.outflow;
+	TS_ASSERT_DELTA(total_water_before, total_water_after, 1.0e-8);
+	TS_ASSERT_DELTA(state.sca, 0.0, 1.0e-8);
+	TS_ASSERT_DELTA(state.swe, 0.0, 1.0e-8);
+	// now snow and freeze water 1 day
+	snow_model.step(state, r, t0, t1, precipitation, -10.0);
+	TS_ASSERT_DELTA(state.swe / 24.0, precipitation, 1.0e-8); //ensure all rain stored as snow
+	TS_ASSERT_DELTA(r.outflow, 0.0, 1e-8);// should be 0.0 outflow
+	// now melt the snow in one timestep
+	snow_model.step(state, r, t0, t1, 0.0, 30.0);// very hot one day
+	TS_ASSERT_DELTA(state.swe / 24.0, 0.0, 1.0e-8); //ensure all rain stored as snow
+	TS_ASSERT_DELTA(r.outflow, precipitation, 1e-8);// should be 0.0 outflow
+
+}
+
 TEST_CASE("test_mass_balance_melt_no_precip") {
     vector<double> s = {1.0, 1.0, 1.0, 1.0, 1.0};
     vector<double> a = {0.0, 0.25, 0.5, 0.75, 1.0};
@@ -170,8 +204,8 @@ TEST_CASE("test_mass_balance_melt_no_precip") {
     state state;
     response r;
 
-    utctime t0 = 0;
-    utctime t1 = 3600; // One hour
+    utctime t0 = _t(0);
+    utctime t1 = _t(3600); // One hour
     double precipitation = 0.0;
     double temperature = 3.0;
     double sca = 0.5;

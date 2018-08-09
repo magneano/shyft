@@ -45,15 +45,15 @@ namespace dtss_stress {
     struct config {
         string host{"127.0.0.1"};
         int port{20000};
-        utctimespan dt_min_read{10000};
-        utctimespan dt_read_var{1000};
+        utctimespan dt_min_read{seconds(10000)};
+        utctimespan dt_read_var{seconds(1000)};
         string container{"test"};
         string ts_path{"a"};
         size_t min_ts{10};
         size_t max_ts{100};
         size_t min_n{10};
         size_t max_n{100};
-        utctimespan dt{10};
+        utctimespan dt{seconds(10)};
         size_t n_pts_min{1};
         int n_pts_var{10000};
     };
@@ -65,13 +65,13 @@ namespace dtss_stress {
         dtss::ts_vector_t mk_read_expression() {
             dtss::ts_vector_t r;
             int n = c.min_ts + rand()%(c.max_ts-c.min_ts);
-            r.reserve(n);for(size_t i=0;i<n;++i) r.push_back(apoint_ts(mk_ts_url(c.container,c.ts_path,i)));
+            r.reserve(n);for(size_t i=0;int(i)<n;++i) r.push_back(apoint_ts(mk_ts_url(c.container,c.ts_path,i)));
             return r;
         }
 
         utcperiod mk_read_period(utctime t_now) {
-            utctime t_end = t_now - rand()%1;
-            utctime t_start = t_end - (c.dt_min_read + rand()%c.dt_read_var);
+            utctime t_end = t_now - seconds(rand()%1);
+            utctime t_start = t_end - (c.dt_min_read + seconds(rand()%to_seconds64(c.dt_read_var)) );
             return utcperiod{t_start,t_end};
         }
 
@@ -84,9 +84,9 @@ namespace dtss_stress {
                 t_now =utctime_now();
                 auto rp=mk_read_period(t_now);
                 int n = c.min_n + rand()%(c.max_n-c.min_n);
-                gta_t ta(rp.start,utctimespan{1 + rp.timespan()/n},n);
+                gta_t ta(rp.start,utctimespan{seconds(1) + rp.timespan()/n},n);
                 try {
-                    use_cache = (rand()%100) > 50;  // randomize 
+                    use_cache = (rand()%100) > 50;  // randomize
                     auto r = d.percentiles(mk_read_expression(),rp,ta,vector<int64_t>{0,10,50,75,100},use_cache,update_cache);
                     rr++;rn +=r.size();
                     this_thread::sleep_for(chrono::milliseconds(10));
@@ -205,10 +205,11 @@ TEST_CASE("dtss_stress") {
         }
     }
     swmr.setup(c,n_readers);
-    auto x=swmr.run(utctime_now()+n_seconds);
+    auto x=swmr.run(utctime_now()+seconds(n_seconds));
     auto cs =srv.get_cache_stats();
     srv.clear();
     FAST_CHECK_GT(x.size(),0);
+    fs::remove_all(tmpdir);
 }
 #define DTSS_MANUAL_SPLIT_TEST 0
 #if DTSS_MANUAL_SPLIT_TEST
@@ -259,7 +260,7 @@ TEST_CASE("dtss_connection_stress") {
     bool ok=true;
     try {
         cs=client.get_cache_stats(); // should work! with retry
-    } catch(const runtime_error &re) {
+    } catch(const runtime_error &) {
         ok=false;
     }
     FAST_CHECK_EQ(ok,true);

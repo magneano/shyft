@@ -741,12 +741,12 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
             p = v
             if ak == "precipitation_amount_acc":
                 # De-accumulate
-                f = api.deltahours(1) / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
+                f = 3600.0 / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
                 res = fcn(np.clip((p[:, 1:, :, :] - p[:, :-1, :, :]) * f[np.newaxis, :, np.newaxis, np.newaxis], 0.0, 1000.0))
             elif ak == "precipitation_amount":
                 # TODO: check with Yisak that this is understood correctly
                 # f = api.deltahours(1) / lead_time[1:]  # conversion from mm/delta_t to mm/1hour
-                f = api.deltahours(1) / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
+                f = 3600.0 / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
                 res = fcn(np.clip(p[:, 1:, :, :] * f[np.newaxis, :, np.newaxis, np.newaxis], 0.0, 1000.0))
             return res
 

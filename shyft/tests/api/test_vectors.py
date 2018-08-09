@@ -45,6 +45,22 @@ class Vectors(unittest.TestCase):
         dv_np[11] = 12
         assert_array_almost_equal(dv_from_np.to_numpy(), dv_np)
 
+    def test_int64_vector(self):
+        dv_from_list = api.Int64Vector([x for x in range(10)])
+        dv_np = np.arange(10, dtype=np.int32)  # notice, default is int64, which does not convert automatically to int32
+        dv_from_np = api.Int64Vector.from_numpy(dv_np)
+        self.assertEqual(len(dv_from_list), 10)
+        assert_array_almost_equal(dv_from_list.to_numpy(), dv_np)
+        assert_array_almost_equal(dv_from_np.to_numpy(), dv_np)
+        dv_from_np[5] = 8
+        dv_from_np.append(11)
+        dv_from_np.append(12)
+        dv_np[5] = 8
+        dv_np.resize(12)
+        dv_np[10] = 11
+        dv_np[11] = 12
+        assert_array_almost_equal(dv_from_np.to_numpy(), dv_np)
+
     def test_utctime_vector(self):
         dv_from_list = api.UtcTimeVector([x for x in range(10)])
         dv_np = np.arange(10, dtype=np.int64)
@@ -52,14 +68,20 @@ class Vectors(unittest.TestCase):
         self.assertEqual(len(dv_from_list), 10)
         assert_array_almost_equal(dv_from_list.to_numpy(), dv_np)
         assert_array_almost_equal(dv_from_np.to_numpy(), dv_np)
-        dv_from_np[5] = 8
-        dv_from_np.append(11)
-        dv_from_np.push_back(12)
-        dv_np[5] = 8
-        dv_np.resize(12)
+        dv_from_np[5] = api.time(8)  # it should also have accepted any number here
+        dv_from_np[5] = 8.5  # 8.5 seconds
+        self.assertAlmostEqual(dv_from_np[5].seconds, 8.5)  # verify it stores microseconds
+        dv_from_np.append(api.time(11))
+        dv_from_np.push_back(12)  # this one takes any that could go as seconds
+        dv_from_np.push_back(api.time(13))  # this one takes any that could go as seconds
+        dv_np[5] = 8.5  # python/numpy silently ignore float -> int64
+        dv_np.resize(13)
         dv_np[10] = 11
         dv_np[11] = 12
+        dv_np[12] = 13
         assert_array_almost_equal(dv_from_np.to_numpy(), dv_np)
+        dv2 = dv_from_np.to_numpy_double()
+        self.assertAlmostEqual(dv2[5], 8.5)  # verify that to_numpy_double preserves microsecond
 
     def test_string_vector(self):
         # NOTE: support for string vector is very limited, e.g. numpy does not work, only lists
@@ -73,12 +95,12 @@ class Vectors(unittest.TestCase):
     def test_geopoint_vector(self):
         gpv = api.GeoPointVector()
         for i in range(5):
-            gpv.append(api.GeoPoint(i, i * 2, i * 3))
+            gpv.append(api.GeoPoint(i, i*2, i*3))
         self.assertEqual(len(gpv), 5)
         for i in range(5):
             self.assertEqual(gpv[i].x, i)
-            self.assertEqual(gpv[i].y, i * 2)
-            self.assertEqual(gpv[i].z, i * 3)
+            self.assertEqual(gpv[i].y, i*2)
+            self.assertEqual(gpv[i].z, i*3)
 
     def test_geo_cell_data_vector(self):
         gcdv = api.GeoCellDataVector()
@@ -86,8 +108,8 @@ class Vectors(unittest.TestCase):
             p = api.GeoPoint(100, 200, 300)
             ltf = api.LandTypeFractions()
             ltf.set_fractions(glacier=0.1, lake=0.1, reservoir=0.1, forest=0.1)
-            gcd=api.GeoCellData(p,1000000.0,i,0.9,ltf)
+            gcd = api.GeoCellData(p, 1000000.0, i, 0.9, ltf)
             gcdv.append(gcd)
-        self.assertEqual(len(gcdv),5)
+        self.assertEqual(len(gcdv), 5)
         for i in range(5):
-            self.assertEqual(gcdv[i].catchment_id(),i)
+            self.assertEqual(gcdv[i].catchment_id(), i)

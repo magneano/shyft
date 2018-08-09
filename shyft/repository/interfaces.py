@@ -195,7 +195,7 @@ class StateRepository(object):
         ----------
         region_model_id: string
             name of the model
-        utc_timestamp:utctime
+        utc_timestamp:time
             time for which the state is (considered) valid
         region_model_state:string
             something that can be interpreted as state elsewhere

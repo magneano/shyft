@@ -13,12 +13,13 @@ using namespace shyft::time_axis;
 using shyft::time_series::dd::apoint_ts;
 using shyft::time_series::dd::ice_packing_recession_parameters;
 using shyft::time_series::dd::ice_packing_recession_ts;
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
 
 TEST_SUITE("time_series") {
     TEST_CASE("ice_packing") {
         /// this test should cover all ice-packing detection cases
 
-        fixed_dt ta(0,3600,24);
+        fixed_dt ta(_t(0),seconds(3600),24);
         point_ts<fixed_dt> temperature{ta,0.0,ts_point_fx::POINT_AVERAGE_VALUE};
         temperature.set(2,-10.0);
         temperature.set(3,-20.0);
@@ -28,7 +29,7 @@ TEST_SUITE("time_series") {
         //-- verify empty ts
         ice_packing_ts<decltype(temperature)> ice_pack_1;
         FAST_CHECK_EQ(ice_pack_1.ip_param.threshold_temp,doctest::Approx(0.0));
-        FAST_CHECK_EQ(ice_pack_1.ip_param.window,0); // is this well defined ?
+        FAST_CHECK_EQ(ice_pack_1.ip_param.window,seconds(0) ); // is this well defined ?
         FAST_CHECK_EQ(ice_pack_1.ipt_policy,ice_packing_temperature_policy::DISALLOW_MISSING);
         FAST_CHECK_EQ(ice_pack_1.needs_bind(),false);
         FAST_CHECK_EQ(ice_pack_1.size(),0);
@@ -76,7 +77,7 @@ TEST_SUITE("time_series") {
 
 
         // using the same setup as test above
-        generic_dt ta(0,3600,24);
+        generic_dt ta(_t(0),seconds(3600),24);
         apoint_ts temperature{ta,0.0,ts_point_fx::POINT_AVERAGE_VALUE};
         temperature.set(2,-10.0);
         temperature.set(3,-20.0);
@@ -104,9 +105,9 @@ TEST_SUITE("time_series") {
             double e = 10.0+i*1.0;
 
             if(i==4) {
-                e = ipr.recession_minimum + ( (10.0 + (i-1)*1.0) - ipr.recession_minimum)*exp(-ipr.alpha*(ice_fixup.time(i)-ice_fixup.time(i-1)));
+                e = ipr.recession_minimum + ( (10.0 + (i-1)*1.0) - ipr.recession_minimum)*exp(-ipr.alpha*to_seconds(ice_fixup.time(i)-ice_fixup.time(i-1)));
             } else if (i==5) {
-                e = ipr.recession_minimum + ( (10.0 + (i-2)*1.0) - ipr.recession_minimum)*exp(-ipr.alpha*(ice_fixup.time(i)-ice_fixup.time(i-2)));
+                e = ipr.recession_minimum + ( (10.0 + (i-2)*1.0) - ipr.recession_minimum)*exp(-ipr.alpha*to_seconds(ice_fixup.time(i)-ice_fixup.time(i-2)));
             }
 
             FAST_CHECK_EQ(v,doctest::Approx(e));
@@ -116,9 +117,9 @@ TEST_SUITE("time_series") {
     }
 
     TEST_CASE("ice_speed") {
-        utctime t0=0;
+        utctime t0=_t(0);
         calendar utc;
-        generic_dt ta(t0,3600,24*365*1);// approx 1y hour ts
+        generic_dt ta(t0,seconds(3600),24*365*1);// approx 1y hour ts
         apoint_ts temperature{ta,0.0,ts_point_fx::POINT_AVERAGE_VALUE};
         for(size_t i=0;i<ta.size();++i) { // create something that should give ice
             auto w=utc.calendar_week_units(ta.time(i)).iso_week;

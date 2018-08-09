@@ -151,16 +151,36 @@ namespace expose {
             "catchment level algorihtms.\n"
             "\n"
             "The region model keeps a list of cells, of specified type \n"
+            "as well as parameters for the cells.\n"
+            "The model also keeps state, such as region_env(forcing variables), time-axis and intial state\n"
+            "- they are non-empty after initializing, and running the model\n"
                 ,model_name);
         // NOTE: explicit expansion of the run_interpolate method is needed here, using this specific syntax
         auto run_interpolation_f= &M::run_interpolation;
         auto run_interpolation_f_g=&M::run_interpolation_g;
 		auto interpolate_f = &M::interpolate;
         class_<M>(model_name,m_doc,no_init)
-	     .def(init<const M&>(py::arg("other_model"),"create a copy of the model"))
-         .def(init< shared_ptr< vector<typename M::cell_t> >&, const typename M::parameter_t& >( (py::arg("cells"), py::arg("region_param")), "creates a model from cells and region model parameters") )
-         .def(init< const vector<shyft::core::geo_cell_data>&, const typename M::parameter_t& >( (py::arg("geo_data_vector"), py::arg("region_param")), "creates a model from geo_data vector and region model parameters"))
-         .def(init< shared_ptr< vector<typename M::cell_t> >&, const typename M::parameter_t&, const map<int,typename M::parameter_t>& >( (py::arg("cells"), py::arg("region_param"), py::arg("catchment_parameters")),"creates a model from cells and region model parameters, and specified catchment parameters") )
+	     .def(init<const M&>((py::arg("self"),py::arg("other_model")),
+            doc_intro("Create a copy of the other_model")
+            doc_parameters()
+            doc_parameter("other_model","RegionModel","region-model to copy")
+          ))
+         .def(init< const vector<shyft::core::geo_cell_data>&, const typename M::parameter_t& >( (py::arg("self"),py::arg("geo_data_vector"), py::arg("region_param")), 
+            doc_intro("Creates a model from GeoCellDataVector and region model parameters")
+            doc_parameters()
+            doc_parameter("geo_data_vector","GeoCellDataVector","contains the geo-related characteristics for the cells")
+            doc_parameter("region_param","Parameter","contains the parameters for all cells of this region model")
+          ))
+         .def(init< shared_ptr< vector<typename M::cell_t> >&, const typename M::parameter_t&, const map<int,typename M::parameter_t>& >( 
+            (py::arg("self"),py::arg("cells"), py::arg("region_param"), py::arg("catchment_parameters")),
+            doc_intro("Creates a model from cells and region model parameters, and specified catchment parameters")
+            doc_intro("The cell-vector and catchment-id's should match those specified in the catchment_parameters mapping")
+            doc_parameters()
+            doc_parameter("cells","CellVector","contains the cells, each with geo-properties and type matching the region-model type")
+            doc_parameter("region_param","Parameter","contains the parameters for cells that does not have catchment specific parameters")
+            doc_parameter("catchment_parameters","ParameterMap","contains mapping (a kind of dict, where the key is catchment-id and value is parameters for cells matching catchment-id")
+             
+          ))
          .def_readonly("time_axis",&M::time_axis,"the time_axis (type TimeAxisFixedDeltaT) as set from run_interpolation, determines the time-axis for run")
 		 .def_readwrite("interpolation_parameter",&M::ip_parameter,"the most recently used interpolation parameter as passed to run_interpolation or interpolate routine")
          .def_readwrite("initial_state",&M::initial_state,"empty or the the initial state as established on the first invokation of .set_states() or .run_cells()")
@@ -410,7 +430,7 @@ namespace expose {
     }
 
     template <class F, class O>
-    O clone_to_opt_impl(F const& f) {
+    O clone_to_opt_impl(F const& f,bool with_catchment_params) {
         O o(f.extract_geo_cell_data(), f.get_region_parameter());
         o.time_axis = f.time_axis;
         o.ip_parameter = f.ip_parameter;
@@ -423,18 +443,26 @@ namespace expose {
             (*oc)[i].env_ts = (*fc)[i].env_ts;
             (*oc)[i].state = (*fc)[i].state;
         }
+        if(with_catchment_params) {
+            auto cids=f.catchment_ids();
+            for(const auto& cid:cids) {
+                if(f.has_catchment_parameter(cid))
+                    o.set_catchment_parameter(cid, f.get_catchment_parameter(cid));
+            }
+        }
         return o;
     }
 
     template <typename F, typename O>
     void def_clone_to_similar_model(const char *func_name) {
         auto pfi = &clone_to_opt_impl< F, O>;
-        def(func_name, pfi, args("src_model"),
+        def(func_name, pfi, (py::arg("src_model"),py::arg("with_catchment_params")=false),
             doc_intro("Clone a model to a another similar type model, full to opt-model or vice-versa")
             doc_intro("The entire state except catchment-specific parameters, filter and result-series are cloned")
             doc_intro("The returned model is ready to run_cells(), state and interpolated enviroment is identical to the clone source")
             doc_parameters()
             doc_parameter("src_model","XXXX?Model","The model to be cloned, with state interpolation done, etc")
+            doc_parameter("with_catchment_params","bool","default false, if true also copy catchment specific parameters")
             doc_returns("new_model","XXXX?Model","new_model ready to run_cells, or to put into the calibrator/optimizer")
         );
     }

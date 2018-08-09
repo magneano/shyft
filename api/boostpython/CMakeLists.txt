@@ -89,6 +89,7 @@
     get_filename_component(d_lib ${dlib_lib} REALPATH CACHE)
     string(REGEX REPLACE ".[1-9]00.0" ""   a_lib_major ${a_lib})  # fixup for armadillo that references major version
 
+
     # step 3: install to the shyft/lib (that is referenced by the RPATH relative to the extensions libraries on linux)
     install(FILES 
         ${a_lib_major}

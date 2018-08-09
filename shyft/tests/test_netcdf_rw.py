@@ -16,6 +16,7 @@ from shyft.api import DoubleVector as dv
 from shyft.api import GeoPoint
 from shyft.api import UtcTimeVector
 from shyft.api import UtcPeriod
+from shyft.api import time
 from shapely.geometry import box
 
 from shyft.repository.netcdf.cf_geo_ts_repository import CFDataRepository, CFDataRepositoryError
@@ -503,7 +504,7 @@ class NetCDFGeoTsRWTestCase(unittest.TestCase):
         # --------------------------------------
         # delete data with range UtcPeriod at the end
         print('\n\n delete data with range UtcPeriod at the end')
-        tp = UtcPeriod(1451952000, utc.time(2016, 1, 10))
+        tp = UtcPeriod(time(1451952000), utc.time(2016, 1, 10))
         # ta = TimeAxis(utc.time(2016, 1, 1), deltahours(1), 24)
         # ts = TimeSeries(ta, dv.from_numpy(np.arange(0, 24, dtype=np.float64)), point_fx=point_fx.POINT_INSTANT_VALUE)
         # write the time series
