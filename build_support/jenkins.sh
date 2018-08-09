@@ -43,9 +43,14 @@ cd build
 cmake ..
 make -j 4 CMAKE_VERBOSE_MAKEFILE=0
 
-# Run tests
+# Run C++ tests
 make install
 make test
+
+# Install shyft_core
+cmake -DCOMPONENT=shyft_core -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -P cmake_install.cmake
+
+# Run Python tests
 cd ..
 python -c "import shyft; shyft.print_versions()"
 export SHYFT_SKIP_OPENDAP_TEST=1
