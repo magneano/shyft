@@ -248,14 +248,11 @@ namespace shyft {
                 }
             }
 
-            size_t n_catchments=0;///< optimized//extracted as max(cell.geo.catchment_id())+1 in run interpolate
-
             void clone(const region_model& c) {
                 // First, clear own content
                 ncore = c.ncore;
                 time_axis = c.time_axis;
                 catchment_filter = c.catchment_filter;
-                n_catchments = c.n_catchments;
 				ip_parameter = c.ip_parameter;
                 region_env = c.region_env;// todo: verify it is deep or shallow copy
                 catchment_parameters.clear();
@@ -363,7 +360,6 @@ namespace shyft {
 				for (auto&c : *cells) {
 					c.init_env_ts(time_axis);
 				}
-				n_catchments = number_of_catchments();// keep this/assume invariant..
 				this->time_axis = time_axis;
 			}
 
@@ -878,8 +874,8 @@ namespace shyft {
             void catchment_discharges( TSV& cr) const {
                 typedef typename TSV::value_type ts_t;
                 cr.clear();
-                cr.reserve(n_catchments);
-                for(size_t i=0;i<n_catchments;++i) {
+                cr.reserve(number_of_catchments());
+                for(size_t i=0;i<number_of_catchments();++i) {
                     cr.emplace_back(ts_t(time_axis, 0.0));
                 }
                 for(const auto& c: *cells) {
@@ -892,8 +888,8 @@ namespace shyft {
             void catchment_charges(TSV& cr) const {
                 typedef typename TSV::value_type ts_t;
                 cr.clear();
-                cr.reserve(n_catchments);
-                for (size_t i = 0;i < n_catchments;++i) {
+                cr.reserve(number_of_catchments());
+                for (size_t i = 0;i < number_of_catchments();++i) {
                     cr.emplace_back(ts_t(time_axis, 0.0));
                 }
                 for (const auto& c : *cells) {

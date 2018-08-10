@@ -480,7 +480,9 @@ namespace shyft {
                 explicit optimizer(region_model_t& model) :
                     parameter_accessor(model.get_region_parameter()),
                     model(model),print_progress_level(0) {
-
+                    parameter_lower_bound=parameter_accessor;// default no params calib
+                    parameter_upper_bound=parameter_accessor;
+                    prepare_optimize();// ensure all is setup
                 }
 
                 /**Set all parameters that matters for the calibration.
@@ -495,6 +497,7 @@ namespace shyft {
                     targets = targetsA;
                     parameter_lower_bound = param_lower_bound;
                     parameter_upper_bound = param_upper_bound;
+                    prepare_optimize();
                 }
 
                 /** copy the model current state into internal store of the calibration class */

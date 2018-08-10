@@ -349,7 +349,8 @@ class RegionModel(unittest.TestCase):
 
     def test_optimization_model(self):
         num_cells = 20
-        model_type = pt_gs_k.PTGSKOptModel
+        model_type = pt_gs_k.PTGSKModel
+        opt_model_type = pt_gs_k.PTGSKOptModel
         model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells)
         cal = api.Calendar()
         t0 = cal.time(2015, 1, 1, 0, 0, 0)
@@ -374,12 +375,14 @@ class RegionModel(unittest.TestCase):
         sum_discharge_value = model.statistics.discharge_value(cids, 0)  # at the first timestep
         self.assertGreaterEqual(sum_discharge_value, 130.0)
         # verify we can construct an optimizer
-        optimizer = model_type.optimizer_t(model)  # notice that a model type know it's optimizer type, e.g. PTGSKOptimizer
+        opt_model = model.create_opt_model_clone()
+        opt_model.run_cells()
+        optimizer = opt_model_type.optimizer_t(opt_model)  # notice that a model type know it's optimizer type, e.g. PTGSKOptimizer
         self.assertIsNotNone(optimizer)
         #
         # create target specification
         #
-        model.revert_to_initial_state()  # set_states(s0)  # remember to set the s0 again, so we have the same initial condition for our game
+        opt_model.revert_to_initial_state()  # set_states(s0)  # remember to set the s0 again, so we have the same initial condition for our game
         tsa = api.TsTransform().to_average(t0, dt, n, sum_discharge)
         t_spec_1 = api.TargetSpecificationPts(tsa, cids, 1.0, api.KLING_GUPTA, 1.0, 0.0, 0.0, api.DISCHARGE, 'test_uid')
 
@@ -402,6 +405,7 @@ class RegionModel(unittest.TestCase):
         orig_c2 = p0.kirchner.c2
         # model.get_cells()[0].env_ts.precipitation.set(0, 5.1)
         # model.get_cells()[0].env_ts.precipitation.set(1, 4.9)
+        goal_f0= optimizer.calculate_goal_function(p0)
         p0.kirchner.c1 = -2.4
         p0.kirchner.c2 = 0.91
         opt_param = optimizer.optimize(p0, 1500, 0.1, 1e-5)
@@ -622,5 +626,5 @@ class RegionModel(unittest.TestCase):
         model.state.apply_state(ms_2, cids_unspecified)
         model.initial_state = model.current_state
 
-    if __name__ == "__main__":
-        unittest.main()
+if __name__ == "__main__":
+    unittest.main()
