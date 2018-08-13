@@ -490,8 +490,12 @@ TEST_SUITE("qm") {
         auto verify_equal_historical_period = [num_historical_data,&historical_data,&tah](const tsv_t &result) {
             for(size_t t=4;t<tah.size();++t) {
                 for(size_t i=0;i<num_historical_data;++i) {
-                        if( fabs(result[i].value(t)-historical_data[i].value(t))>0.0001) {
-                            INFO("Failed at time step "<<t<< " and historical index "<<i);
+                        auto a=result[i].value(t);
+                        auto b= historical_data[i].value(t);
+                        auto diff=fabs(a-b);
+                        if( diff >0.0001) {
+                            INFO("Failed at time step "<<t<< " and historical index "<<i<<" diff is "<<diff);
+                            INFO("The resulting qm value is "<< a<<" and the expected historical value is "<<b);
                             FAIL("historical is not identical after(should be if same resolution and interpolation type)");
                         }
                 }
@@ -506,5 +510,78 @@ TEST_SUITE("qm") {
         result = qm::quantile_map_forecast<tsa_t>(forecast_sets, weight_sets,
             historical_data, tah, tah.time(3),tah.time(4),interpolated_quantiles);
         verify_equal_historical_period(result);
+    }
+     TEST_CASE("qm_speed") {
+         // the purpose of this test is to figure out the 
+         // speed characteristics of qm.
+         // testcases of interest is
+         //   12 (4x3)  forecast typical arome 4 times a day, use last 3 days, 1-3 hour dt, 14 days ahead
+         //   100 historical scenarios
+         //   time-axis wanted is
+         //   next 14 days plus historical scenarios 3..60 weeks ahead
+         //
+         // expected performance:
+         //   the first 14 days includes sorting 10 forcasts, 100 historical pr. timestep.
+         //   the period after should be close to 'memcpy' performance.
+         // 
+         
+        //Arrange the inputs
+        const auto fx_avg = time_series::ts_point_fx::POINT_AVERAGE_VALUE;
+        core::calendar utc;
+        const size_t n_hist_ts=100;
+        const size_t n_fc_days=14;
+        const size_t n_hist_days=n_fc_days+360;
+        const size_t n_fc_ts=10;
+        auto t0=utc.time(2017, 1, 1, 0, 0, 0);
+        
+        auto generate_ts = [fx_avg](const ta_t &ta,size_t n_fc)->tsv_t {
+            tsv_t r;r.reserve(n_fc);
+            const double w= 2*3.14/ta.size();
+            for(size_t i=0;i<n_fc;++i) {
+                vector<double> v;v.reserve(ta.size());
+                auto a=static_cast<double>(std::rand()) / RAND_MAX * 20-10.0;
+                auto b=static_cast<double>(std::rand()) / RAND_MAX * 5.0;
+                for(size_t t=0;t<ta.size();++t)  v.push_back(a+b*sin(w*i));
+                r.emplace_back(ta,v,fx_avg);
+            }
+            return r;
+        };
+
+        ta_t ta_hist(t0, core::deltahours(1), 24*n_hist_days);
+        auto historical_scenario_ts=generate_ts(ta_hist,n_hist_ts);
+        vector<tsv_t> fc_set;
+        vector<double> fc_weight;
+        size_t n_fc_sets=4*2;
+        auto fc_every_dt=core::deltahours(6);// six hours between each arome fc.
+        auto dt_fc = core::deltahours(1);
+        for(size_t i=0;i<n_fc_sets;++i) {
+            auto t0_fc=t0+fc_every_dt*i;
+            fc_set.emplace_back(generate_ts(ta_t(t0_fc,dt_fc,24*n_fc_days),n_fc_ts));
+            fc_weight.emplace_back((3+i));
+        }
+        
+        //auto historical_order = qm::quantile_index<tsa_t>(historical_data, tah);
+        bool verbose=getenv("SHYFT_VERBOSE")?true:false;
+        //core::utctime interpolation_start(core::no_utctime);
+        //Act
+        bool interpolated_quantiles=false;
+        auto qm_end_idx1=24*(n_fc_days-2);
+        auto qm_end_idx2=24*(n_fc_days-1);
+        size_t n_ts=0;
+        size_t n_v =0;
+        if(verbose) std::cout<<"n_days\ttime_used[s]\n";
+        double tot_seconds=0.0;
+        for(size_t h_days=n_fc_days+10;h_days<n_hist_days;h_days+=30) {
+            ta_t ta_qm(t0+n_fc_sets*fc_every_dt,dt_fc,24*h_days);
+            auto a0=core::utctime_now();
+            auto result = qm::quantile_map_forecast<tsa_t>(fc_set,fc_weight,
+                historical_scenario_ts, ta_qm, ta_qm.time(qm_end_idx1),ta_qm.time(qm_end_idx2),interpolated_quantiles);
+            n_ts +=result.size();
+            n_v += result[0].size()*result.size();
+            auto a1=core::utctime_now();
+            tot_seconds += core::to_seconds(a1-a0);
+            if(verbose) std::cout<<" "<<h_days<<"\t"<<to_string(core::to_seconds(a1-a0))<<endl;
+        }
+        if(verbose) std::cout<<"Total of "<<n_ts<<" ts, was forecasted, number values produced "<<n_v/1000000<<" Mpts, Mb/s="<<8.0*n_v/1000000/tot_seconds<<"\n";
     }
 }
