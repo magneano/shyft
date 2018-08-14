@@ -9,6 +9,7 @@ See file COPYING for more details **/
 
 #include "utctime_utilities.h"
 #include "time_series.h"
+#include "time_series_average.h"
 
 namespace shyft {
     namespace qm {
@@ -319,7 +320,7 @@ namespace shyft {
             tsv_t output;
             output.reserve(pri_tsv.size());
             for (size_t i = 0; i<pri_tsv.size(); ++i) {
-                output.emplace_back(time_axis, nan, pri_tsv[i].point_interpretation());
+                output.emplace_back(time_axis, nan, time_series::POINT_AVERAGE_VALUE);
             }
             for (size_t t = 0; t<time_axis.size(); ++t) {
                 wvo_fc.t_ix = t;
@@ -348,6 +349,28 @@ namespace shyft {
 
             return output;
         }
+
+        /** append historical_ts to the end qm ts,
+         * inplace construct the resulting ts into the result vector.
+         * 
+         * \param historical_ts with values that should be appended to the qm, could be of any time-resolution.
+         * \param qm the quantile mapped result, starts the result series, the time-axis should be aligned with the ta-parameter first part
+         * \param ta the total time-axis for the resulting time-series, the qm ts should be aligned with the start of this one
+         * \param ta_hist the time-axis  that should be appended
+         * \param r the result vector where the result should be .emplace_back constructed into
+         */
+         template <class ta_t,class ts_t>
+         void merge_qm_result( const ts_t &historical_ts, const ts_t& qm,const ta_t &ta, const ta_t&ta_hist,vector<ts_t>&r) {
+                vector<double> v(ta.size(),nan);
+                auto b=begin(qm.values());
+				const auto p_fx = historical_ts.point_interpretation();
+                std::copy(b,b+qm.size(),begin(v));
+				vector<double> hv = p_fx==time_series::POINT_AVERAGE_VALUE?
+					time_series::accumulate_stair_case(ta_hist, historical_ts, true):
+					time_series::accumulate_linear(ta_hist, historical_ts, true);
+				std::copy(begin(hv), end(hv), begin(v) + qm.size());
+                r.emplace_back(ta, move(v), time_series::POINT_AVERAGE_VALUE); // because the operation is true average
+            };
 
         /** \brief the quantile_map_forecast applies quantile_mapping to weighted forecast_set and historical data
         *
@@ -415,16 +438,8 @@ namespace shyft {
 
             tsv_t r;
             r.reserve(historical_data.size());
-            for (size_t i = 0; i<historical_data.size(); ++i) {
-                const auto & qm=qm_tsv[i];
-                vector<double> v(time_axis.size(),nan);
-                auto b=begin(qm.values());
-                std::copy(b,b+qm.size(),begin(v));
-                tsa_t a(historical_data[i],time_axis);
-                for(size_t j=qm_n_steps;j<time_axis.size();++j)
-                    v[j]=a.value(j);
-                r.emplace_back(time_axis, move(v), historical_data[i].point_interpretation());
-            }
+			auto ta_ext = time_axis.slice(qm_n_steps, time_axis.size() - qm_n_steps);// the time-axis extension with historical data
+            for (size_t i = 0; i<historical_data.size(); ++i)  merge_qm_result(historical_data[i],qm_tsv[i],time_axis,ta_ext,r);
             return r;
         }
     }
