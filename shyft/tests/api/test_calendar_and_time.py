@@ -259,6 +259,10 @@ class Calendar(unittest.TestCase):
         self.assertAlmostEqual(math.floor(api.time(3.2)), 3.0)
         self.assertAlmostEqual(math.floor(api.time(-3.2)), -4.0)
 
+    def test_time_round(self):
+        self.assertAlmostEqual(round(api.time(3.2)), 3.0)
+        self.assertAlmostEqual(round(api.time(-3.7)), -4.0)
+
     def test_time_cast(self):
         self.assertAlmostEqual(int(api.time(10.23)), 10)
         self.assertAlmostEqual(float(api.time(10.23)), 10.23)

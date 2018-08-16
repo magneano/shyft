@@ -192,6 +192,9 @@ namespace expose {
 		static double _float_(utctime x) {
 			return to_seconds(x);
 		}
+		static utctime _round_(utctime x) {
+            return from_seconds(std::round(to_seconds(x)));
+        }
 		/// best effort convert from any number or string to utctime
 		/// as long as it is well defined
 		static utctime as_utctime(const py::object& po) {
@@ -337,7 +340,8 @@ namespace expose {
 			.def_pickle(utctime_picklers())
 			.add_property("seconds",raw_function(utctime_ext::get_seconds,1),doc_intro("returns time in seconds"))
 			.def("__abs__",&utctime_ext::abs_timespan,(py::arg("self")))
-			.def("__float__",&utctime_ext::_float_,(py::arg("self")))
+            .def("__round__",&utctime_ext::_round_,(py::arg("self")))
+            .def("__float__",&utctime_ext::_float_,(py::arg("self")))
 			.def("__int__",raw_function(utctime_ext::get_int_seconds,1),doc_intro("time as int seconds"))
 			.def("__long__", raw_function(utctime_ext::get_int_seconds, 1), doc_intro("time as int seconds"))
 			.def("__repr__",raw_function(utctime_ext::repr,1),doc_intro("repr of time"))
@@ -363,6 +367,7 @@ namespace expose {
 
 			.def("__mul__", raw_function(utctime_ext::_mult_, 1))
 			.def("__rmul__", raw_function(utctime_ext::_mult_, 1))
+
 			.def("sqrt",raw_function(utctime_ext::_sqrt_,1))
 			//.def(self % self)
 			.def(-self)
