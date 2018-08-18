@@ -206,7 +206,7 @@ TEST_CASE("dtss_stress") {
     }
     swmr.setup(c,n_readers);
     auto x=swmr.run(utctime_now()+seconds(n_seconds));
-    auto cs =srv.get_cache_stats();
+    (void)srv.get_cache_stats();// just to cover code
     srv.clear();
     FAST_CHECK_GT(x.size(),0);
     fs::remove_all(tmpdir);

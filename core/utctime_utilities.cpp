@@ -59,7 +59,7 @@ utctime create_from_iso8601_string(const std::string&s) {
 }
 
 string calendar::to_string(utctime t) const {
-    char s[100];
+    char s[200];
     if (t == no_utctime) { sprintf(s, "no_utctime"); }
     else if (t == min_utctime) { sprintf(s, "-oo"); }
     else if (t == max_utctime) { sprintf(s, "+oo"); }

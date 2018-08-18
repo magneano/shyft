@@ -78,14 +78,14 @@ else()
 
 endif()
 
-set(boost_link_libraries ${boost_system_lib} ${boost_filesystem_lib} ${boost_serialization_lib})
-set(boost_py_link_libraries ${boost_link_libraries} ${boost_python3_lib})
+set(boost_link_libraries ${boost_filesystem_lib} ${boost_serialization_lib} ${boost_system_lib})
+set(boost_py_link_libraries ${boost_python3_lib} ${boost_link_libraries})
 
 # The compiler requirement,flags definitions and include that applies for all
 # Notice that we need MINIMIZE_SIZE to ensure g++ vs. ms c++ compat
 set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-fPIC -fexceptions -pthread -Wno-deprecated-declarations)
-add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG -DBOOST_VARIANT_MINIMIZE_SIZE -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS -DBOOST_MPL_LIMIT_LIST_SIZE=30 -DBOOST_MPL_LIMIT_VECTOR_SIZE=30")
+add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG -DBOOST_ERROR_CODE_HEADER_ONLY -DBOOST_VARIANT_MINIMIZE_SIZE -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS -DBOOST_MPL_LIMIT_LIST_SIZE=30 -DBOOST_MPL_LIMIT_VECTOR_SIZE=30")
 include_directories(${CMAKE_SOURCE_DIR} ${SHYFT_DEPENDENCIES}/include) # we could add more explicit list boost,dlib,armadillo,doctest here
 
 

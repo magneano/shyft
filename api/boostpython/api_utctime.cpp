@@ -6,11 +6,11 @@ See file COPYING for more details **/
 /*
  * This section provides a  functional-convertible mechanism that was lacking in boost python.
  * The idea is that there is a function Fx that takes a type Source and construct inplace a type Target.
- * 
+ *
  */
-namespace boost { namespace python { 
-    
-namespace converter { 
+namespace boost { namespace python {
+
+namespace converter {
 
 template <class Source, class Target,class Fx>
 struct fx_implicit
@@ -24,7 +24,7 @@ struct fx_implicit
         return implicit_rvalue_convertible_from_python(obj, registered<Source>::converters)
             ? obj : 0;
     }
-      
+
     static void construct(PyObject* obj, rvalue_from_python_stage1_data* data)
     {
         void* storage = ((rvalue_from_python_storage<Target>*)data)->storage.bytes;
@@ -44,7 +44,7 @@ template <class Source, class Target,class Fx>
 void fx_implicitly_convertible(boost::type<Source>* = 0, boost::type<Target>* = 0)
 {
     typedef converter::fx_implicit<Source,Target,Fx> functions;
-    
+
     converter::registry::push_back(
           &functions::convertible
         , &functions::construct
@@ -53,7 +53,7 @@ void fx_implicitly_convertible(boost::type<Source>* = 0, boost::type<Target>* = 
         , &converter::expected_from_python_type_direct<Source>::get_pytype
 #endif
         );
-}   
+}
 }} // namespace boost::python
 
 namespace expose {
@@ -95,7 +95,7 @@ namespace expose {
 		py::extract<T> xtract_arg(o);
 		return xtract_arg();
 	}
-	
+
 	template<class T>
     static T  x_kwarg(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw) {
         if (py::len(args)  > (int)i) {
@@ -245,7 +245,7 @@ namespace expose {
     struct utctime_picklers : py::pickle_suite {
 		static py::tuple getinitargs(utctime const& t) { return py::make_tuple(to_seconds(t)); }
 	};
-    
+
     struct calendar_ext {
         static py::object trim(const py::tuple& args,const py::dict & kwargs) {
             const auto& c=x_arg<const calendar&>(args,0);
@@ -280,7 +280,7 @@ namespace expose {
             return py::object(c.calendar_week_units(x_kwarg_utctime(args,kwargs,1,"t")));
         }
     };
-    
+
 	static void e_utctime() {
 		class_<utctime>("time",
               doc_intro("time is represented as a number, in unit seconds.")
@@ -381,7 +381,7 @@ namespace expose {
             current.attr("min_utctime")= min_utctime;
             current.attr("no_utctime")=no_utctime;
             current.attr("npos")=string::npos;
-            //TODO: require own type for utctime: 
+            //TODO: require own type for utctime:
             //implicitly_convertible<utctime,int64_t>();
             //implicitly_convertible<int64_t,utctime>();
             //fx_implicitly_convertible<int64_t,utctime,ct_from_int64>();
@@ -399,9 +399,9 @@ namespace expose {
 
     static void e_calendar() {
 
-        std::string (shyft::core::calendar::*to_string_t)(shyft::core::utctime) const= &calendar::to_string;//selects correct ptr.
+        //std::string (shyft::core::calendar::*to_string_t)(shyft::core::utctime) const= &calendar::to_string;//selects correct ptr.
         std::string (calendar::*to_string_p)(utcperiod) const=&calendar::to_string;
-        int64_t (calendar::*diff_units)(utctime,utctime,utctimespan) const=&calendar::diff_units;
+        //int64_t (calendar::*diff_units)(utctime,utctime,utctimespan) const=&calendar::diff_units;
         utctime (calendar::*time_YMDhms)(YMDhms) const = &calendar::time;
         utctime (calendar::*time_YWdhms)(YWdhms) const = &calendar::time;
         utctime (calendar::*time_6)(int,int,int,int,int,int,int) const = &calendar::time;
@@ -560,7 +560,7 @@ namespace expose {
             doc_returns("t", "time", "new trimmed timestamp, seconds utc since epoch")
             doc_see_also("add(t,delta_t,n),diff_units(t1,t2,delta_t)")
         )
-               
+
         .def("quarter",&calendar::quarter,args("t"),
             doc_intro("returns the quarter of the specified t, -1 if invalid t")
             doc_parameters()
@@ -656,7 +656,7 @@ namespace expose {
         utcperiod (utcperiod::*trim_t)(const calendar &, utctimespan , trim_policy ) const=&utcperiod::trim;
         int64_t (utcperiod::*diff_units_t)(const calendar&, utctimespan) const = &utcperiod::diff_units;
         int64_t (utcperiod::*diff_units_i)(const calendar&, int64_t) const = &utcperiod::diff_units;
-        
+
         class_<utcperiod>("UtcPeriod","UtcPeriod defines the open utc-time range [start..end> \nwhere end is required to be equal or greater than start")
         .def(init<utctime,utctime>(args("start,end"),"Create utcperiod given start and end"))
         .def(init<int64_t, int64_t>(args("start,end"), "Create utcperiod given start and end"))

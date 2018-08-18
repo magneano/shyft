@@ -33,8 +33,8 @@ namespace expose {
 	static string nice_str(const gta_t & ta) {
 		char s[100]; s[0] = 0;
 		switch (ta.gt) {
-		case gta_t::generic_type::FIXED:sprintf(s, "TaF[%s,%lld,%zd]", calendar().to_string(ta.f.t).c_str(), ta.f.dt, ta.f.n); break;
-		case gta_t::generic_dt::CALENDAR:sprintf(s, "TaC[%s,%s,%lld,%zd]", ta.c.cal->tz_info->name().c_str(), ta.c.cal->to_string(ta.c.t).c_str(), ta.c.dt, ta.c.n); break;
+		case gta_t::generic_type::FIXED:sprintf(s, "TaF[%s,%g,%zd]", calendar().to_string(ta.f.t).c_str(), to_seconds(ta.f.dt), ta.f.n); break;
+		case gta_t::generic_dt::CALENDAR:sprintf(s, "TaC[%s,%s,%g,%zd]", ta.c.cal->tz_info->name().c_str(), ta.c.cal->to_string(ta.c.t).c_str(), to_seconds(ta.c.dt), ta.c.n); break;
 		case gta_t::generic_dt::POINT:sprintf(s, "TaP[%s,%zd]", ta.p.total_period().to_string().c_str(), ta.p.size()); break;
 		}
 		return s;
@@ -75,7 +75,7 @@ namespace expose {
 	static string nice_str(const shared_ptr<time_series::dd::inside_ts>&b) { return "inside_ts(" + nice_str(apoint_ts(b->ts)) + ", "+to_string(b->p.min_x)+", "+to_string(b->p.max_x)+", ..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::decode_ts>&b) { return "decode_ts(" + nice_str(apoint_ts(b->ts)) + ",start_bit="+to_string(b->p.start_bit)+",n_bits="+to_string(b->p.n_bits())+")"; }
 
-	
+
 	static string nice_str(const apoint_ts&ats) {
 		if (!ats.ts)
 			return "null";
@@ -111,10 +111,10 @@ namespace expose {
 			)
 			.def(vector_indexing_suite<core_ts_vector>());
 	}
-	
+
     /** ats_vector python expose helper for constructor variants so that
      * it's easy for to use. We can't use py_convertible since
-     * python get confused by 3*tsv etc. (trying to convert 3 -> tsvector) 
+     * python get confused by 3*tsv etc. (trying to convert 3 -> tsvector)
      */
 	struct ats_vector_ext {
         static ats_vector *create_default() {return new ats_vector{};}
@@ -136,7 +136,7 @@ namespace expose {
             return r;
         }
     };
-    
+
     static void expose_ats_vector() {
         using namespace shyft::api;
         typedef ats_vector(ats_vector::*m_double)(double)const;
@@ -249,7 +249,7 @@ namespace expose {
                 doc_parameter("method","derivative_method","what derivative_method variant to use")
                 doc_returns("tsv","TsVector","where each member is the derivative of the source")
             )
-            
+
 			.def("time_shift", &ats_vector::time_shift,args("delta_t"),
 				doc_intro("create a new vector of ts that is a the time-shift'ed  version of self")
 				doc_parameters()
@@ -384,7 +384,7 @@ namespace expose {
             def("max", (f_atsv_double)max, args("ts_vector", "number"), "return max of ts_vector and number");
             def("max", (f_double_atsv)max, args("number", "ts_vector"), "return max of number and ts_vector");
             def("max", (f_atsv_atsv)max, args("a", "b"), "return max of ts_vectors a and b (requires equal size!)");
-            
+
             // we also need a vector of ats_vector for quantile_map_forecast function
             typedef std::vector<ats_vector> TsVectorSet;
             class_<TsVectorSet>("TsVectorSet",
@@ -476,7 +476,7 @@ namespace expose {
 		py::extract<T> xtract_arg(o);
 		return xtract_arg();
 	}
-    
+
     template<class T>
     static T  x_kwarg(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw) {
         if (py::len(args)  > (int)i) {
@@ -513,7 +513,7 @@ namespace expose {
         }
         throw std::runtime_error("Expected UtcTimeVector, or Int64Vector  for kw arg #" + std::string(kw) );
 	}
-	
+
     template<class T>
     static T  x_kwarg_default(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw,const T& default_value) {
         if (py::len(args)  > (int)i) {
@@ -530,7 +530,7 @@ namespace expose {
 
     /** helper to ensure we can take any time-rep as input args */
     struct ts_factory_ext {
-        
+
         static shyft::api::TsFactory x_self(const py::tuple& args) {
 			if (py::len(args) == 0)
 				throw std::runtime_error("self is null in UtcTime");
@@ -538,7 +538,7 @@ namespace expose {
 			py::extract<shyft::api::TsFactory> xtract_self(self);
 			return xtract_self();
 		}
-		
+
         static py::object create_point_ts(const py::tuple& args, const py::dict& kwargs) {
             auto self=x_self(args);
             size_t n=x_kwarg<int>(args,kwargs,1,"n");
@@ -557,7 +557,7 @@ namespace expose {
             return py::object(self.create_time_point_ts(p,t,v,ct));
         }
     };
-    
+
     static void TsFactory() {
         class_<shyft::api::TsFactory>("TsFactory",
 			doc_intro("TsFactory is used in specific contexts, to create point time-series that exposes the ITimeSeriesOfPoint interface, using the internal ts-implementations")
@@ -601,7 +601,7 @@ namespace expose {
         self_ts_t  min_ts_f =&pts_t::min;
         self_dbl_t max_double_f=&pts_t::max;
         self_ts_t  max_ts_f =&pts_t::max;
-        
+
         typedef ts_bind_info TsBindInfo;
         class_<TsBindInfo>("TsBindInfo",
             doc_intro("TsBindInfo gives information about the time-series and it's binding")
@@ -625,13 +625,13 @@ namespace expose {
             .def(vector_indexing_suite<TsBindInfoVector>())
             ;
         py_api::iterable_converter().from_python<TsBindInfoVector>();
-        
+
         apoint_ts (apoint_ts::*min_max_check_linear_fill_t)(double ,double ,utctimespan ) const = &apoint_ts::min_max_check_linear_fill;
         apoint_ts  (apoint_ts::*min_max_check_ts_fill_t)(double,double,utctimespan,const apoint_ts& ) const=&apoint_ts::min_max_check_ts_fill;
         apoint_ts  (apoint_ts::*min_max_check_linear_fill_i)(double,double ,int64_t ) const= &apoint_ts::min_max_check_linear_fill;
         apoint_ts  (apoint_ts::*min_max_check_ts_fill_i)(double,double,int64_t ,const apoint_ts&) const =&apoint_ts::min_max_check_ts_fill;
 
-        
+
 		class_<apoint_ts>("TimeSeries",
                 doc_intro("A time-series providing mathematical and statistical operations and functionality.")
                 doc_intro("")
