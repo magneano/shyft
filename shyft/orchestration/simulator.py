@@ -84,6 +84,7 @@ class DefaultSimulator(object):
                                                                      catchments=catchments)
         self.epsg = self.region_model.bounding_region.epsg()
         self.initial_state_repo = initial_state_repository
+        self.region_model.interpolation_parameter = self.ip_repos.get_parameters(self.interpolation_id)
         if isinstance(self.initial_state_repo, GeneratedStateRepository):  # special case!
             self.initial_state_repo.model = self.region_model  # have to ensure that the generated state match this model
         if hasattr(self.region_model, "optimizer_t"):
@@ -159,7 +160,6 @@ class DefaultSimulator(object):
         sources = self.geo_ts_repository.get_timeseries(self._geo_ts_names, period,
                                                         geo_location_criteria=bbox)
         self.region_model.region_env = self._get_region_environment(sources)
-        self.region_model.interpolation_parameter = self.ip_repos.get_parameters(self.interpolation_id)
         self.simulate()
 
     def run_forecast(self, time_axis, t_c, state):
@@ -169,7 +169,6 @@ class DefaultSimulator(object):
                                                       geo_location_criteria=bbox)
         self.region_model.initialize_cell_environment(time_axis)
         self.region_model.region_env = self._get_region_environment(sources)
-        self.region_model.interpolation_parameter = self.ip_repos.get_parameters(self.interpolation_id)
         self.region_model.state.apply_state(self.get_initial_state_from_repo() if state is None else state, [])
         self.region_model.initial_state = self.region_model.current_state
         self.simulate()
@@ -182,7 +181,6 @@ class DefaultSimulator(object):
         self.region_model.initialize_cell_environment(time_axis)
         self.region_model.state.apply_state(self.get_initial_state_from_repo() if state is None else state, [])
         self.region_model.initial_state = self.region_model.current_state
-        self.region_model.interpolation_parameter = self.ip_repos.get_parameters(self.interpolation_id)
         runnables = []
         for source in sources:
             simulator = self.copy()

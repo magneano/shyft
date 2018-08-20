@@ -50,7 +50,7 @@ namespace expose {
             .def("cell_state", &shyft::api::cell_state_id_of, args("geo_cell_data"), "create a cell state with id for the supplied cell.geo")
             .staticmethod("cell_state")
             ;
-        char csv_name[200];sprintf(csv_name, "%sVector", cs_name);
+        char csv_name[250];sprintf(csv_name, "%sVector", cs_name);
         typedef std::vector<CellState> cell_state_with_id_vector;
         typedef std::shared_ptr<cell_state_with_id_vector> cell_state_with_id_vector_;
         class_<cell_state_with_id_vector, bases<>, cell_state_with_id_vector_  >(csv_name, "vector of cell state")
@@ -165,13 +165,13 @@ namespace expose {
             doc_parameters()
             doc_parameter("other_model","RegionModel","region-model to copy")
           ))
-         .def(init< const vector<shyft::core::geo_cell_data>&, const typename M::parameter_t& >( (py::arg("self"),py::arg("geo_data_vector"), py::arg("region_param")), 
+         .def(init< const vector<shyft::core::geo_cell_data>&, const typename M::parameter_t& >( (py::arg("self"),py::arg("geo_data_vector"), py::arg("region_param")),
             doc_intro("Creates a model from GeoCellDataVector and region model parameters")
             doc_parameters()
             doc_parameter("geo_data_vector","GeoCellDataVector","contains the geo-related characteristics for the cells")
             doc_parameter("region_param","Parameter","contains the parameters for all cells of this region model")
           ))
-         .def(init< shared_ptr< vector<typename M::cell_t> >&, const typename M::parameter_t&, const map<int,typename M::parameter_t>& >( 
+         .def(init< shared_ptr< vector<typename M::cell_t> >&, const typename M::parameter_t&, const map<int,typename M::parameter_t>& >(
             (py::arg("self"),py::arg("cells"), py::arg("region_param"), py::arg("catchment_parameters")),
             doc_intro("Creates a model from cells and region model parameters, and specified catchment parameters")
             doc_intro("The cell-vector and catchment-id's should match those specified in the catchment_parameters mapping")
@@ -179,7 +179,7 @@ namespace expose {
             doc_parameter("cells","CellVector","contains the cells, each with geo-properties and type matching the region-model type")
             doc_parameter("region_param","Parameter","contains the parameters for cells that does not have catchment specific parameters")
             doc_parameter("catchment_parameters","ParameterMap","contains mapping (a kind of dict, where the key is catchment-id and value is parameters for cells matching catchment-id")
-             
+
           ))
          .def_readonly("time_axis",&M::time_axis,"the time_axis (type TimeAxisFixedDeltaT) as set from run_interpolation, determines the time-axis for run")
 		 .def_readwrite("interpolation_parameter",&M::ip_parameter,"the most recently used interpolation parameter as passed to run_interpolation or interpolate routine")

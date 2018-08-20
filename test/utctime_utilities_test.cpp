@@ -100,7 +100,6 @@ TEST_CASE("test_calendar_to_string") {
     TS_ASSERT_EQUALS(osl.to_string(t),string("2012-05-08T13:16:44+01"));
     TS_ASSERT_EQUALS(xxx.to_string(t),string("2012-05-08T09:46:44-02:30"));
     t=utc.time(1960,1,2,3,4,5,6);
-    YMDhms c=utc.calendar_units(t);
     auto s=utc.to_string(t);
     TS_ASSERT_EQUALS(s,string("1960-01-02T03:04:05.000006Z"));
 }

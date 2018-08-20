@@ -17,7 +17,7 @@
       uid: /TEV.-Tya...........-D9100A3B1060R123.999
       start_datetime: 2013-09-01T00:00:00
       run_time_step: 86400 # 3600
-      number_of_steps: 365 # 26280
+      number_of_steps: 364 # 26280
       weight: 1.0
       obj_func:
         name: NSE # Nash–Sutcliffe efficiency (NSE) or Kling–Gupta efficiency (KGE)
@@ -29,7 +29,7 @@
       uid: /TEV.-Selbu-lok.....-D9100A3B1070R123.020
       start_datetime: 2013-09-01T00:00:00
       run_time_step: 86400 # 3600
-      number_of_steps: 365 # 26280
+      number_of_steps: 364 # 26280
       weight: 1.0
       obj_func:
         name: NSE # Nash–Sutcliffe efficiency (NSE) or Kling–Gupta efficiency (KGE)
@@ -41,7 +41,7 @@
       uid: /TEV.-Nea...........-D9100A3B1050R123.998
       start_datetime: 2013-09-01T00:00:00
       run_time_step: 86400 # 3600
-      number_of_steps: 365 # 26280
+      number_of_steps: 364 # 26280
       weight: 1.0
       obj_func:
         name: NSE # Nash–Sutcliffe efficiency (NSE) or Kling–Gupta efficiency (KGE)
@@ -107,6 +107,33 @@
     gs.glacier_albedo:
       min: 0.4
       max: 0.4
+    gs.initial_bare_ground_fraction:
+      min: 0.04
+      max: 0.04
+    gs.winter_end_day_of_year:
+      min: 100
+      max: 100
+    gs.calculate_iso_pot_energy:
+      min: 0
+      max: 0
+    gs.n_winter_days:
+      min: 100
+      max: 100
+    gm.dtf:
+      min: 5
+      max: 5 
+    gm.direct_response:
+      min: 0.0
+      max: 0.0
+    routing.velocity:
+      min: 0
+      max: 0
+    routing.alpha:
+      min: 0.9
+      max: 0.9
+    routing.beta:
+      min: 3.0
+      max: 3.0
     p_corr.scale_factor:
       min: 1.0
       max: 1.0
