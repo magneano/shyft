@@ -504,6 +504,8 @@ public:
 
         if ( ! save_path_exists(fn) ) {
             this->register_from_save(fn, ts, queries, win_thread_close);
+        } else if ( auto it = queries.find("destination"); it != queries.cend() ) {
+            this->move_from_save(fn, ts, queries, overwrite, win_thread_close);
         } else {
             this->update_from_save(fn, ts, queries, win_thread_close);
         }
@@ -514,7 +516,7 @@ public:
         core::utctimespan dt = core::calendar::HOUR;
         if ( auto it = queries.find("dt"); it != queries.cend() ) {
             try {
-                dt = seconds(std::stol(it->second));
+                dt = core::seconds(std::stol(it->second));
             } catch ( const std::invalid_argument & ) {
                 throw std::runtime_error(std::string{"krls_pred_db: cannot parse time-step: "}+it->second);
             }
@@ -598,7 +600,7 @@ public:
     ) {
         // request exclusive access
         wait_for_close_fh();
-        const auto ffp = make_full_path(fn);
+        const auto ffp = make_full_path(fn, true);
         writer_file_lock lck(f_mx, ffp);
         // setup file pointer
         std::unique_ptr<std::FILE, close_write_handle> fh;  // zero-initializes deleter
@@ -707,6 +709,34 @@ public:
         }
     }
 
+    void move_predictor(
+        const std::string & from_fn,
+        const std::string & to_fn,
+        const bool overwrite = false,
+        const bool win_thread_close = true
+    ) {
+        // request exclusive access to both paths
+        wait_for_close_fh();
+        const auto from_ffp = make_full_path(from_fn);
+        const auto to_ffp = make_full_path(to_fn);
+        writer_file_lock from_lck(f_mx, from_ffp);
+        writer_file_lock to_lck(f_mx, to_ffp);
+        // setup file pointer
+        std::unique_ptr<std::FILE, close_write_handle> fh;  // zero-initializes deleter
+        fh.get_deleter().win_thread_close = win_thread_close;
+        fh.get_deleter().parent = const_cast<krls_pred_db*>(this);
+
+        if ( this->save_path_exists(from_fn) ) {
+            if ( overwrite || ! save_path_exists(to_fn) ) {
+                fs::rename(from_ffp, to_ffp);
+            } else {
+                throw std::runtime_error(std::string{"krls_pred_db: destination id already exist and overwrite not specified"});
+            }
+        } else {
+            throw std::runtime_error(std::string{"krls_pred_db: no data for id: "}+from_fn);
+        }
+    }
+
     gts_t predict_time_series(
         const std::string & fn,
         const gta_t & ta
@@ -761,6 +791,8 @@ private:
     }
     std::string make_full_path(const std::string& fn, bool create_paths = false) const {
         fs::path fn_path{ fn }, root_path{ root_dir };
+        fn_path.make_preferred();
+        root_path.make_preferred();
         // determine path type
         if (fn_path.is_relative()) {
             fn_path = root_path / fn_path;
@@ -802,7 +834,7 @@ private:
 
         core::utctimespan dt_scaling;
         if ( auto it = queries.find("dt_scaling"); it != queries.cend() ) {
-            dt_scaling = seconds(std::stoll(it->second));
+            dt_scaling = core::seconds(std::stoll(it->second));
         } else {
             throw std::runtime_error("krls_pred_db: no time scaling (dt_scaling) in query parameters");
         }
@@ -834,6 +866,21 @@ private:
         }
 
         this->register_rbf_series(fn, source_url, period, dt_scaling, point_fx, krls_dict_size, tolerance, gamma, win_thread_close);
+    }
+    void move_from_save(
+        const std::string & fn, const gts_t & ts,
+        const queries_t & queries = queries_t{},
+        const bool overwrite = false,
+        const bool win_thread_close = true
+    ) {
+        std::string to_fn{};
+        if ( auto it = queries.find("destination"); it != queries.cend() ) {
+            to_fn = it->second;
+        } else {
+            throw std::runtime_error{std::string{"krls_pred_db: no destination id to move"}};
+        }
+
+        this->move_predictor(fn, to_fn, overwrite, win_thread_close);
     }
     void update_from_save(
         const std::string & fn, const gts_t & ts,
