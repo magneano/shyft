@@ -261,7 +261,7 @@ namespace shyft {
 			YMDhms():year(0), month(0), day(0), hour(0), minute(0), second(0),micro_second(0) {}
 			YMDhms(int Y, int M=1, int D=1, int h=0, int m=0, int s=0,int us=0) : year(Y), month(M), day(D), hour(h), minute(m), second(s),micro_second(us)  {
                 if(!is_valid())
-                    throw std::runtime_error("calendar coordinates failed simple range check for one or more item");
+                    throw std::runtime_error("calendar coordinates failed simple range check for one or more item:"+std::to_string(Y));
 			}
 
 			int year; int month; int day; int hour; int minute; int second;int micro_second;

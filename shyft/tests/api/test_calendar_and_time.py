@@ -268,5 +268,14 @@ class Calendar(unittest.TestCase):
         self.assertAlmostEqual(float(api.time(10.23)), 10.23)
         self.assertAlmostEqual(api.time(1.23).seconds, 1.23)
 
+    def test_time_large_number(self):
+        a = 1000.0*api.time(1534832966.984426)
+        self.assertIsNotNone(a)
+        b = api.time(a)/1000.0
+        self.assertIsNotNone(b)
+        sb=str(b)
+        self.assertTrue(len(sb)>0)
+        pass
+
 if __name__ == "__main__":
     unittest.main()

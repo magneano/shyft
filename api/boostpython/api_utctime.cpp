@@ -155,8 +155,11 @@ namespace expose {
 		    // presenting it as a iso 8601 if > 1 year from 1970, otherwise just report seconds
 			utctime dt = x_self(args);
 			auto dt_s = std::chrono::duration_cast<std::chrono::seconds>(dt);
-			if(dt > calendar::YEAR || dt < -calendar::YEAR) { // assume user want to see year..
-                calendar utc;
+            static calendar utc;
+            auto max_year = utc.time(YMDhms::YEAR_MAX,1,1);
+            auto min_year = utc.time(YMDhms::YEAR_MIN,1,1);
+            
+			if((dt > calendar::YEAR || dt < -calendar::YEAR) && (dt<max_year && dt>min_year)) { // assume user want to see year..
                 return py::str(utc.to_string(dt));
 			} else {
                 char s[100];
@@ -209,7 +212,7 @@ namespace expose {
 				return   from_seconds(d());
             py::extract<string> s(po);
 			if (s.check())
-				return create_from_iso8601_string(s);
+				return create_from_iso8601_string(s());
 			throw std::runtime_error("supplied argument not convertible to time");
 		}
 		// rel ops
