@@ -36,6 +36,9 @@ conda activate shyft_env
 export SHYFT_DEPENDENCIES_DIR=$WORKSPACE/shyft_dependencies
 export PYTHONPATH=$WORKSPACE/shyft
 
+# Purge previously built conda packages to save disk space
+conda build purge-all
+
 # Build shyft
 cd $WORKSPACE/shyft
 mkdir -p build
