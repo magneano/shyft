@@ -681,7 +681,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         elif k == 'forecasts_that_cover_period':
             v_shift_first = int(v.start - lead_times_in_sec[nb_lead_intervals_to_drop])
             v_shift_last = int(v.end - lead_times_in_sec[nb_lead_intervals_to_drop + nb_lead_intervals])
-            time_slice = ((time <= v_shift_first) & (time > v_shift_last))
+            time_slice = ((time <= v_shift_first) & (time >= v_shift_last))
             if not any(time_slice):
                 raise ConcatDataRepositoryError(
                     "No forecasts found that cover period {} with restrictions 'nb_lead_intervals_to_drop'={} "
