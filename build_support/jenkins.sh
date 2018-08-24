@@ -38,6 +38,7 @@ export PYTHONPATH=$WORKSPACE/shyft
 
 # Purge previously built conda packages to save disk space
 conda build purge-all
+conda clean --all -y
 
 # Build shyft
 cd $WORKSPACE/shyft
