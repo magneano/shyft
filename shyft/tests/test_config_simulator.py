@@ -50,7 +50,7 @@ class ConfigSimulationTestCase(unittest.TestCase):
 
     def test_run_geo_ts_data_config_calibrator(self):
         # These config files are versioned in shyft git
-        config_dir = path.join(path.dirname(__file__), "netcdf")
+        config_dir = path.join(shyftdata_dir,"neanidelv","yaml_config")
         config_file = path.join(config_dir, "neanidelva_calibration.yaml")
         print(config_file)
         config_section = "neanidelva"
