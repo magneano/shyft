@@ -7,11 +7,13 @@
 #include "core/time_axis.h"
 #include "core/time_series_dd.h"
 
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
 
 
 TEST_SUITE("time_series") {
 
     using shyft::core::no_utctime;
+    using shyft::core::seconds;
     using std::numeric_limits;
     const double eps = numeric_limits<double>::epsilon();
     using shyft::time_series::dd::apoint_ts;
@@ -44,7 +46,7 @@ TEST_SUITE("time_series") {
     }
 
     TEST_CASE("qac_ts") {
-        generic_dt ta{0,10,5};
+        generic_dt ta{_t(0),seconds(10),5};
         //                 0    1       2     3    4
         vector<double> v {0.0,1.0,shyft::nan,3.0,-20.1};
         vector<double>ev {0.0,1.0,       2.0,3.0,-20.1};
@@ -59,14 +61,14 @@ TEST_SUITE("time_series") {
         FAST_CHECK_UNARY(ts.get()!=nullptr);
         FAST_CHECK_EQ(ts->value(2),doctest::Approx(2.0));
         FAST_CHECK_EQ(ts->value_at(ts->time(2)),doctest::Approx(2.0));
-        FAST_CHECK_EQ(ts->value_at(ts->time(2)+1),doctest::Approx(2.0));
+        FAST_CHECK_EQ(ts->value_at(ts->time(2)+seconds(1)),doctest::Approx(2.0));
         src.set_point_interpretation(ts_point_fx::POINT_INSTANT_VALUE);
-        FAST_CHECK_EQ(ts->value_at(ts->time(2)+1),doctest::Approx(2.1));
-        FAST_CHECK_EQ(ts->value_at(ts->time(2)-1),doctest::Approx(1.9));
+        FAST_CHECK_EQ(ts->value_at(ts->time(2)+ seconds(1) ),doctest::Approx(2.1));
+        FAST_CHECK_EQ(ts->value_at(ts->time(2)- seconds(1) ),doctest::Approx(1.9));
         ts->p.min_x = 0.0;
-        FAST_CHECK_UNARY(!isfinite(ts->value_at(ts->time(3)+1)));
+        FAST_CHECK_UNARY(!isfinite(ts->value_at(ts->time(3)+ seconds(1) )));
         ts->p.min_x = -40.0;
-        FAST_CHECK_UNARY(isfinite(ts->value_at(ts->time(3)+1)));
+        FAST_CHECK_UNARY(isfinite(ts->value_at(ts->time(3)+ seconds(1) )));
         ts->p.max_x = 2.9; // clip 3.0 out of range
         FAST_CHECK_EQ(ts->value(2),
                       doctest::Approx(

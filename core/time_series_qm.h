@@ -9,10 +9,12 @@ See file COPYING for more details **/
 
 #include "utctime_utilities.h"
 #include "time_series.h"
+#include "time_series_average.h"
 
 namespace shyft {
     namespace qm {
         using namespace std;
+        using shyft::core::to_seconds;
 
         /**\brief quantile_index generates a pr. time-step index for order by value
         * \tparam tsa_t time-series accessor type that fits to tsv_t::value_type and ta_t, thread-safe fast access to the value aspect
@@ -207,6 +209,44 @@ namespace shyft {
             double value(size_t i) const { return tsv[ordered_ix[t_ix][i]].value(t_ix); }
         };
 
+        /** compute the utcperiod that covers all ts in tsv
+         *
+         * Given a tsv, find the largest period that covers all time-axis.
+         * \tparam tsv_t any kind of iterable that returns object that supports
+         *               .time_axis(), that provides .total_period().
+         * \param tsv - the ts-vector with forecasts
+         * \return utcperiod, the period that covers all time_axis().total_period()
+         */
+        template<class tsv_t>
+        inline core::utcperiod compute_cover_period(const tsv_t&tsv) {
+            core::utcperiod fc_period;
+            for (const auto&ts : tsv) {
+                auto p = ts.time_axis().total_period();
+                if (!fc_period.valid())
+                    fc_period = p;
+                else {
+                    fc_period.start = std::min(fc_period.start, p.start);
+                    fc_period.end = std::max(fc_period.end, p.end);
+                }
+            }
+            return fc_period;
+        }
+
+        /** given interpolation start,end, and max time t_end, return empty period, or ready clipped period */
+        inline core::utcperiod compute_interpolation_period(core::utcperiod fc_period,core::utctime interpolation_start,core::utctime interpolation_end,core::utctime t_end) {
+            core::utcperiod interpolation_period;
+            if (core::is_valid(interpolation_start)) {
+                interpolation_period = core::utcperiod(interpolation_start, t_end);
+                if (core::is_valid(interpolation_end))
+                    interpolation_period.end = interpolation_end;
+                // now clip i.start <= fc_end
+                // and clip i.end <= fc_end
+                interpolation_period.start = std::min(fc_period.end, interpolation_period.start);
+                interpolation_period.end = std::min(fc_period.end, interpolation_period.end);
+            }
+            return interpolation_period;
+        }
+
         /**\brief The main quantile mapping function, which, using quantile
         * calculations, maps the values of the weighted 'forecast' time
         * series vectors onto the 'prior' time series. This mapping is done
@@ -267,43 +307,20 @@ namespace shyft {
             for (const auto& ts : pri_tsv)
                 pri_accessor_vec.emplace_back(ts, time_axis);
 
-            core::utcperiod fc_period; // compute the maximum forecast period
-            for (const auto&ts : fc_tsv) {
-                auto p = ts.time_axis().total_period();
-                if (!fc_period.valid())
-                    fc_period = p;
-                else {
-                    fc_period.start = std::min(fc_period.start, p.start);
-                    fc_period.end = std::max(fc_period.end, p.end);
-                }
-            }
-
-            core::utcperiod interpolation_period;
-            if (core::is_valid(interpolation_start)) {
-                interpolation_period = core::utcperiod(interpolation_start, time_axis.time(time_axis.size() - 1));
-                if (core::is_valid(interpolation_end))
-                    interpolation_period.end = interpolation_end;
-                // now clip i.start <= fc_end
-                // and clip i.end <= fc_end
-                interpolation_period.start = std::min(fc_period.end, interpolation_period.start);
-                interpolation_period.end = std::min(fc_period.end, interpolation_period.end);
-            }
-            else {
-                interpolation_period = core::utcperiod();
-            }
+            auto fc_period=compute_cover_period(fc_tsv); // compute the maximum forecast period
+            auto interpolation_period=compute_interpolation_period(fc_period,interpolation_start,interpolation_end,time_axis.time(time_axis.size() - 1));
 
             vector<tsa_t> fc_accessor_vec;
-            pri_accessor_vec.reserve(fc_tsv.size());
+            fc_accessor_vec.reserve(fc_tsv.size());
             for (const auto& ts : fc_tsv)
                 fc_accessor_vec.emplace_back(ts, time_axis);
 
             auto wvo_fc = wvo_accessor<tsa_t>(fc_idx_v, fc_weights, fc_accessor_vec);
 
-
             tsv_t output;
             output.reserve(pri_tsv.size());
             for (size_t i = 0; i<pri_tsv.size(); ++i) {
-                output.emplace_back(time_axis, nan, pri_tsv[i].point_interpretation());
+                output.emplace_back(time_axis, nan, time_series::POINT_AVERAGE_VALUE);
             }
             for (size_t t = 0; t<time_axis.size(); ++t) {
                 wvo_fc.t_ix = t;
@@ -319,19 +336,41 @@ namespace shyft {
                             interpolation_period.end == time_axis.time(t))) {
                         core::utctime start = interpolation_period.start;
                         core::utctime end = interpolation_period.end;
-                        double interp_weight = (static_cast<double>(time_axis.time(t) - start)/(end - start));
+                        double interp_weight = to_seconds(time_axis.time(t) - start)/to_seconds(end - start);
                         for (size_t i = 0; i < num_pri_cases; ++i)
                             output[pri_idx_v[t][i]].set(t,(1.0 - interp_weight)*quantile_vals[i] + interp_weight*pri_accessor_vec[pri_idx_v[t][i]].value(t));
                     } else {
                         for (size_t i = 0; i < num_pri_cases; ++i)  output[pri_idx_v[t][i]].set(t, quantile_vals[i]);
                     }
                 } else { // if no more forecast available, or after valid end, use the prior scenario value for the specified time-points
-                    for (size_t i = 0; i < num_pri_cases; ++i)  output[pri_idx_v[t][i]].set(t, pri_accessor_vec[pri_idx_v[t][i]].value(t));
+                    for (size_t i = 0; i < output.size(); ++i)  output[i].set(t, pri_accessor_vec[i].value(t));
                 }
             }
 
             return output;
         }
+
+        /** append historical_ts to the end qm ts,
+         * inplace construct the resulting ts into the result vector.
+         * 
+         * \param historical_ts with values that should be appended to the qm, could be of any time-resolution.
+         * \param qm the quantile mapped result, starts the result series, the time-axis should be aligned with the ta-parameter first part
+         * \param ta the total time-axis for the resulting time-series, the qm ts should be aligned with the start of this one
+         * \param ta_hist the time-axis  that should be appended
+         * \param r the result vector where the result should be .emplace_back constructed into
+         */
+         template <class ta_t,class ts_t>
+         void merge_qm_result( const ts_t &historical_ts, const ts_t& qm,const ta_t &ta, const ta_t&ta_hist,vector<ts_t>&r) {
+                vector<double> v(ta.size(),nan);
+                auto b=begin(qm.values());
+				const auto p_fx = historical_ts.point_interpretation();
+                std::copy(b,b+qm.size(),begin(v));
+				vector<double> hv = p_fx==time_series::POINT_AVERAGE_VALUE?
+					time_series::accumulate_stair_case(ta_hist, historical_ts, true):
+					time_series::accumulate_linear(ta_hist, historical_ts, true);
+				std::copy(begin(hv), end(hv), begin(v) + qm.size());
+                r.emplace_back(ta, move(v), time_series::POINT_AVERAGE_VALUE); // because the operation is true average
+            };
 
         /** \brief the quantile_map_forecast applies quantile_mapping to weighted forecast_set and historical data
         *
@@ -373,14 +412,35 @@ namespace shyft {
                     weights_unpacked.emplace_back(set_weights[i]);
                 }
             }
+            auto fc_period=compute_cover_period(forecasts_unpacked); // compute the maximum forecast period
+            auto ta_last_step = time_axis.time(time_axis.size() - 1);
+            auto interpolation_period=compute_interpolation_period(fc_period,interpolation_start,interpolation_end,ta_last_step);
+            auto qm_end = interpolation_period.valid()?interpolation_period.end:fc_period.end;
+            auto qm_ix_end = time_axis.index_of(qm_end);
+            auto qm_n_steps = qm_ix_end==std::string::npos?time_axis.size():qm_ix_end+1;
+            auto qm_time_axis = time_axis.slice(0,qm_n_steps); // +1, ->include time-step we end into
+            auto historical_indices_handle = async(launch::async, quantile_index<tsa_t, tsv_t, ta_t>, historical_data, qm_time_axis);
+            auto forecast_indices = quantile_index<tsa_t>(forecasts_unpacked, qm_time_axis);
 
-            auto historical_indices_handle = async(launch::async, quantile_index<tsa_t, tsv_t, ta_t>, historical_data, time_axis);
-            auto forecast_indices = quantile_index<tsa_t>(forecasts_unpacked, time_axis);
+            auto qm_tsv=quantile_mapping<tsa_t>(
+                            historical_data,
+                            forecasts_unpacked,
+                            historical_indices_handle.get(),
+                            forecast_indices,
+                            weights_unpacked,
+                            qm_time_axis,
+                            interpolation_start,
+                            interpolation_end,
+                            interpolated_quantiles
+                    );
+            if(qm_time_axis==time_axis) // early exit, zero copy if possible
+                return qm_tsv;
 
-            return quantile_mapping<tsa_t>(historical_data, forecasts_unpacked,
-                historical_indices_handle.get(), forecast_indices, weights_unpacked,
-                time_axis, interpolation_start,interpolation_end,
-                interpolated_quantiles);
+            tsv_t r;
+            r.reserve(historical_data.size());
+			auto ta_ext = time_axis.slice(qm_n_steps, time_axis.size() - qm_n_steps);// the time-axis extension with historical data
+            for (size_t i = 0; i<historical_data.size(); ++i)  merge_qm_result(historical_data[i],qm_tsv[i],time_axis,ta_ext,r);
+            return r;
         }
     }
 }

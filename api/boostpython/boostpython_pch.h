@@ -7,32 +7,11 @@ See file COPYING for more details **/
 #pragma warning (disable : 4503)
 #endif
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include <boost/python/module.hpp>
-#include <boost/python/def.hpp>
-#include <boost/python/args.hpp>
-#include <boost/python/class.hpp>
-#include <boost/python/scope.hpp>
+#include <boost/python.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
 #include <boost/python/suite/indexing/map_indexing_suite.hpp>
-#include <boost/python/overloads.hpp>
-#include <boost/python/return_internal_reference.hpp>
-#include <boost/python/copy_const_reference.hpp>
-#include <boost/python/handle.hpp>
-#include <boost/python/tuple.hpp>
-#include <boost/python/enum.hpp>
-#include <boost/python/operators.hpp>
-#include <boost/python/overloads.hpp>
-#include <boost/operators.hpp>
-#include <boost/python/docstring_options.hpp>
-
 #include <boost/preprocessor/seq/for_each.hpp>
-#include <boost/python/import.hpp>
-#include "boost/python/make_constructor.hpp"
-
-
-
 #include <boost/multi_array.hpp>
-
 #include "core/core_serialization.h"
 
 // experiment with python doc standard macro helpers

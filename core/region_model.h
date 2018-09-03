@@ -248,14 +248,11 @@ namespace shyft {
                 }
             }
 
-            size_t n_catchments=0;///< optimized//extracted as max(cell.geo.catchment_id())+1 in run interpolate
-
             void clone(const region_model& c) {
                 // First, clear own content
                 ncore = c.ncore;
                 time_axis = c.time_axis;
                 catchment_filter = c.catchment_filter;
-                n_catchments = c.n_catchments;
 				ip_parameter = c.ip_parameter;
                 region_env = c.region_env;// todo: verify it is deep or shallow copy
                 catchment_parameters.clear();
@@ -315,7 +312,7 @@ namespace shyft {
             region_env_t region_env;///< the region environment (shallow-copy?) as passed to the interpolation/run_interpolation
             std::vector<state_t> initial_state; ///< the initial state, set explicit, or by the first call to .set_states(..) or run_cells()
             routing::river_network river_network;///< the routing river_network, can be empty
-            
+
             /** \brief compute and return number of catchments inspecting call cells.geo.catchment_id() */
             size_t number_of_catchments() const { return cix_to_cid.size(); }
             /** \brief provide a copy of computed cids to python */
@@ -363,7 +360,6 @@ namespace shyft {
 				for (auto&c : *cells) {
 					c.init_env_ts(time_axis);
 				}
-				n_catchments = number_of_catchments();// keep this/assume invariant..
 				this->time_axis = time_axis;
 			}
 
@@ -372,7 +368,7 @@ namespace shyft {
 			    if(ta.gt == generic_dt::generic_type::FIXED)
                     return ta.f;
                 if(ta.gt == generic_dt::generic_type::CALENDAR) {
-                    if(ta.c.dt <= 86400)
+                    if(ta.c.dt <= seconds(86400))
                         return timeaxis_t(ta.c.t,ta.c.dt,ta.c.n);
 			    }
 			    throw runtime_error("region-model routine requires a fixed-delta-t type of TimeAxis");
@@ -878,8 +874,8 @@ namespace shyft {
             void catchment_discharges( TSV& cr) const {
                 typedef typename TSV::value_type ts_t;
                 cr.clear();
-                cr.reserve(n_catchments);
-                for(size_t i=0;i<n_catchments;++i) {
+                cr.reserve(number_of_catchments());
+                for(size_t i=0;i<number_of_catchments();++i) {
                     cr.emplace_back(ts_t(time_axis, 0.0));
                 }
                 for(const auto& c: *cells) {
@@ -892,8 +888,8 @@ namespace shyft {
             void catchment_charges(TSV& cr) const {
                 typedef typename TSV::value_type ts_t;
                 cr.clear();
-                cr.reserve(n_catchments);
-                for (size_t i = 0;i < n_catchments;++i) {
+                cr.reserve(number_of_catchments());
+                for (size_t i = 0;i < number_of_catchments();++i) {
                     cr.emplace_back(ts_t(time_axis, 0.0));
                 }
                 for (const auto& c : *cells) {
@@ -951,9 +947,9 @@ namespace shyft {
                 }
                 return r;
             }
-            
+
             /** check if all values in cell.env_ts for selected calculation-filter is non-nan,
-             * i.e. valid numbers 
+             * i.e. valid numbers
              */
             bool is_cell_env_ts_ok() {
                 for(const auto& c: *cells) {

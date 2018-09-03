@@ -2,6 +2,8 @@
 #include "test_pch.h"
 #include "core/hbv_physical_snow.h"
 
+static inline shyft::core::utctime _t(int64_t t1970s) {return shyft::core::utctime{shyft::core::seconds(t1970s)};}
+
 using namespace shyft::core;
 using namespace shyft::core::hbv_physical_snow;
 using namespace std;
@@ -53,7 +55,7 @@ TEST_CASE("test_hbv_physical_snow_mass_balance_at_snowpack_reset") {
 
     state.distribute(p);
 
-    snow_model.step(state, r, dt*24*320, dt, temperature, rad, precipitation,
+    snow_model.step(state, r, utctime(dt*24*320), dt, temperature, rad, precipitation,
             wind_speed, rel_hum);
     double total_water_after = state.swe + r.outflow;
     TS_ASSERT_DELTA(total_water_before, total_water_after, 1.0e-8);
@@ -86,7 +88,7 @@ TEST_CASE("test_hbv_physical_snow_mass_balance_at_snowpack_buildup") {
     double total_water_before = precipitation + swe;
     SnowModel snow_model(p);
     state.distribute(p);
-    snow_model.step(state, r, dt*24*320, dt, temperature, rad, precipitation,
+    snow_model.step(state, r, utctime(dt*24*320), dt, temperature, rad, precipitation,
             wind_speed, rel_hum);
     double total_water_after = state.swe + r.outflow;
     TS_ASSERT_DELTA(total_water_before, total_water_after, 1.0e-8);
@@ -95,7 +97,7 @@ TEST_CASE("test_hbv_physical_snow_mass_balance_at_snowpack_buildup") {
     temperature=p.tx;// special check fo tx
     SnowModel snow_model2(p);
     state.distribute(p);
-    snow_model2.step(state, r, dt*24*320, dt, temperature, rad, precipitation,
+    snow_model2.step(state, r, utctime(dt*24*320), dt, temperature, rad, precipitation,
             wind_speed, rel_hum);
     TS_ASSERT_DELTA(total_water_before,state.swe+r.outflow, 1.0e-8);
 
@@ -129,7 +131,7 @@ TEST_CASE("test_hbv_physical_snow_mass_balance_rain_no_snow") {
     double total_water_before = precipitation + swe;
     SnowModel snow_model(p);
     state.distribute(p);
-    snow_model.step(state, r, dt*24*320, dt, temperature, rad, precipitation,
+    snow_model.step(state, r, utctime(dt*24*320), dt, temperature, rad, precipitation,
             wind_speed, rel_hum);
     double total_water_after = state.swe + r.outflow;
     TS_ASSERT_DELTA(total_water_before, total_water_after, 1.0e-8);
@@ -166,7 +168,7 @@ TEST_CASE("test_hbv_physical_snow_mass_balance_melt_no_precip") {
     SnowModel snow_model(p);
     state.distribute(p);
 
-    snow_model.step(state, r, dt*24*320, dt, temperature, rad, precipitation,
+    snow_model.step(state, r, utctime(dt*24*320), dt, temperature, rad, precipitation,
             wind_speed, rel_hum);
     double total_water_after = state.swe + r.outflow;
     TS_ASSERT_DELTA(total_water_before, total_water_after, 1.0e-8);

@@ -12,6 +12,12 @@ See file COPYING for more details **/
 #include "core/geo_cell_data.h"
 #include "core/time_series_dd.h"
 #include "api/api.h"
+#include "core/core_serialization.h"
+#include "core/core_archive.h"
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
+
+//#include <boost/python/raw_function.hpp>
 
 namespace expose {
     using namespace shyft::core;
@@ -28,6 +34,39 @@ namespace expose {
         import_array();
         return nullptr;
     }
+
+    template<class T>
+    static T x_arg(const py::tuple& args, size_t i) {
+        if (py::len(args) + 1 < (int)i)
+            throw std::runtime_error("missing arg #" + std::to_string(i) + std::string(" in time"));
+        py::object o = args[i];
+        py::extract<T> xtract_arg(o);
+        return xtract_arg();
+    }
+
+    /* helper to expose serialize and deserialize */
+    struct geo_cell_data_vector_ext {
+        static py::object serialize_to_string(const py::tuple& args, const py::dict & kwargs) {
+            const auto& gcd = x_arg<const vector<shyft::core::geo_cell_data>&>(args, 0);
+            // serialize to binary string
+            //
+            std::ostringstream bs;
+            core_oarchive oa(bs,core_arch_flags);
+            oa<<core_nvp("geo_cell_data_vector", gcd);
+            bs.flush();
+            auto bss = bs.str();
+            return py::object(vector<char>(begin(bss),end(bss)));
+        }
+        static py::object deserialize_from_string(const py::tuple& args, const py::dict & kwargs) {
+            auto bss = x_arg<vector<char>>(args, 0);
+            //-- de-serialize from
+            istringstream xmli(string(bss.data(),bss.size()));
+            core_iarchive ia(xmli, core_arch_flags);
+            vector<geo_cell_data> gcd;
+            ia>>core_nvp("geo_cell_data_vector", gcd);
+            return py::object(gcd);
+        }
+    };
 
     ats_vector create_tsv_from_np(const gta_t& ta, const numpy_boost<double,2>& a ,ts::ts_point_fx point_fx) {
         ats_vector r;
@@ -129,6 +168,14 @@ namespace expose {
         class_<GeoCellDataVector>("GeoCellDataVector", "A vector, list, of GeoCellData")
             .def(vector_indexing_suite<GeoCellDataVector>())
             .def(init<const GeoCellDataVector&>(args("const_ref_v")))
+            .def(self==self)
+            .def(self!=self)
+            .def("serialize",py::raw_function(&geo_cell_data_vector_ext::serialize_to_string,1),
+                 doc_intro("serialize to a binary byte vector")
+            )
+            .def("deserialize", py::raw_function(&geo_cell_data_vector_ext::deserialize_from_string, 1),
+                 doc_intro("deserialize from a binary to GeoCellDataVector")
+            ).staticmethod("deserialize")
             ;
         py_api::iterable_converter().from_python<GeoCellDataVector>();
     }
@@ -199,15 +246,194 @@ namespace expose {
         );
         numpy_boost_python_register_type<double, 2>();
     }
+	typedef std::vector<utctime> UtcTimeVector;
+    extern utctime  x_kwarg_utctime(const py::tuple& args, const py::dict& kwargs,size_t i,const char *kw) ;
+	struct utc_ext {
+		static UtcTimeVector *create_default() {
+			return new UtcTimeVector();
+		}
+		static UtcTimeVector *create_from_intv(const std::vector<int>&v) {
+			auto r = new UtcTimeVector(); r->reserve(v.size());
+			for (auto s : v)
+				r->emplace_back(utctime{ std::chrono::seconds(s) });
+			return r;
+		}
 
+		static UtcTimeVector *create_from_doublev(const std::vector<double>&v) {
+			auto r = new UtcTimeVector(); r->reserve(v.size());
+			for (auto s : v)
+				r->emplace_back(from_seconds(s));
+			return r;
+		}
+		template<class tp>
+		static UtcTimeVector *create_from_np_tp(const numpy_boost<tp, 1>& npv) {
+			auto r = new UtcTimeVector();
+			size_t n = npv.shape()[0];
+			r->reserve(n);
+			for (size_t i = 0; i<n; ++i) {
+				r->emplace_back(from_seconds(npv[i]));
+			}
+			return r;
+		}
+		static UtcTimeVector *create_from_clone(const std::vector<utctime>&v) {
+			return new UtcTimeVector(v);
+		}
+		static UtcTimeVector *create_from_list(py::list times) {
+			if(py::len(times)==0)
+				return new UtcTimeVector();
+			auto r = new UtcTimeVector();
+			size_t n = py::len(times);
+			r->reserve(py::len(times));
+			for(size_t i=0;i<n;++i) {
+				py::object oi = times[i];
+				py::extract<utctime> xtract_utctime(oi);
+				if (xtract_utctime.check()) {
+					r->push_back(xtract_utctime());
+				} else {
+					py::extract<int64_t> xtract_int(oi);
+					if (xtract_int.check()) {
+						r->push_back(utctime{ std::chrono::seconds(xtract_int()) });
+					} else {
+						py::extract<double> xtract_double(oi);
+						if (xtract_double.check()) {
+							r->push_back(utctime{ from_seconds(xtract_double()) });
+						} else {
+							py::extract<string> xtract_string(oi);
+							if (xtract_string.check()){
+								r->push_back(create_from_iso8601_string(xtract_string()));
+							} else {
+								throw std::runtime_error(std::string("failed to convert ") + std::to_string(i) + " element to utctime");
+							}
+						}
+					}
+				}
+			}
+			return r;
+
+		}
+
+		static py::object push_back(const py::tuple& args,const py::dict& kwargs) {
+            py::extract<vector<utctime>&> s(args[0]);
+            if(!s.check()) throw std::runtime_error("UtcTimeVector: invalid self to push_back");
+            auto& v=s();
+            auto t=x_kwarg_utctime(args,kwargs,1,"t");
+            v.push_back(t);
+            return py::object();
+        }
+
+	};
+	
+    static numpy_boost<int64_t, 1> utctime_to_numpy(const vector<utctime>&v) {
+		int dims[] = { int(v.size()) };
+		numpy_boost<int64_t, 1> r(dims);
+		for (size_t i = 0; i<r.size(); ++i) {
+			r[i] = to_seconds64( v[i]);
+		}
+		return r;
+	}
+    static numpy_boost<double, 1> utctime_to_numpy_double(const vector<utctime>&v) {
+		int dims[] = { int(v.size()) };
+		numpy_boost<double, 1> r(dims);
+		for (size_t i = 0; i<r.size(); ++i) {
+			r[i] = to_seconds( v[i]);
+		}
+		return r;
+	}
+	
+	static vector<utctime> utctime_from_numpy(const numpy_boost<int64_t, 1>& npv) {
+		size_t n = npv.shape()[0];
+		vector<utctime> r; r.reserve(n);
+		for (size_t i = 0; i<npv.shape()[0]; ++i) {
+			r.emplace_back(from_seconds(npv[i]));
+		}
+		return r;
+	}
+
+	static void expose_utctime_vector() {
+
+		class_<UtcTimeVector>("UtcTimeVector",no_init)
+			.def(vector_indexing_suite<UtcTimeVector>()) // meaning it get all it needs to appear as python list
+			.def("__init__", make_constructor(&utc_ext::create_default,
+				default_call_policies()
+				),
+				doc_intro("construct empty UtcTimeVecor")
+			)
+			.def("__init__", make_constructor(&utc_ext::create_from_clone,
+				default_call_policies(),(py::arg("clone_me"))
+				),
+				doc_intro("construct a copy of supplied  UtcTimeVecor")
+				doc_parameters()
+				doc_parameter("clone_me", "UtcTimeVector", "to be cloned")
+			)
+			.def("__init__", make_constructor(&utc_ext::create_from_intv,
+				default_call_policies(),
+				(py::arg("seconds_vector"))
+			    ),
+				doc_intro("construct a from seconds epoch utc as integer")
+				doc_parameters()
+				doc_parameter("seconds", "IntVector", "seconds")
+			)
+			.def("__init__", make_constructor(&utc_ext::create_from_doublev,
+				default_call_policies(),
+				(py::arg("seconds_vector"))
+			    ),
+				doc_intro("construct a from seconds epoch utc as float")
+				doc_parameters()
+				doc_parameter("seconds", "DoubleVector", "seconds, up to us resolution epoch utc")
+			)
+			.def("__init__", make_constructor(&utc_ext::create_from_list,
+				default_call_policies(),
+				(py::arg("times"))
+				),
+				doc_intro("construct a from a list of something that is convertible to UtcTime")
+				doc_parameters()
+				doc_parameter("times", "list", "a list with convertible times")
+			)
+			.def("__init__", make_constructor(&utc_ext::create_from_np_tp<int64_t>,
+				default_call_policies(),
+				(py::arg("np_times"))
+				),
+				doc_intro("construct a from a numpy array of int64 s epoch")
+				doc_parameters()
+				doc_parameter("np_times", "list", "a list with convertible times")
+			)
+			.def("__init__", make_constructor(&utc_ext::create_from_np_tp<double>,
+				default_call_policies(),
+				(py::arg("np_times"))
+			    ),
+				doc_intro("construct a from a numpy array of float s epoch")
+				doc_parameters()
+				doc_parameter("np_times", "list", "a list with float convertible times")
+			)
+            .def("push_back",raw_function(utc_ext::push_back,2),
+                doc_intro("appends a utctime like value to the vector")
+                doc_parameters()
+                doc_parameter("t","utctime","an int (seconds), or utctime")
+            )
+			.def("from_numpy", utctime_from_numpy).staticmethod("from_numpy") //bw.compatible
+			.def("to_numpy", utctime_to_numpy,(py::arg("self")),
+				doc_intro("convert to numpy array of type np.int64, seconds since epoch")
+			)
+			.def("to_numpy_double", utctime_to_numpy_double,(py::arg("self")),
+				doc_intro("convert to numpy array of type np.float64, seconds since epoch")
+			)
+			;
+
+		numpy_boost_python_register_type<utctime, 1>(); // register the numpy object so we can access it in C++
+		numpy_boost_python_register_type<int64_t, 1>();
+		py_api::iterable_converter().from_python<UtcTimeVector>();
+
+	}
     void vectors() {
         np_import();
         expose_str_vector("StringVector");
         expose_vector<double>("DoubleVector");
 		expose_vector<vector<double>>("DoubleVectorVector");
         expose_vector<int>("IntVector");
+        expose_vector<int64_t>("Int64Vector");
         expose_vector<char>("ByteVector");
-        expose_vector<utctime>("UtcTimeVector");
+        //expose_vector<utctime>("UtcTimeVector");
+        expose_utctime_vector();
         expose_geo_point_vector();
         expose_geo_cell_data_vector();
         expose_ts_vector_create();

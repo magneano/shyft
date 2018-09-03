@@ -1,7 +1,11 @@
 import unittest
 from shyft import api
 from shyft.repository.netcdf.time_conversion import convert_netcdf_time
-from netcdftime import utime
+try:
+    from cftime import utime
+except ModuleNotFoundError as mnf:
+    from netcdftime import utime
+
 import numpy as np
 
 

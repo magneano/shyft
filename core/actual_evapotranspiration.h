@@ -57,7 +57,7 @@ namespace shyft {
 				const double potential_evapotranspiration,
 				const double scale_factor,
 				const double snow_fraction,
-				const utctime ) {
+				const utctimespan ) {
 				return potential_evapotranspiration*calc_pot_ratio(water_level,scale_factor)*(1.0 - snow_fraction);
 			}
 		};

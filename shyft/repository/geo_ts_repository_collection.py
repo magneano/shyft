@@ -19,7 +19,7 @@ class GeoTsRepositoryCollection(interfaces.GeoTsRepository):
        repository.
     We have started out providing to simple hopefully useful ways of combining
     the results:
-    add: - the result will be the union of the data provided by the geo-ts-repositories
+    add: the result will be the union of the data provided by the geo-ts-repositories
     replace: the geo-ts from the last geo-ts-repository will replace
              the one preceeding in the list.
              
@@ -36,12 +36,19 @@ class GeoTsRepositoryCollection(interfaces.GeoTsRepository):
         src_types = self._get_src_types_per_repo(input_source_types)
         tss = [r.get_timeseries(src_type, utc_period, geo_location_criteria)
                for r, src_type in zip(self.geo_ts_repositories, src_types)]
+        sources = tss[0]
         if self.reduce_type == "replace":
-            sources = tss[0]
             for ts in tss[1:]:
                 sources.update(ts)
+        elif self.reduce_type == "add":
+            for ts in tss[1:]:
+                for srs_name, srs_vec in ts.items():
+                    if srs_name in sources:
+                        [sources[srs_name].append(srs) for srs in srs_vec]
+                    else:
+                        sources[srs_name] = srs_vec
         else:
-            raise GeoTsRepositoryCollectionError("Only replace is supported yet")
+            raise GeoTsRepositoryCollectionError("Only replace and add is supported.")
         return sources
 
     def get_forecast(self, input_source_types, utc_period, t_c, geo_location_criteria=None):

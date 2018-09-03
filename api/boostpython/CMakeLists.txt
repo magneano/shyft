@@ -87,7 +87,8 @@
     # step 2: get the real-name (we want libboost_system.so.1.66.0, not the symlink libboost_system.so)
     get_filename_component(a_lib ${ARMADILLO_LIBRARIES} REALPATH CACHE)
     get_filename_component(d_lib ${dlib_lib} REALPATH CACHE)
-    string(REPLACE ".400.0" ""   a_lib_major ${a_lib})  # fixup for armadillo that references major version
+    string(REGEX REPLACE ".[1-9]00.[1-9]" ""   a_lib_major ${a_lib})  # fixup for armadillo that references major version
+
 
     # step 3: install to the shyft/lib (that is referenced by the RPATH relative to the extensions libraries on linux)
     install(FILES 

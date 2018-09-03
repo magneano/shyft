@@ -10,87 +10,95 @@ See file COPYING for more details **/
 #include <iosfwd>
 #include <algorithm>
 #include <ctime>
-
+#include <chrono>
+#include <cmath>
 #include "core_serialization.h"
+
 namespace shyft {
 	namespace core {
         /** \brief utctime
-         * basic types for time handling
-		 * we use linear time, i.e. time is just a number
-		 * on the timeaxis, utc. Timeaxis zero is at 1970-01-01 00:00:00 (unix time).
-		 * resolution is 1 second, integer.
-		 * also define min max and no_utctime
-		 *
-		 * The advantage with the definition is that it is well defined and commonly known in all platforms
-		 * Also considered: moving to std::chrono, would enable a strict time arithmetic regime, of little advantage in this
-		 * context, and at the cost of compile time (also consider the python/api part).
-         */
+        * basic types for time handling
+        * we use linear time, i.e. time is just a number
+        * on the timeaxis, utc. Timeaxis zero is at 1970-01-01 00:00:00 (unix time).
+        * resolution is 1 utctimespan, currently micro seconds.
+        * also define min max and no_utctime
+        *
+        * The advantage with the definition is that it is well defined and commonly known in all platforms
+        */
+        using utc_clock = std::chrono::system_clock;
+        using utctimespan = std::chrono::microseconds;
+        using seconds = std::chrono::seconds;
+        inline utctimespan deltahours(int h) { return std::chrono::duration_cast<utctimespan>(std::chrono::hours(h)); }
+        inline utctimespan deltaminutes(int m) { return std::chrono::duration_cast<utctimespan>(std::chrono::minutes(m)); }
 
-		#ifdef _WIN32
-		typedef long long utctime;          /// time_t is typedef'd as a __time64_t, which is an __int64., happens to be equal to EnkiTime
-		typedef long long utctimespan;      /// utctimespan is typdedef'd as a utctime (thus __int64)
+        using utctime = utctimespan;//std::chrono::time_point<utc_clock,utctimespan>;// clock::time_point<chrono::milliseconds>;
+        constexpr const utctime utctime_0 = utctime{seconds{0}};// epoch, 1970.01.01 utc
+        constexpr const utctime max_utctime	= utctime::max();	/// max 64bit int
+        constexpr const utctime min_utctime	= utctime::min()+utctimespan{1};
+        constexpr const utctime no_utctime = utctime::min();
 
-		#else
-				typedef long utctime;       /// time_t is typedef'd as a __time64_t, which is an __int64., happens to be equal to EnkiTime
-				typedef long utctimespan;   /// utctimespan is typdedef'd as a utctime (thus __int64)
-		#endif
-
-        /*
-         * Forward declarations
-         */
-        struct calendar;
-        /** \brief deltahours
-         * \param n number of hours
-         * \return utctimespan representing number of hours specified
-         */
-		inline utctimespan deltahours(int n) { return n*utctimespan(3600); }
-
-        /** \brief deltaminutes
-         * \param n number of minutes
-         * \return utctimespan representing number of minutes specified
-         */
-		inline utctimespan deltaminutes(int n) { return n*60; }
-
-        /** \brief max_utctime represent the maximum utctime
-         */
-		const		utctime max_utctime	= (utctime) (0x7FFFFFFFFFFFFFFFL);	/// max 64bit int
-
-        /** \brief min_utctime represent the minimum utctime (equal to -max_utctime)
-         */
-		const		utctime min_utctime	= - max_utctime;  /// min 64bit int
-
-        /** \brief no_utctime represents 'NaN' time, null time, not valid time
-         */
-		const		utctime no_utctime	= min_utctime - 1L;/// Nonvalid
-
-        /** \brief utctimeNow, utctime_now()
-         *  \return current systemclock utctime
-         */
-		inline utctime utctime_now() {return (utctime)time(0); }
+        /** \brief current utctime
+        *  \return current systemclock utctime
+        */
+        inline utctime utctime_now() {return std::chrono::time_point_cast<utctimespan>(utc_clock::now()).time_since_epoch(); }
 
         inline bool is_valid(utctime t) {return t != no_utctime;}
-        
+
+        /** \brief computes floor of t vs utctimespan dt
+        *
+        * If dt is 0, t is returned
+        * if dt< 0 then it computes ceil, (hmm)
+        * \return floor of t vs dt as explained above
+        */
+        inline utctime floor(utctime t, utctimespan dt) noexcept {
+            int64_t den = dt.count();
+            if (den == 0)
+                return t;
+            int64_t num = t.count();
+            if (0 < (num^den))
+                return utctime(utctimespan(den*(num / den)));
+            auto r = lldiv(num, den);
+            return utctime(utctimespan(r.rem ? den*(r.quot - 1) : den*r.quot));
+        }
+
+        utctime utctime_floor(utctime t, utctimespan dt) noexcept; // expose to python
+
+        utctime create_from_iso8601_string(const std::string&s);
+
+        inline double to_seconds(const utctimespan &dt) noexcept { return double(dt.count()) / utctimespan{seconds{1}}.count(); }
+        inline int64_t to_seconds64(const utctimespan&dt ) noexcept {return dt.count()/utctimespan{seconds{1}}.count();}
+        inline utctimespan from_seconds(double sec) noexcept { return utctimespan{ int64_t(round(utctimespan::period::den*sec / utctimespan::period::num)) }; } // NAN,INF?
+        constexpr inline utctime utctime_from_seconds64(int64_t x) noexcept {return utctime{seconds(x)};}
+
+
+        struct calendar;
+
         enum class trim_policy:int8_t {TRIM_IN, TRIM_OUT};
+
         /** \brief utcperiod is defined
          *  as period on the utctime space, like
          * [start..end>, where end >=start to be valid
          *
          */
 		struct utcperiod {
-			utcperiod(utctime start, utctime end): start(start), end(end) {}
-			utcperiod(): start(no_utctime), end(no_utctime) {}
-			utctimespan timespan() const {	return end - start; }
-			bool valid() const { return start != no_utctime && end != no_utctime && start <= end; }
-			bool operator==(const utcperiod &p) const { return start == p.start &&  end == p.end; }
-			bool operator!=(const utcperiod &p) const {return ! (*this==p);}
-			bool contains(utctime t) const {return is_valid(t)&&valid()?t>=start && t<end:false;}
-
-			bool contains(const utcperiod& p) const {return valid()&&p.valid()&& p.start>=start &&p.end <=end;}
-			bool overlaps(const utcperiod& p) const {return ( (p.start >= end) || (p.end <= start) )?false:true; }
+            utcperiod(utctime start, utctime end) noexcept: start(start), end(end) {}
+            utcperiod(int64_t start, int64_t end) noexcept : start{ seconds(start) }, end{ seconds(end) } {}
+            utcperiod() noexcept: start(no_utctime), end(no_utctime) {}
+            utctimespan timespan() const noexcept {	return (end - start); }
+			bool valid() const noexcept { return start != no_utctime && end != no_utctime && start <= end; }
+			bool operator==(const utcperiod &p) const noexcept { return start == p.start &&  end == p.end; }
+			bool operator!=(const utcperiod &p) const noexcept {return ! (*this==p);}
+			bool contains(utctime t) const noexcept {return is_valid(t)&&valid()?t>=start && t<end:false;}
+            bool contains(int64_t t) const noexcept {return contains(seconds{t});}
+			bool contains(const utcperiod& p) const noexcept {return valid()&&p.valid()&& p.start>=start &&p.end <=end;}
+			bool overlaps(const utcperiod& p) const noexcept {return ( (p.start >= end) || (p.end <= start) )?false:true; }
 
             utcperiod trim(const calendar &c, utctimespan deltaT, trim_policy tp) const;
-            utctimespan diff_units(const calendar &c, utctimespan deltaT) const;
-            utctimespan diff_units(const calendar &c, utctimespan deltaT, utctimespan &remainder) const;
+            utcperiod trim(const calendar &c, int64_t deltaT, trim_policy tp) const {return trim(c,seconds{deltaT},tp);}
+            int64_t diff_units(const calendar &c, utctimespan deltaT) const;
+            int64_t diff_units(const calendar &c, int64_t deltaT) const {return diff_units(c,seconds{deltaT});}
+            int64_t diff_units(const calendar &c, utctimespan deltaT, utctimespan &remainder) const;
+            int64_t diff_units(const calendar &c, int64_t deltaT, utctimespan &remainder) const {return diff_units(c,seconds{deltaT},remainder);}
 
 			utctime start;
 			utctime end;
@@ -98,13 +106,13 @@ namespace shyft {
             friend std::ostream& operator<<(std::ostream& os, const utcperiod& p);
             x_serialize_decl();
 		};
-		inline bool is_valid(const utcperiod &p) {return p.valid();}
+		inline bool is_valid(const utcperiod &p) noexcept {return p.valid();}
 		/** returns intersection of a and b
          *  ensures that if there is an a.overlaps(b), the intersection is returned, where .timespan() >0
          *  otherwise an empty not .valid() period is returned.
          *  \note: that intersection of 0 is not defined as intersection
          */
-        inline utcperiod intersection(const utcperiod&a, const utcperiod& b) {
+        inline utcperiod intersection(const utcperiod&a, const utcperiod& b) noexcept {
 			if (a.overlaps(b)) {
 				return utcperiod(std::max(a.start, b.start), std::min(a.end, b.end));
 			}
@@ -161,7 +169,7 @@ namespace shyft {
                 * \param dt of type utctimespan, positive for tz east of GMT
                 */
                 explicit tz_table(utctimespan dt):start_year(0) {
-                    if(dt != 0) {
+                    if(dt != utctimespan{0}) {
                         char s[100];sprintf(s,"UTC%+02d",int(dt/deltahours(1)));
                         tz_name=s;
                     } else {
@@ -250,21 +258,21 @@ namespace shyft {
 		struct YMDhms {
             static const int YEAR_MAX= 9999;
             static const int YEAR_MIN=-9999;
-			YMDhms():year(0), month(0), day(0), hour(0), minute(0), second(0) {}
-			YMDhms(int Y, int M=1, int D=1, int h=0, int m=0, int s=0) : year(Y), month(M), day(D), hour(h), minute(m), second(s)  {
+			YMDhms():year(0), month(0), day(0), hour(0), minute(0), second(0),micro_second(0) {}
+			YMDhms(int Y, int M=1, int D=1, int h=0, int m=0, int s=0,int us=0) : year(Y), month(M), day(D), hour(h), minute(m), second(s),micro_second(us)  {
                 if(!is_valid())
-                    throw std::runtime_error("calendar coordinates failed simple range check for one or more item");
+                    throw std::runtime_error("calendar coordinates failed simple range check for one or more item:"+std::to_string(Y));
 			}
 
-			int year; int month; int day; int hour; int minute; int second;
+			int year; int month; int day; int hour; int minute; int second;int micro_second;
 			///< just check that YMDhms are within reasonable ranges,\note it might still be an 'invalid' date!
-			bool is_valid_coordinates() const {return !(year<YEAR_MIN || year>YEAR_MAX || month<1 || month>12 ||day<1 || day>31 ||hour<0 || hour>23 || minute<0 ||minute>59||second<0 ||second>59);}
+			bool is_valid_coordinates() const {return !(year<YEAR_MIN || year>YEAR_MAX || month<1 || month>12 ||day<1 || day>31 ||hour<0 || hour>23 || minute<0 ||minute>59||second<0 ||second>59||micro_second<0 || micro_second>=1000000);}
             ///< if a 'null' or valid_coordinates
 			bool is_valid() const { return is_null() || is_valid_coordinates(); }
-			bool is_null() const { return year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0; }
+			bool is_null() const { return year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0 && micro_second==0; }
 			bool operator==(YMDhms const& x) const {
                 return x.year == year && x.month == month && x.day == day && x.hour == hour
-                       && x.minute == minute && x.second == second;
+                       && x.minute == minute && x.second == second && x.micro_second==micro_second;
             }
             bool operator!=(YMDhms const&o) const { return !operator==(o); }
 			static YMDhms max() {return YMDhms(YEAR_MAX,12,31,23,59,59);}
@@ -277,25 +285,27 @@ namespace shyft {
             int hour;
             int minute;
             int second;
-            YWdhms() :iso_year(0), iso_week(0), week_day(0), hour(0), minute(0), second(0) {}
+            int micro_second;
+            YWdhms() :iso_year(0), iso_week(0), week_day(0), hour(0), minute(0), second(0),micro_second(0) {}
             YWdhms(int iso_year,
                 int iso_week=1,
                 int week_day=1,
                 int hour=0,
                 int minute=0,
-                int second=0
-            ):iso_year(iso_year), iso_week(iso_week), week_day(week_day), hour(hour), minute(minute), second(second) {
+                int second=0,
+                int micro_second=0
+            ):iso_year(iso_year), iso_week(iso_week), week_day(week_day), hour(hour), minute(minute), second(second),micro_second(micro_second) {
                 if (!is_valid())
                     throw std::runtime_error("calendar iso week coordinates failed simple range check for one or more item");
             }
             bool operator==(YWdhms const& x) const {
                 return x.iso_year == iso_year && x.iso_week == iso_week && x.week_day == week_day && x.hour == hour
-                    && x.minute == minute && x.second == second;
+                    && x.minute == minute && x.second == second && x.micro_second==micro_second;
             }
             bool operator!=(YWdhms const&x) const { return !operator==(x); }
-            bool is_null() const { return iso_year == 0 && iso_week == 0 && week_day == 0 && hour == 0 && minute == 0 && second == 0; }
+            bool is_null() const { return iso_year == 0 && iso_week == 0 && week_day == 0 && hour == 0 && minute == 0 && second == 0 && micro_second==0; }
             ///< just check that YMDhms are within reasonable ranges,\note it might still be an 'invalid' date!
-            bool is_valid_coordinates() const { return !(iso_year<YMDhms::YEAR_MIN || iso_year>YMDhms::YEAR_MAX || iso_week < 1 || iso_week>53 || week_day < 1 || week_day>7 || hour < 0 || hour>23 || minute < 0 || minute>59 || second < 0 || second>59); }
+            bool is_valid_coordinates() const { return !(iso_year<YMDhms::YEAR_MIN || iso_year>YMDhms::YEAR_MAX || iso_week < 1 || iso_week>53 || week_day < 1 || week_day>7 || hour < 0 || hour>23 || minute < 0 || minute>59 || second < 0 || second>59 || micro_second<0 || micro_second >=1000000); }
             ///< if a 'null' or valid_coordinates
             bool is_valid() const { return is_null() || is_valid_coordinates(); }
             static YWdhms max() { return YWdhms(YMDhms::YEAR_MAX, 52, 6, 23, 59, 59); }
@@ -318,22 +328,22 @@ namespace shyft {
          */
 		struct calendar {
 			// these do have calendar sematics(could/should be separate typed/enum instad)
-			static const utctimespan YEAR=365*24*3600L;
-            static const utctimespan QUARTER = 3*30*24*3600L;
-			static const utctimespan MONTH = 30*24*3600L;
-			static const utctimespan WEEK = 7*24*3600L;
-			static const utctimespan DAY =  1*24*3600L;
-			static const utctimespan HOUR_3 = 3 * 3600L;
+			static const utctimespan YEAR;//=seconds{365*24*3600L};
+            static const utctimespan QUARTER;// = seconds{3*30*24*3600L};
+			static const utctimespan MONTH;// = seconds{30*24*3600L};
+			static const utctimespan WEEK;// = seconds{7*24*3600L};
+			static const utctimespan DAY;// =  seconds{1*24*3600L};
+			static const utctimespan HOUR_3;// = seconds{3 * 3600L};
 			// these are just timespan constants with no calendar semantics
-			static const utctimespan HOUR = 3600L;
-			static const utctimespan MINUTE = 60L;
-			static const utctimespan SECOND = 1L;
+			static const utctimespan HOUR;// = seconds{3600L};
+			static const utctimespan MINUTE;// = seconds{60L};
+			static const utctimespan SECOND;// = seconds{1L};
 
-			static const int UnixDay = 2440588;///< Calc::julian_day_number(ymd(1970,01,01));
-			static const utctime UnixSecond = 86400LL * (utctime)UnixDay;///<Calc::julian_day_number(ymd(1970,01,01));
+			static constexpr const int64_t UnixDay = 2440588;///< Calc::julian_day_number(ymd(1970,01,01));
+			static constexpr const int64_t UnixSecond = 86400LL * UnixDay;///<Calc::julian_day_number(ymd(1970,01,01));
 
 			// Snapped from boost gregorian_calendar.ipp
-			static inline unsigned long day_number(const YMDhms& ymd) {
+			static inline unsigned long day_number(const YMDhms& ymd) noexcept {
 				unsigned short a = static_cast<unsigned short>((14 - ymd.month) / 12);
 				unsigned short y = static_cast<unsigned short>(ymd.year + 4800 - a);
 				unsigned short m = static_cast<unsigned short>(ymd.month + 12 * a - 3);
@@ -341,7 +351,7 @@ namespace shyft {
 				return d;
 			}
 
-			static inline YMDhms from_day_number(unsigned long dayNumber) {
+			static inline YMDhms from_day_number(unsigned long dayNumber) noexcept {
 				int a = dayNumber + 32044;
 				int b = (4 * a + 3) / 146097;
 				int c = a - ((146097 * b) / 4);
@@ -353,16 +363,20 @@ namespace shyft {
 				int year = static_cast<unsigned short>(100 * b + d - 4800 + (m / 10));
 				return YMDhms(year, month, day);
 			}
-			static int inline day_number(utctime t) {
-				return (int)((UnixSecond + t) / DAY);
-			}
-			static inline utctimespan seconds(int h, int m, int s) { return h*HOUR + m*MINUTE + s*SECOND; }
+
+            static inline int64_t day_number(utctime t) noexcept {
+                return (int64_t)((UnixSecond + std::chrono::duration_cast<std::chrono::seconds>(t).count()) / std::chrono::duration_cast<std::chrono::seconds>(DAY).count());
+            }
+            static inline utctimespan hms_seconds(int h, int m, int s,int us=0) noexcept { return deltahours(h) + deltaminutes(m) + seconds(s)+utctime(us); }
+
+
 
 			time_zone::tz_info_t_ tz_info;
 			/**\brief returns tz_info (helper for boost python really) */
 			time_zone::tz_info_t_ get_tz_info() const {return tz_info;}
 			/**\brief construct a timezone with standard offset, no dst, name= UTC+01 etc. */
-			explicit calendar(utctimespan tz=0): tz_info(new time_zone::tz_info_t(tz)) {}
+			explicit calendar(utctimespan tz): tz_info(new time_zone::tz_info_t(tz)) {}
+			explicit calendar(int tz_s=0) :tz_info(new time_zone::tz_info_t(utctimespan{seconds(tz_s)})) {}
 			/**\brief construct a timezone from tz_info shared ptr provided from typically time_zone db */
 			explicit calendar(time_zone::tz_info_t_ tz_info):tz_info(tz_info) {}
             calendar(calendar const&o) :tz_info(o.tz_info) {}
@@ -398,10 +412,10 @@ namespace shyft {
             utctime time(YWdhms c) const;
 
             ///<short hand for calendar::time(YMDhms)
-            utctime time(int Y,int M=1,int D=1,int h=0,int m=0,int s=0) const {
-                return time(YMDhms(Y,M,D,h,m,s));
+            utctime time(int Y,int M=1,int D=1,int h=0,int m=0,int s=0,int us=0) const {
+                return time(YMDhms(Y,M,D,h,m,s,us));
             }
-            utctime time_from_week(int Y, int W = 1, int wd = 1, int h = 0, int m = 0, int s = 0) const;
+            utctime time_from_week(int Y, int W = 1, int wd = 1, int h = 0, int m = 0, int s = 0,int us=0) const;
             /**\brief returns *utc_year* of t \note for internal dst calculations only */
 			static inline int utc_year(utctime t) {
                 if(t == no_utctime  ) throw std::runtime_error("year of no_utctime");
@@ -478,7 +492,7 @@ namespace shyft {
 			 * \param n number of delta T to add, can be negative
 			 * \return new calculated utctime
 			 */
-			utctime add(utctime t, utctimespan deltaT, long n) const ;
+			utctime add(utctime t, utctimespan deltaT, int64_t n) const ;
 
 			/**\brief calculate the distance t1..t2 in specified units
 			 *
@@ -491,9 +505,9 @@ namespace shyft {
 			 *
 			 * \return (t2-t1)/deltaT, and remainder, where deltaT could be calendar units DAY,WEEK,MONTH,YEAR
 			 */
-			utctimespan diff_units(utctime t1, utctime t2, utctimespan deltaT, utctimespan &remainder) const ;
+			int64_t diff_units(utctime t1, utctime t2, utctimespan deltaT, utctimespan &remainder) const ;
 			///< diff_units discarding remainder, \sa diff_units
-			utctimespan diff_units(utctime t1, utctime t2, utctimespan deltaT) const {
+			int64_t diff_units(utctime t1, utctime t2, utctimespan deltaT) const {
 			    utctimespan ignore;
 			    return diff_units(t1,t2,deltaT,ignore);
 			}
@@ -514,6 +528,34 @@ namespace shyft {
 	}
 }
 //-- serialization support: expose class keys
+namespace boost {
+namespace archive {
+namespace sc = shyft::core;
+
+template<class Archive>
+void load(Archive& ar, sc::utctime& tp, unsigned);
+
+template<class Archive>
+void save(Archive& ar, sc::utctime const& tp, unsigned);
+
+template<class Archive>
+void serialize(Archive & ar, sc::utctime& tp, unsigned version);
+#if 0
+template<class Archive>
+void load(Archive& ar, sc::utctimespan& tp, unsigned) ;
+
+template<class Archive>
+void save(Archive& ar, sc::utctimespan const& tp, unsigned);
+
+template<class Archive>
+void serialize(Archive & ar, sc::utctimespan& tp, unsigned version);
+#endif
+}
+}
+
+
+//x_serialize_export_key_nt(shyft::core::utctime);
+//x_serialize_export_key_nt(shyft::core::utctimespan);
 x_serialize_export_key_nt(shyft::core::utcperiod);
 x_serialize_export_key(shyft::core::time_zone::tz_info_t);
 x_serialize_export_key(shyft::core::time_zone::tz_table);

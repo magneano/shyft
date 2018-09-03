@@ -134,9 +134,12 @@
     <ClCompile Include="calibration_test.cpp" />
     <ClCompile Include="cell_builder_test.cpp" />
     <ClCompile Include="api_test.cpp" />
+    <ClCompile Include="dtss_krls_pred_db_test.cpp" />
     <ClCompile Include="dtss_mutex_test.cpp" />
     <ClCompile Include="dtss_stress_test.cpp" />
     <ClCompile Include="dtss_test.cpp" />
+    <ClCompile Include="dtss_db_test.cpp" />
+    <ClCompile Include="dtss_url_test.cpp" />
     <ClCompile Include="glacier_melt_test.cpp" />
     <ClCompile Include="gridpp_test.cpp" />
     <ClCompile Include="hbv_actual_evapotranspiration_test.cpp" />
@@ -177,6 +180,7 @@
     <ClCompile Include="time_series_fixup_test.cpp" />
     <ClCompile Include="time_series_test.cpp" />
     <ClCompile Include="time_series_decode_test.cpp" />
+    <ClCompile Include="time_series_derivative_test.cpp" />
     <ClCompile Include="time_axis_test.cpp" />
     <ClCompile Include="utctime_utilities_test.cpp" />
     <ClCompile Include="serialization_test.cpp" />

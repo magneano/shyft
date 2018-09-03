@@ -12,7 +12,7 @@
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="-nv -tc=dtss_mutex" />
+				<Option parameters="-nv -tc=qm_main" />
 				<Compiler>
 					<Add option="-g" />
 				</Compiler>
@@ -98,6 +98,9 @@
 			<Option virtualFolder="dtss/" />
 		</Unit>
 		<Unit filename="dtss_test.cpp">
+			<Option virtualFolder="dtss/" />
+		</Unit>
+		<Unit filename="dtss_db_test.cpp">
 			<Option virtualFolder="dtss/" />
 		</Unit>
 		<Unit filename="gamma_snow_test.cpp">
@@ -210,6 +213,9 @@
 			<Option virtualFolder="time_series/" />
 		</Unit>
 		<Unit filename="time_series_decode_test.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>
+		<Unit filename="time_series_derivative_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
 		<Unit filename="time_series_fixup_test.cpp">

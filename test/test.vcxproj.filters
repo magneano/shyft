@@ -126,6 +126,9 @@
     <ClCompile Include="time_series_average_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
+    <ClCompile Include="time_series_derivative_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
     <ClCompile Include="time_series_decode_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
@@ -142,6 +145,15 @@
       <Filter>dtss</Filter>
     </ClCompile>
     <ClCompile Include="dtss_test.cpp">
+      <Filter>dtss</Filter>
+    </ClCompile>
+    <ClCompile Include="dtss_db_test.cpp">
+      <Filter>dtss</Filter>
+    </ClCompile>
+    <ClCompile Include="dtss_url_test.cpp">
+      <Filter>dtss</Filter>
+    </ClCompile>
+    <ClCompile Include="dtss_krls_pred_db_test.cpp">
       <Filter>dtss</Filter>
     </ClCompile>
   </ItemGroup>

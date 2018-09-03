@@ -192,18 +192,20 @@ namespace shyft {
                     return p.intervals.size();
                 }
 
-                template <class R> void step(S& s, R& r, utctime t0, utctime t1, double prec, double temp) const {
+                template <class R> void step(S& s, R& r, utctime t0, utctime t1, double prec_mm_h, double temp) const {
                     double swe = s.swe;
                     double sca = s.sca;
                     const auto &I = p.intervals;
-                    const double total_water = prec + swe;
+					double step_in_days = to_seconds(t1 - t0) / 86400.0;
+					const double dt_hours = to_seconds(t1 - t0)/3600.0;
+					const double prec = prec_mm_h*dt_hours;// from mm/h to mm
+					const double total_water = prec + swe;
                     double snow,rain;
                     if( temp < p.tx ) {snow=prec;rain= 0.0;}
                     else              {snow= 0.0;rain=prec;}
-                    double step_in_days = (t1 - t0)/86400.0;
                     swe += snow + sca*rain;
                     if (swe < 0.1) {
-                        r.outflow = total_water;
+                        r.outflow = total_water/dt_hours;
                         fill(begin(s.sp), end(s.sp), 0.0);
                         fill(begin(s.sw), end(s.sw), 0.0);
                         s.swe = 0.0;
@@ -267,7 +269,7 @@ namespace shyft {
                         } else
                             swe = total_water;
                     }
-                    r.outflow = total_water - swe;
+                    r.outflow = (total_water - swe)/dt_hours;// output is mm/h
                     s.swe = swe;
                     s.sca = sca;
                 }

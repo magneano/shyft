@@ -29,6 +29,23 @@ namespace fs = boost::filesystem;
 namespace shyft {
 namespace dtss {
 
+using std::move;
+using std::vector;
+using std::map;
+using std::shared_ptr;
+using std::make_shared;
+using std::unique_ptr;
+using std::make_unique;
+using std::runtime_error;
+using std::string;
+using std::size_t;
+using std::fopen;
+using std::fclose;
+using std::fwrite;
+using std::fread;
+using std::fseek;
+using std::FILE;
+
 using shyft::time_series::dd::apoint_ts;
 using shyft::time_series::dd::gpoint_ts;
 using shyft::time_series::dd::gts_t;
@@ -37,8 +54,12 @@ using shyft::core::utctime;
 using shyft::core::utcperiod;
 using shyft::core::utctimespan;
 using shyft::core::no_utctime;
+using shyft::core::max_utctime;
+using shyft::core::min_utctime;
 using shyft::core::calendar;
 using shyft::core::deltahours;
+using shyft::core::to_seconds64;
+using shyft::core::seconds;
 
 
 using gta_t = shyft::time_axis::generic_dt;
@@ -58,7 +79,10 @@ using gts_t = shyft::time_series::point_ts<gta_t>;
  * Format specification:
  * The binary format of the file is then defined as :
  *   <ts.db.file>   -> <header><time-axis><values>
- *       <header>   -> 'TS1' <point_fx> <ta_type> <n> <data_period>
+ *       <header>   -> ()'TS1'|'TS2') <point_fx> <ta_type> <n> <data_period>
+ *                            note:
+ *                               if 'TS1', then all time-values (int64_t) are in seconds,
+ *                               if 'TS2,' all time-values(int64_t) are in micro seconds
  *     <point_fx>   -> ts_point_fx:uint8_t
  *      <ta_type>   -> time_axis::generic_dt::generic_type:uint8_t
  *            <n>   -> uint32_t // number points
@@ -91,12 +115,67 @@ struct ts_db_header {
     utcperiod data_period; ///< [from..until> period range
 
     ts_db_header() = default;
-    ts_db_header(time_series::ts_point_fx point_fx, time_axis::generic_dt::generic_type ta_type, uint32_t n, utcperiod data_period)
+    ts_db_header(time_series::ts_point_fx point_fx, time_axis::generic_dt::generic_type ta_type, uint32_t n, utcperiod data_period, char v='1')
         : point_fx(point_fx), ta_type(ta_type), n(n), data_period(data_period) {
+     signature[2]=v;
     }
+    bool is_seconds() const noexcept {return signature[2]=='1';}
 };
 #pragma pack(pop)
 
+
+/** native-time io, using direct write/read utctime, that is micro seconds,
+  * zero overhead.
+  */
+struct native_time_io {
+        static char version() {return '2';}
+        static void write(FILE *fh,const utctime &t) {
+            if( fwrite(&t,sizeof(utctime),1,fh)!=1)
+                throw runtime_error("dtss_store: failed to write timepoint to disk");
+        }
+        static void write(FILE *fh,const vector<utctime> &t) {
+            if( fwrite(t.data(),sizeof(utctime),t.size(),fh)!=t.size())
+                throw runtime_error("dtss_store: failed to write timepoints to disk");
+        }
+         static void read(FILE *fh,utctime&t ) {
+            if( fread(&t,sizeof(utctime),1,fh)!=1)
+                throw runtime_error("dtss_store: failed to read timepoint from from disk");
+        }
+        static  void read(FILE *fh, vector<utctime> &t) {
+            if( fread(t.data(),sizeof(utctime),t.size(),fh)!=t.size())
+                throw runtime_error("dtss_store: failed to read timepoints  from disk");
+        }
+};
+
+/** seconds-based -time io, needs conversion/to/from us/seconds
+  * computational  overhead.
+  */
+struct seconds_time_io {
+        static char version() {return '1';}
+        static void write(FILE *fh,const utctime &t_us) {
+            int64_t t=to_seconds64(t_us);
+            if( fwrite(&t,sizeof(utctime),1,fh)!=1)
+                throw runtime_error("dtss_store: failed to write timepoint to disk");
+        }
+        static void write(FILE *fh,const vector<utctime> &t_us) {
+            vector<int64_t> t;t.reserve(t_us.size());// have to alloc and convert
+            for(const auto&tx:t_us) t.emplace_back(to_seconds64(tx));
+            if( fwrite(t.data(),sizeof(utctime),t.size(),fh)!=t.size())
+                throw runtime_error("dtss_store: failed to write timepoints to disk");
+        }
+         static void read(FILE *fh,utctime& t_us) {
+            int64_t t;
+            if( fread(&t,sizeof(utctime),1,fh)!=1)
+                throw runtime_error("dtss_store: failed to read timeponit from from disk");
+            t_us=seconds(t);
+        }
+        static  void read(FILE *fh, vector<utctime> &t_us) {
+            vector<int64_t>t;t.resize(t_us.size());
+            if( fread(t.data(),sizeof(utctime),t.size(),fh)!=t.size())
+                throw runtime_error("dtss_store: failed to read timepoints from disk");
+            for(size_t i=0;i<t.size();++i) t_us[i]=seconds(t[i]);
+        }
+};
 
 /** \brief A simple file-io based internal time-series storage for the dtss.
  *
@@ -133,10 +212,10 @@ struct ts_db_header {
  *
  */
 struct ts_db {
-    
-    using queries_t = std::map<std::string, std::string>;
 
-    std::string root_dir; ///< root_dir points to the top of the container
+    using queries_t = map<string, string>;
+
+    string root_dir; ///< root_dir points to the top of the container
 
   private:
       /** helper class needed for win compensating code */
@@ -148,29 +227,29 @@ struct ts_db {
         close_write_handle(bool wtc) noexcept : win_thread_close{ wtc } {};
         close_write_handle(const close_write_handle &) noexcept = default;
 
-        void operator()(std::FILE * fh) const {
+        void operator()(FILE * fh) const {
 #ifdef _WIN32WORKAROUND
             if (win_thread_close && parent) {
                 parent->fclose_me(fh);
             } else {
-                std::fclose(fh); // takes forever in windows, by design
+                fclose(fh); // takes forever in windows, by design
             }
 #else
-            std::fclose(fh);
+            fclose(fh);
 #endif
         }
     };
 
-    std::map<std::string, std::shared_ptr<core::calendar>> calendars;
+    map<string, shared_ptr<calendar>> calendars;
 
     //--section dealing with windows and (postponing slow) closing files
 #ifdef _WIN32WORKAROUND
     mutable mutex fclose_mx;
-    mutable std::vector<std::future<void>> fclose_windows;
+    mutable vector<std::future<void>> fclose_windows;
 
-    void fclose_me(std::FILE *fh) {
+    void fclose_me(FILE *fh) {
 		lock_guard<decltype(fclose_mx)> sl(fclose_mx);
-        fclose_windows.emplace_back(std::async(std::launch::async, [fh]() { std::fclose(fh); }));
+        fclose_windows.emplace_back(std::async(std::launch::async, [fh]() { fclose(fh); }));
     }
 
     void wait_for_close_fh() const noexcept {
@@ -190,17 +269,18 @@ struct ts_db {
 	file_lock_manager f_mx;
 
 public:
+    bool time_format_micro_seconds=true;///< for testing only, force save in old seconds format, to ensure we can read it.
     ts_db() = default;
 
     /** constructs a ts_db with specified container root */
-    explicit ts_db(const std::string& root_dir) :root_dir(root_dir) {
+    explicit ts_db(const string& root_dir) :root_dir(root_dir) {
         if (!fs::is_directory(root_dir)) {
             if (!fs::exists(root_dir)) {
                 if (!fs::create_directories(root_dir)) {
-                    throw std::runtime_error(std::string("ts_db: failed to create root directory :") + root_dir);
+                    throw runtime_error(string("ts_db: failed to create root directory :") + root_dir);
                 }
             } else {
-                throw std::runtime_error(std::string("ts_db: designated root directory is not a directory:") + root_dir);
+                throw runtime_error(string("ts_db: designated root directory is not a directory:") + root_dir);
             }
         }
         make_calendar_lookups();
@@ -227,59 +307,65 @@ public:
      *                          Use a deatached background thread to close the file.
      *                          Defaults to true.
      */
-    void save(const std::string& fn, const gts_t& ts, bool overwrite = true, const queries_t & queries = queries_t{}, bool win_thread_close = true) {
+    void save(const string& fn, const gts_t& ts, bool overwrite = true, const queries_t & queries = queries_t{}, bool win_thread_close = true) {
         wait_for_close_fh();
 
-        std::string ffp = make_full_path(fn, true);
+        string ffp = make_full_path(fn, true);
         writer_file_lock lck(f_mx,ffp);
-        std::unique_ptr<std::FILE, close_write_handle> fh;  // zero-initializes deleter
+        unique_ptr<FILE, close_write_handle> fh;  // zero-initializes deleter
         fh.get_deleter().win_thread_close = win_thread_close;
         fh.get_deleter().parent = const_cast<ts_db*>(this);
         ts_db_header old_header;
 
         bool do_merge = false;
         if (!overwrite && save_path_exists(fn)) {
-            fh.reset(std::fopen(ffp.c_str(), "r+b"));
+            fh.reset(fopen(ffp.c_str(), "r+b"));
             old_header = read_header(fh.get());
             if (ts.total_period().contains(old_header.data_period)) {
                 // old data is completly contained in the new => start the file anew
                 //  - reopen, as there is no simple way to truncate an open file...
-                //std::fseek(fh.get(), 0, SEEK_SET);
+                //fseek(fh.get(), 0, SEEK_SET);
                 wait_for_close_fh();
-                fh.reset(std::fopen(ffp.c_str(), "wb"));
+                fh.reset(fopen(ffp.c_str(), "wb"));
             } else {
                 do_merge = true;
             }
         } else {
-            fh.reset(std::fopen(ffp.c_str(), "wb"));
+            fh.reset(fopen(ffp.c_str(), "wb"));
         }
         if (!do_merge) {
-            write_ts(fh.get(), ts);
+            if(time_format_micro_seconds)
+                write_ts<native_time_io>(fh.get(), ts);
+            else
+                write_ts<seconds_time_io>(fh.get(), ts);
         } else {
-            merge_ts(fh.get(), old_header, ts);
+            if(old_header.is_seconds())
+                merge_ts<seconds_time_io>(fh.get(), old_header, ts);
+            else 
+                merge_ts<native_time_io>(fh.get(), old_header, ts);
         }
     }
 
     /** read a ts from specified file */
-    gts_t read(const std::string& fn, core::utcperiod p, const queries_t & queries = queries_t{}) {
+    gts_t read(const string& fn, utcperiod p, const queries_t & queries = queries_t{}) {
         wait_for_close_fh();
-        std::string ffp = make_full_path(fn);
+        string ffp = make_full_path(fn);
         reader_file_lock lck(f_mx, ffp);
 
-        std::unique_ptr<std::FILE, decltype(&std::fclose)> fh{ std::fopen(ffp.c_str(), "rb"), &std::fclose };
+        unique_ptr<FILE, decltype(&fclose)> fh{ fopen(ffp.c_str(), "rb"), &fclose };
         if(!fh.get()) {
-            throw std::runtime_error(std::string("shyft-read time-series internal: Could not open file ")+ffp );
+            throw runtime_error(string("shyft-read time-series internal: Could not open file ")+ffp );
         }
         return read_ts(fh.get(), p);
     }
 
     /** removes a ts from the container */
-    void remove(const std::string& fn, const queries_t & queries = queries_t{}) {
+    void remove(const string& fn, const queries_t & queries = queries_t{}) {
         wait_for_close_fh();
         auto fp = make_full_path(fn);
         writer_file_lock lck(f_mx, fp);
 
-        for (std::size_t retry = 0; retry < 10; ++retry) {
+        for (size_t retry = 0; retry < 10; ++retry) {
             try {
                 fs::remove(fp);
                 return;
@@ -287,27 +373,27 @@ public:
                 std::this_thread::sleep_for(std::chrono::duration<int, std::milli>(300));
             }
         }
-        throw std::runtime_error("failed to remove file '" + fp + "' after 10 repeated attempts lasting for 3 seconds");
+        throw runtime_error("failed to remove file '" + fp + "' after 10 repeated attempts lasting for 3 seconds");
     }
 
     /** get minimal ts-information from specified fn */
-    ts_info get_ts_info(const std::string& fn, const queries_t & queries = queries_t{}) {
+    ts_info get_ts_info(const string& fn, const queries_t & queries = queries_t{}) {
         wait_for_close_fh();
         auto ffp = make_full_path(fn);
         reader_file_lock lck(f_mx, ffp);
 
-        if ( this->save_path_exists(fn) ) {
-            std::unique_ptr<std::FILE, decltype(&std::fclose)> fh{ std::fopen(ffp.c_str(), "rb"), &std::fclose };
+        if ( save_path_exists(fn) ) {
+            unique_ptr<FILE, decltype(&fclose)> fh{ fopen(ffp.c_str(), "rb"), &fclose };
             auto h = read_header(fh.get());
             ts_info i;
             i.name = fn;
             i.point_fx = h.point_fx;
-            i.modified = utctime(fs::last_write_time(ffp));
+            i.modified = utctime(seconds(fs::last_write_time(ffp)));
             i.data_period = h.data_period;
             // consider time-axis type info, dt.. as well
             return i;
         } else {
-            throw std::runtime_error(std::string{"ts_db: no ts named: "}+fn);
+            throw runtime_error(string{"ts_db: no ts named: "}+fn);
         }
     }
 
@@ -316,14 +402,14 @@ public:
      * e.g.: match= 'hydmet_station/.*_id/temperature'
      *    would find all time-series /hydmet_station/xxx_id/temperature
      */
-    std::vector<ts_info> find(const std::string& match, const queries_t & queries = queries_t{}) {
+    vector<ts_info> find(const string& match, const queries_t & queries = queries_t{}) {
         wait_for_close_fh();
         fs::path root(root_dir);
-        std::vector<ts_info> r;
+        vector<ts_info> r;
         std::regex r_match(match, std::regex_constants::ECMAScript | std::regex_constants::icase);
 		for (auto& x : fs::recursive_directory_iterator(root)) {
             if (fs::is_regular(x.path())) {
-                std::string fn = x.path().lexically_relative(root).generic_string(); // x.path() except root-part
+                string fn = x.path().lexically_relative(root).generic_string(); // x.path() except root-part
                 if (std::regex_search(fn, r_match)) {
                     r.push_back(get_ts_info(fn, queries)); // TODO: maybe multi-core this into a job-queue
                 }
@@ -337,21 +423,21 @@ public:
     }
 
 private:
-    std::shared_ptr<core::calendar> lookup_calendar(const std::string& tz) const {
+    shared_ptr<calendar> lookup_calendar(const string& tz) const {
         auto it = calendars.find(tz);
         if (it == calendars.end())
-            return std::make_shared<core::calendar>(tz);
+            return make_shared<calendar>(tz);
         return it->second;
     }
 
     void make_calendar_lookups() {
         for (int hour = -11; hour < 12; hour++) {
-            auto c = std::make_shared<core::calendar>(deltahours(hour));
+            auto c = make_shared<calendar>(deltahours(hour));
             calendars[c->tz_info->name()] = c;
         }
     }
 
-    bool save_path_exists(const std::string & fn) const {
+    bool save_path_exists(const string & fn) const {
         fs::path fn_path{ fn }, root_path{ root_dir };
         if (fn_path.is_relative()) {
             fn_path = root_path / fn_path;
@@ -361,7 +447,7 @@ private:
         }
         return fs::is_regular_file(fn_path);
     }
-    std::string make_full_path(const std::string& fn, bool create_paths = false) const {
+    string make_full_path(const string& fn, bool create_paths = false) const {
         fs::path fn_path{ fn }, root_path{ root_dir };
         // determine path type
         if (fn_path.is_relative()) {
@@ -372,7 +458,7 @@ private:
         }
         // not a directory and create missing path
         if (fs::is_directory(fn_path)) {
-            throw std::runtime_error(fn_path.string() + " is a directory. Should be a file.");
+            throw runtime_error(fn_path.string() + " is a directory. Should be a file.");
         } else if (!fs::exists(fn_path) && create_paths) {
             fs::path rp = fn_path.parent_path();
             if (rp.compare(root_path) > 0) {  // if fn contains sub-directory, we have to check that it exits
@@ -385,65 +471,76 @@ private:
         return fn_path.string();
     }
 
+    template<class T>
     ts_db_header mk_header(const gts_t& ts) const {
-        return ts_db_header{ ts.point_interpretation(),ts.time_axis().gt,uint32_t(ts.size()),ts.total_period() };
+        auto p{ts.total_period() };
+         if(T::version()=='1') {
+             p.start /= utctime::period::den;
+             p.end  /= utctime::period::den;
+        }
+         return ts_db_header{ ts.point_interpretation(),ts.time_axis().gt,uint32_t(ts.size()),p,T::version()};
     }
 
     // ----------
 
-    inline void write(std::FILE * fh, const void* d, std::size_t sz) const {
-        if (std::fwrite(d, sizeof(char), sz, fh) != sz)
-            throw std::runtime_error("dtss_store: failed to write do disk");
+    inline void write(FILE * fh, const void* d, size_t sz) const {
+        if (fwrite(d, sizeof(char), sz, fh) != sz)
+            throw runtime_error("dtss_store: failed to write do disk");
     }
-    void write_header(std::FILE * fh, const gts_t & ats) const {
-        ts_db_header h = mk_header(ats);
+    template<class T>
+    void write_header(FILE * fh, const gts_t & ats) const {
+        ts_db_header h = mk_header<T>(ats);
         write(fh, static_cast<const void*>(&h), sizeof(h));
     }
-    void write_time_axis(std::FILE * fh, const gta_t& ta) const {
+    
+    template <class T>
+    void write_time_axis(FILE * fh, const gta_t& ta) const {
         switch (ta.gt) {
         case time_axis::generic_dt::FIXED: {
-            write(fh, static_cast<const void*>(&ta.f.t), sizeof(core::utctime));
-            write(fh, static_cast<const void*>(&ta.f.dt), sizeof(core::utctimespan));
+            T::write(fh, ta.f.t);
+            T::write(fh, ta.f.dt);
         } break;
         case time_axis::generic_dt::CALENDAR: {
-            write(fh, static_cast<const void*>(&ta.c.t), sizeof(core::utctime));
-            write(fh, static_cast<const void*>(&ta.c.dt), sizeof(core::utctimespan));
-            std::string tz = ta.c.cal->tz_info->name();
+            T::write(fh, ta.c.t);
+            T::write(fh, ta.c.dt);
+            string tz = ta.c.cal->tz_info->name();
             uint32_t sz = tz.size();
             write(fh, static_cast<const void*>(&sz), sizeof(uint32_t));
             write(fh, static_cast<const void*>(tz.c_str()), sz);
         } break;
         case time_axis::generic_dt::POINT: {
-            write(fh, static_cast<const void*>(&ta.p.t_end), sizeof(core::utctime));
-            write(fh, static_cast<const void*>(ta.p.t.data()), sizeof(core::utctime)*ta.p.t.size());
+            T::write(fh, ta.p.t_end);
+            T::write(fh, ta.p.t);
         } break;
         }
     }
-    void write_values(std::FILE * fh, const std::vector<double>& v) const {
+    void write_values(FILE * fh, const vector<double>& v) const {
         write(fh, static_cast<const void*>(v.data()), sizeof(double)*v.size());
     }
-    void write_ts(std::FILE * fh, const gts_t& ats) const {
-        write_header(fh, ats);
-        write_time_axis(fh, ats.ta);
+    template<class T>
+    void write_ts(FILE * fh, const gts_t& ats) const {
+        write_header<T>(fh, ats);
+        write_time_axis<T>(fh, ats.ta);
         write_values(fh, ats.v);
     }
 
     // ----------
 
-    void do_merge(std::FILE * fh, const ts_db_header & old_header, const time_axis::generic_dt & old_ta, const gts_t & new_ts) const {
+    template<class T>
+    void do_merge(FILE * fh, const ts_db_header & old_header, const time_axis::generic_dt & old_ta, const gts_t & new_ts) const {
 
         // assume the two time-axes have the same type and are aligned
 
-        const core::utcperiod old_p = old_header.data_period,
+        const auto old_p = old_header.data_period,
             new_p = new_ts.ta.total_period();
 
         switch (old_header.ta_type) {
         case time_axis::generic_dt::FIXED: {
-            core::utctime t0, tn;          // first/last time point in the merged data
-            std::size_t keep_old_v = 0,    // number of old values to keep
+            utctime t0, tn;          // first/last time point in the merged data
+            size_t keep_old_v = 0,    // number of old values to keep
                 nan_v_before = 0,  // number of NaN values to insert between new and old
                 nan_v_after = 0;   // number of NaN values to insert between old and new
-            std::vector<double> old_tail(0, 0.);
+            vector<double> old_tail(0, 0.);
             // determine first time-axis
             if (old_p.start <= new_p.start) {  // old start before new
                 t0 = old_p.start;
@@ -465,9 +562,9 @@ private:
 
                 // is there is a tail of old values
                 if (new_p.end < old_p.end) {
-                    std::size_t count = (old_p.end - new_p.end) / new_ts.ta.f.dt - nan_v_before;
+                    size_t count = (old_p.end - new_p.end) / new_ts.ta.f.dt - nan_v_before;
                     old_tail.resize(count);
-                    std::fseek(fh,
+                    fseek(fh,
                         sizeof(ts_db_header)  // header
                         + 2 * sizeof(int64_t)  // + fixed_dt time-axis
                         + (old_header.n - count) * sizeof(double),  // + values except count last
@@ -486,28 +583,28 @@ private:
             // write header
             ts_db_header new_header{
                 old_header.point_fx, old_header.ta_type,
-                static_cast<uint32_t>((tn - t0) / new_ts.ta.f.dt), core::utcperiod{ t0, tn }
+                static_cast<uint32_t>((tn - t0) / new_ts.ta.f.dt), utcperiod{ t0, tn },T::version()
             };
             // -----
-            std::fseek(fh, 0, SEEK_SET);  // seek to begining
+            fseek(fh, 0, SEEK_SET);  // seek to begining
             write(fh, static_cast<const void*>(&new_header), sizeof(ts_db_header));
 
             // write time-axis
-            write(fh, static_cast<const void*>(&t0), sizeof(int64_t));
+            T::write(fh, t0);
 
             // write values
             //  - seek past old values to keep
-            std::fseek(fh, sizeof(int64_t) + keep_old_v * sizeof(double), SEEK_CUR);
+            fseek(fh, sizeof(int64_t) + keep_old_v * sizeof(double), SEEK_CUR);
             //  - if gap after new -> write NaN
             if (nan_v_after > 0) {
-                std::vector<double> tmp(nan_v_after, shyft::nan);
+                vector<double> tmp(nan_v_after, shyft::nan);
                 write(fh, static_cast<const void*>(tmp.data()), nan_v_after * sizeof(double));
             }
             //  - write new values
             write(fh, static_cast<const void*>(new_ts.v.data()), new_ts.v.size() * sizeof(double));
             //  - if gap before old -> write NaN
             if (nan_v_before > 0) {
-                std::vector<double> tmp(nan_v_before, shyft::nan);
+                vector<double> tmp(nan_v_before, shyft::nan);
                 write(fh, static_cast<const void*>(tmp.data()), nan_v_before * sizeof(double));
             }
             //  - if old tail values -> write them back
@@ -516,11 +613,11 @@ private:
             }
         } break;
         case time_axis::generic_dt::CALENDAR: {
-            core::utctime t0, tn;          // first/last time point in the merged data
-            std::size_t keep_old_v = 0,    // number of old values to keep
+            utctime t0, tn;          // first/last time point in the merged data
+            size_t keep_old_v = 0,    // number of old values to keep
                 nan_v_before = 0,  // number of NaN values to insert between new and old
                 nan_v_after = 0;   // number of NaN values to insert between old and new
-            std::vector<double> old_tail(0, 0.);
+            vector<double> old_tail(0, 0.);
             // determine first time-axis
             if (old_p.start <= new_p.start) {  // old start before new
                 t0 = old_p.start;
@@ -542,15 +639,15 @@ private:
 
                 // is there is a tail of old values
                 if (new_p.end < old_p.end) {
-                    std::size_t count = new_ts.ta.c.cal->diff_units(new_p.end, old_p.end, new_ts.ta.c.dt) - nan_v_before;
+                    size_t count = new_ts.ta.c.cal->diff_units(new_p.end, old_p.end, new_ts.ta.c.dt) - nan_v_before;
                     old_tail.resize(count);
-                    std::fseek(fh,
+                    fseek(fh,
                         sizeof(ts_db_header)  // header
                         + 2 * sizeof(int64_t),  // + first part of calendar_dt time-axis
                         SEEK_SET);
                     uint32_t tz_sz{};
                     read(fh, static_cast<void *>(&tz_sz), sizeof(tz_sz));  // read size of tz_name
-                    std::fseek(fh,
+                    fseek(fh,
                         tz_sz * sizeof(uint8_t)  // + second part of calendar_dt time-axis
                         + (old_header.n - count) * sizeof(double),  // values to overwrite
                         SEEK_CUR);
@@ -569,34 +666,35 @@ private:
             ts_db_header new_header{
                 old_header.point_fx, old_header.ta_type,
                 static_cast<uint32_t>(new_ts.ta.c.cal->diff_units(t0, tn, new_ts.ta.c.dt)),
-                core::utcperiod{ t0, tn }
+                utcperiod{ t0, tn },
+                T::version()
             };
             // -----
-            std::fseek(fh, 0, SEEK_SET);  // seek to begining
+            fseek(fh, 0, SEEK_SET);  // seek to begining
             write(fh, static_cast<const void*>(&new_header), sizeof(ts_db_header));
 
             // update time-axis
-            write(fh, static_cast<const void*>(&t0), sizeof(int64_t));
-            std::fseek(fh, sizeof(int64_t), SEEK_CUR);
+            T::write(fh, t0);
+            fseek(fh, sizeof(int64_t), SEEK_CUR);
             {
                 uint32_t tz_sz{};
                 read(fh, static_cast<void *>(&tz_sz), sizeof(tz_sz));  // read size of calendar str
-                std::fseek(fh, tz_sz * sizeof(uint8_t), SEEK_CUR);  // seek past tz_name
+                fseek(fh, tz_sz * sizeof(uint8_t), SEEK_CUR);  // seek past tz_name
             }
 
             // write values
             //  - seek past old values to keep
-            std::fseek(fh, keep_old_v * sizeof(double), SEEK_CUR);
+            fseek(fh, keep_old_v * sizeof(double), SEEK_CUR);
             //  - if gap after new -> write NaN
             if (nan_v_after > 0) {
-                std::vector<double> tmp(nan_v_after, shyft::nan);
+                vector<double> tmp(nan_v_after, shyft::nan);
                 write(fh, static_cast<const void*>(tmp.data()), nan_v_after * sizeof(double));
             }
             //  - write new values
             write(fh, static_cast<const void*>(new_ts.v.data()), new_ts.v.size() * sizeof(double));
             //  - if gap before old -> write NaN
             if (nan_v_before > 0) {
-                std::vector<double> tmp(nan_v_before, shyft::nan);
+                vector<double> tmp(nan_v_before, shyft::nan);
                 write(fh, static_cast<const void*>(tmp.data()), nan_v_before * sizeof(double));
             }
             //  - if old tail values -> write them back
@@ -605,13 +703,13 @@ private:
             }
         } break;
         case time_axis::generic_dt::POINT: {
-            std::vector<core::utctime> merged_t;
+            vector<utctime> merged_t;
             merged_t.reserve(old_ta.size() + new_ts.size() + 1);  // guaranteed large enough
                                                                   // -----
-            std::vector<double> merged_v(0u, 0.);
+            vector<double> merged_v(0u, 0.);
             merged_v.reserve(old_ta.size() + new_ts.size() + 1);  // guaranteed large enough
                                                                   // -----
-            const std::size_t old_v_offset = sizeof(ts_db_header) + (old_header.n + 1) * sizeof(int64_t);
+            const size_t old_v_offset = sizeof(ts_db_header) + (old_header.n + 1) * sizeof(int64_t);
 
             // new start AFTER  =>  start at old
             if (old_p.start < new_p.start) {
@@ -625,9 +723,9 @@ private:
                 // store portion of old time-points to keep
                 merged_t.insert(merged_t.end(), old_ta.p.t.cbegin(), old_end);
                 // store portion of old values to keep
-                const std::size_t to_insert = std::distance(old_ta.p.t.cbegin(), old_end);
+                const size_t to_insert = std::distance(old_ta.p.t.cbegin(), old_end);
                 auto it = merged_v.insert(merged_v.end(), to_insert, 0.);
-                std::fseek(fh, old_v_offset, SEEK_SET);
+                fseek(fh, old_v_offset, SEEK_SET);
                 read(fh, static_cast<void*>(&(*it)), to_insert * sizeof(double));
 
                 // if NEW start truly after OLD include the end point
@@ -658,13 +756,13 @@ private:
                 merged_t.insert(merged_t.end(), old_begin, old_ta.p.t.cend());
                 merged_t.emplace_back(old_ta.p.t_end);
                 // store portion of old values to keep
-                std::size_t to_insert = std::distance(old_begin, old_ta.p.t.cend());
+                size_t to_insert = std::distance(old_begin, old_ta.p.t.cend());
                 // new end INSIDE of AT start of old  =>  insert value from old where new end
                 if (new_p.end >= old_p.start) {
                     to_insert += 1;
                 }
                 auto it = merged_v.insert(merged_v.end(), to_insert, 0.);
-                std::fseek(fh, old_v_offset + (old_header.n - to_insert) * sizeof(double), SEEK_SET);
+                fseek(fh, old_v_offset + (old_header.n - to_insert) * sizeof(double), SEEK_SET);
                 read(fh, static_cast<void*>(&(*it)), to_insert * sizeof(double));
             }
 
@@ -672,91 +770,106 @@ private:
             ts_db_header new_header{
                 old_header.point_fx, old_header.ta_type,
                 static_cast<uint32_t>(merged_t.size() - 1),
-                core::utcperiod{ merged_t.at(0), merged_t.at(merged_t.size() - 1) }
+                utcperiod{ merged_t.at(0), merged_t.at(merged_t.size() - 1) },
+                T::version()
             };
             // -----
-            std::fseek(fh, 0, SEEK_SET);  // seek to begining
+            fseek(fh, 0, SEEK_SET);  // seek to begining
             write(fh, static_cast<const void *>(&new_header), sizeof(ts_db_header));
 
             // write time-axis
-            write(fh, static_cast<const void *>(&merged_t.at(merged_t.size() - 1)), sizeof(int64_t));
-            write(fh, static_cast<const void *>(merged_t.data()), (merged_t.size() - 1) * sizeof(int64_t));
-
+            T::write(fh, merged_t.at(merged_t.size() - 1));
+            merged_t.pop_back();
+            T::write(fh, merged_t);
             // write values
             write(fh, static_cast<const void *>(merged_v.data()), merged_v.size() * sizeof(double));
         } break;
         }
     }
-    void check_ta_alignment(std::FILE * fh, const ts_db_header & old_header, const time_axis::generic_dt & old_ta, const gts_t & ats) const {
+    void check_ta_alignment(FILE * fh, const ts_db_header & old_header, const time_axis::generic_dt & old_ta, const gts_t & ats) const {
         if (ats.fx_policy != old_header.point_fx) {
-            throw std::runtime_error("dtss_store: cannot merge with different point interpretation");
+            throw runtime_error("dtss_store: cannot merge with different point interpretation");
         }
         // -----
         if (ats.ta.gt != old_header.ta_type) {
-            throw std::runtime_error("dtss_store: cannot merge with different ta type");
+            throw runtime_error("dtss_store: cannot merge with different ta type");
         } else {
             // parse specific ta data to determine compatibility
             switch (old_header.ta_type) {
             case time_axis::generic_dt::FIXED:
             {
-                if (old_ta.f.dt != ats.ta.f.dt || (old_ta.f.t - ats.ta.f.t) % old_ta.f.dt != 0) {
-                    throw std::runtime_error("dtss_store: cannot merge unaligned fixed_dt");
+                if (old_ta.f.dt != ats.ta.f.dt || (old_ta.f.t - ats.ta.f.t).count() % old_ta.f.dt.count() != 0) {
+                    throw runtime_error("dtss_store: cannot merge unaligned fixed_dt");
                 }
             } break;
             case time_axis::generic_dt::CALENDAR:
             {
                 if (ats.ta.c.cal->tz_info->tz.tz_name == old_ta.c.cal->tz_info->tz.tz_name) {
-                    core::utctimespan remainder;
+                    utctimespan remainder;
                     ats.ta.c.cal->diff_units(old_ta.c.t, ats.ta.c.t, old_ta.c.dt, remainder);
-                    if (old_ta.c.dt != ats.ta.c.dt || remainder != 0) {
-                        throw std::runtime_error("dtss_store: cannot merge unaligned calendar_dt");
+                    if (old_ta.c.dt != ats.ta.c.dt || remainder != utctimespan{0}) {
+                        throw runtime_error("dtss_store: cannot merge unaligned calendar_dt");
                     }
                 } else {
-                    throw std::runtime_error("dtss_store: cannot merge calendar_dt with different calendars");
+                    throw runtime_error("dtss_store: cannot merge calendar_dt with different calendars");
                 }
             } break;
-            case time_axis::generic_dt::POINT: break;
+            case time_axis::generic_dt::POINT:
+                if(old_header.is_seconds()) { // check if us resolution in new time-axis.. throw if ..
+                    for(const auto& t:ats.ta.p.t) {
+                        if( t!= seconds(to_seconds64(t)))
+                            throw runtime_error("dtss_store: can not merge us resolution to old seconds based ts-file");
+                    }
+                    if(ats.ta.p.t_end!=no_utctime && (ats.ta.p.t_end!=seconds(to_seconds64(ats.ta.p.t_end))))
+                        throw runtime_error("dtss_store: can not merge us resolution to old seconds based ts-file");
+                }
+            break;
             }
         }
     }
-    void merge_ts(std::FILE * fh, const ts_db_header & old_header, const gts_t & ats) const {
+    template <class T>
+    void merge_ts(FILE * fh, const ts_db_header & old_header, const gts_t & ats) const {
         // read time-axis
-        std::size_t ignored{};
-        time_axis::generic_dt old_ta = read_time_axis(fh, old_header, old_header.data_period, ignored);
-
+        size_t ignored{};
+        time_axis::generic_dt old_ta = read_time_axis<T>(fh, old_header, old_header.data_period, ignored);
         check_ta_alignment(fh, old_header, old_ta, ats);
-        do_merge(fh, old_header, old_ta, ats);
+        do_merge<T>(fh, old_header, old_ta, ats);
     }
 
     // ----------
 
-    inline void read(std::FILE * fh, void* d, std::size_t sz) const {
-        std::size_t rsz = std::fread(d, sizeof(char), sz, fh);
+    inline void read(FILE * fh, void* d, size_t sz) const {
+        size_t rsz = fread(d, sizeof(char), sz, fh);
 		if (rsz != sz) {
-			std::string fn{"?"};
-			throw std::runtime_error("dtss_store: failed to read '" + fn + "'from disk expected size="+std::to_string(sz)+"!="+std::to_string(rsz));
+			string fn{"?"};
+			throw runtime_error("dtss_store: failed to read '" + fn + "'from disk expected size="+std::to_string(sz)+"!="+std::to_string(rsz));
 		}
     }
-    ts_db_header read_header(std::FILE * fh) const {
+    ts_db_header read_header(FILE * fh) const {
         ts_db_header h;
-        std::fseek(fh, 0, SEEK_SET);
+        fseek(fh, 0, SEEK_SET);
         read(fh, static_cast<void *>(&h), sizeof(ts_db_header));
+        if(h.is_seconds()) {
+            h.data_period.start *= utctime::period::den;
+            h.data_period.end *= utctime::period::den;
+        }
         return h;
     }
-    gta_t read_time_axis(std::FILE * fh, const ts_db_header& h, const utcperiod p, std::size_t& skip_n) const {
+    template <class T>
+    gta_t read_time_axis(FILE * fh, const ts_db_header& h, const utcperiod p, size_t& skip_n) const {
 
         // seek to beginning of time-axis
-        std::fseek(fh, sizeof(ts_db_header), SEEK_SET);
+        fseek(fh, sizeof(ts_db_header), SEEK_SET);
 
         gta_t ta;
         ta.gt = h.ta_type;
 
-        core::utctime t_start = p.start;
-        core::utctime t_end = p.end;
-        if (t_start == core::no_utctime)
-            t_start = core::min_utctime;
-        if (t_end == core::no_utctime)
-            t_end = core::max_utctime;
+        utctime t_start = p.start;
+        utctime t_end = p.end;
+        if (t_start == no_utctime)
+            t_start = min_utctime;
+        if (t_end == no_utctime)
+            t_end = max_utctime;
 
         // no overlap?
         if (h.data_period.end <= t_start || h.data_period.start >= t_end) {
@@ -764,19 +877,19 @@ private:
         }
 
         skip_n = 0;
-        core::utctime t0 = core::no_utctime;
+        utctime t0 = no_utctime;
         switch (h.ta_type) {
         case time_axis::generic_dt::FIXED: {
             // read start & step
-            read(fh, static_cast<void *>(&t0), sizeof(core::utctime));
-            read(fh, static_cast<void *>(&ta.f.dt), sizeof(core::utctimespan));
+            T::read(fh,t0);
+            T::read(fh, ta.f.dt);
             // handle various overlaping periods
             if (t_start <= h.data_period.start && t_end >= h.data_period.end) {
                 // fully around or exact
                 ta.f.t = t0;
                 ta.f.n = h.n;
             } else {
-                std::size_t drop_n = 0;
+                size_t drop_n = 0;
                 if (t_start > h.data_period.start)  // start inside
                     skip_n = (t_start - h.data_period.start) / ta.f.dt;
                 if (t_end < h.data_period.end)  // end inside
@@ -788,14 +901,14 @@ private:
         } break;
         case time_axis::generic_dt::CALENDAR: {
             // read start & step
-            read(fh, static_cast<void *>(&t0), sizeof(core::utctime));
-            read(fh, static_cast<void *>(&ta.c.dt), sizeof(core::utctimespan));
+            T::read(fh, t0);
+            T::read(fh, ta.c.dt);
             // read tz_info
             uint32_t sz{ 0 };
             read(fh, static_cast<void *>(&sz), sizeof(uint32_t));
-            std::string tz(sz, '\0');
+            string tz(sz, '\0');
             {
-                std::unique_ptr<char[]> tmp_ptr = std::make_unique<char[]>(sz);
+                unique_ptr<char[]> tmp_ptr = make_unique<char[]>(sz);
                 read(fh, static_cast<void*>(tmp_ptr.get()), sz);
                 tz.replace(0, sz, tmp_ptr.get(), sz);
             }
@@ -806,7 +919,7 @@ private:
                 ta.c.t = t0;
                 ta.c.n = h.n;
             } else {
-                std::size_t drop_n = 0;
+                size_t drop_n = 0;
                 if (t_start > h.data_period.start)  // start inside
                     skip_n = ta.c.cal->diff_units(h.data_period.start, t_start, ta.c.dt);
                 if (t_end < h.data_period.end)  // end inside
@@ -820,17 +933,17 @@ private:
             if (t_start <= h.data_period.start && t_end >= h.data_period.end) {
                 // fully around or exact
                 ta.p.t.resize(h.n);
-                read(fh, static_cast<void *>(&ta.p.t_end), sizeof(core::utctime));
-                read(fh, static_cast<void *>(ta.p.t.data()), sizeof(core::utctime)*h.n);
+                T::read(fh,ta.p.t_end);
+                T::read(fh, ta.p.t);
             } else {
-                core::utctime f_time = 0;
-                std::vector<core::utctime> tmp(h.n, 0.);
-                read(fh, static_cast<void *>(&f_time), sizeof(core::utctime));
-                read(fh, static_cast<void *>(tmp.data()), sizeof(core::utctime)*h.n);
+                utctime f_time{seconds{0}};
+                vector<utctime> tmp(h.n, seconds{0});
+                T::read(fh, f_time);
+                T::read(fh, tmp);
                 // -----
                 auto it_b = tmp.begin();
                 if (t_start > h.data_period.start) {
-                    it_b = std::upper_bound(tmp.begin(), tmp.end(), t_start, std::less<core::utctime>());
+                    it_b = std::upper_bound(tmp.begin(), tmp.end(), t_start, std::less<utctime>());
                     if (it_b != tmp.begin()) {
                         std::advance(it_b, -1);
                     }
@@ -838,7 +951,7 @@ private:
                 // -----
                 auto it_e = tmp.end();
                 if (t_end < h.data_period.end) {
-                    it_e = std::upper_bound(it_b, tmp.end(), t_end, std::less<core::utctime>());
+                    it_e = std::upper_bound(it_b, tmp.end(), t_end, std::less<utctime>());
                     if (it_e != tmp.end()) {
                         f_time = *it_e;
                     }
@@ -853,37 +966,39 @@ private:
         }
         return ta;
     }
-    std::vector<double> read_values(std::FILE * fh, const ts_db_header& h, const gta_t& ta, const std::size_t skip_n) const {
+    
+    vector<double> read_values(FILE * fh, const ts_db_header& h, const gta_t& ta, const size_t skip_n) const {
 
         // seek to beginning of values
-        std::fseek(fh, sizeof(ts_db_header), SEEK_SET);
+        fseek(fh, sizeof(ts_db_header), SEEK_SET);
         switch (h.ta_type) {
         case time_axis::generic_dt::FIXED: {
-            std::fseek(fh, 2 * sizeof(int64_t), SEEK_CUR);
+            fseek(fh, 2 * sizeof(int64_t), SEEK_CUR);
         } break;
         case time_axis::generic_dt::CALENDAR: {
-            std::fseek(fh, 2 * sizeof(int64_t), SEEK_CUR);
+            fseek(fh, 2 * sizeof(int64_t), SEEK_CUR);
             uint32_t sz{};
             read(fh, static_cast<void*>(&sz), sizeof(uint32_t));
-            std::fseek(fh, sz * sizeof(uint8_t), SEEK_CUR);
+            fseek(fh, sz * sizeof(uint8_t), SEEK_CUR);
         } break;
         case time_axis::generic_dt::POINT: {
-            std::fseek(fh, (h.n + 1) * sizeof(int64_t), SEEK_CUR);
+            fseek(fh, (h.n + 1) * sizeof(int64_t), SEEK_CUR);
         } break;
         }
 
-        const std::size_t points_n = ta.size();
-        std::vector<double> val(points_n, 0.);
-        std::fseek(fh, sizeof(double)*skip_n, SEEK_CUR);
+        const size_t points_n = ta.size();
+        vector<double> val(points_n, 0.);
+        fseek(fh, sizeof(double)*skip_n, SEEK_CUR);
         read(fh, static_cast<void *>(val.data()), sizeof(double)*points_n);
         return val;
     }
-    gts_t read_ts(std::FILE * fh, const utcperiod p) const {
-        std::size_t skip_n = 0u;
+
+    gts_t read_ts(FILE * fh, const utcperiod p) const {
+        size_t skip_n = 0u;
         ts_db_header h = read_header(fh);
-        gta_t ta = read_time_axis(fh, h, p, skip_n);
-        std::vector<double> v = read_values(fh, h, ta, skip_n);
-        return gts_t{ std::move(ta),move(v),h.point_fx };
+        gta_t ta = h.is_seconds()?read_time_axis<seconds_time_io>(fh, h, p, skip_n):read_time_axis<native_time_io>(fh,h,p,skip_n);
+        vector<double> v = read_values(fh, h, ta, skip_n);
+        return gts_t{ move(ta),move(v),h.point_fx };
     }
 
 };

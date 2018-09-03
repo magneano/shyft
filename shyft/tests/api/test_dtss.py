@@ -5,7 +5,6 @@ import unittest
 from contextlib import closing
 
 import numpy as np
-from time import sleep
 from numpy.testing import assert_array_almost_equal
 
 from shyft.api import Calendar
@@ -80,7 +79,7 @@ class DtssTestCase(unittest.TestCase):
     def dtss_read_callback(self, ts_ids: StringVector, read_period: UtcPeriod) -> TsVector:
         self.callback_count += 1
         r = TsVector()
-        ta = TimeAxis(read_period.start, deltahours(1), read_period.timespan()//deltahours(1))
+        ta = TimeAxis(read_period.start, deltahours(1), int(read_period.timespan()//deltahours(1)))
         if self.rd_throws:
             self.rd_throws = False
             raise RuntimeError("read-ts-problem")
@@ -149,7 +148,7 @@ class DtssTestCase(unittest.TestCase):
         r1 = dts.evaluate(tsv, ta.total_period())
         tsv1x = tsv.inside(-0.5, 0.5)
         tsv1x.append(tsv1x[-1].decode(start_bit=1, n_bits=1))  # just to verify serialization/bind
-
+        tsv1x.append(store_tsv[1].derivative())
         r1x = dts.evaluate(tsv1x, ta.total_period())
         r2 = dts.percentiles(tsv, ta.total_period(), ta24, percentile_list)
         r3 = dts.find('netcdf://dummy\.nc/ts\d')

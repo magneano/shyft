@@ -68,7 +68,7 @@ class KalmanAndBiasPrediction(unittest.TestCase):
         Parameters
         ----------
         n_fc : int number of forecasts, e.g. 8
-        t0 : utctime start of first forecast
+        t0 : time start of first forecast
         dt : utctimespan delta t for forecast-ts
         n_steps : number of steps in one forecast-ts
         dt_fc : utctimespan delta t between each forecast, like deltahours(6)
@@ -95,7 +95,7 @@ class KalmanAndBiasPrediction(unittest.TestCase):
         Parameters
         ----------
         n_fc : int number of forecasts, e.g. 8
-        t0 : utctime start of first forecast
+        t0 : time start of first forecast
         dt : utctimespan delta t for forecast-ts
         n_steps : number of steps in one forecast-ts
         dt_fc : utctimespan delta t between each forecast, like deltahours(6)

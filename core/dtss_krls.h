@@ -25,6 +25,8 @@ namespace dtss {
 
 namespace ta = shyft::time_axis;
 namespace ts = shyft::time_series;
+using shyft::core::to_seconds64;
+using shyft::core::utctime_from_seconds64;
 
 /*
  * Data layout:
@@ -118,7 +120,7 @@ struct krls_pred_db_io {
         std::fseek(fh, 0, SEEK_SET);
 
         const krls_kernel_type_identifiers kernel_id = krls_kernel_type_identifiers::radial_basis_kernel;
-        const krls_ts_db_generic_header generic_header{ dt, tolerance, point_fx, period.start, period.end };
+        const krls_ts_db_generic_header generic_header{ to_seconds64(dt), tolerance, point_fx, to_seconds64(period.start), to_seconds64(period.end) };
         const krls_ts_db_rbf_header rbf_kernel_header{ gamma };
         prediction::krls_rbf_predictor predictor{ dt, gamma, tolerance, dict_size, point_fx };
 
@@ -126,25 +128,25 @@ struct krls_pred_db_io {
         krls_pred_db_io::write(fh, static_cast<const void*>(file_id.data()), sizeof(char), file_id.size(), "create_rbf_file");
 
         // header data
-        write_header_start(fh, file_id.size()*sizeof(char) + 3*sizeof(std::uint64_t), true);
-        write_header(fh, generic_header, true);
+        write_header_start(fh, file_id.size()*sizeof(char) + 3*sizeof(std::uint64_t));
+        write_header(fh, generic_header);
 
         // source url data
-        write_source_url_start(fh, file_id.size()*sizeof(char) + 3*sizeof(std::uint64_t) + sizeof(krls_ts_db_generic_header), true);
-        write_source_url(fh, source_url, true);
+        write_source_url_start(fh, file_id.size()*sizeof(char) + 3*sizeof(std::uint64_t) + sizeof(krls_ts_db_generic_header));
+        write_source_url(fh, source_url);
 
         // predictor data
         const std::uint64_t predictor_start = std::ftell(fh);
         // -----
-        write_predictor_start(fh, predictor_start, true);
+        write_predictor_start(fh, predictor_start);
         // -----
-        write_predictor_kernel_type_start(fh, predictor_start + 3*sizeof(std::uint64_t), true);
-        write_predictor_kernel_header_start(fh, predictor_start + 3*sizeof(std::uint64_t) + sizeof(int32_t), true);
-        write_predictor_blob_start(fh, predictor_start + 3*sizeof(std::uint64_t) + sizeof(int32_t) + sizeof(krls_ts_db_rbf_header), true);
+        write_predictor_kernel_type_start(fh, predictor_start + 3*sizeof(std::uint64_t));
+        write_predictor_kernel_header_start(fh, predictor_start + 3*sizeof(std::uint64_t) + sizeof(int32_t));
+        write_predictor_blob_start(fh, predictor_start + 3*sizeof(std::uint64_t) + sizeof(int32_t) + sizeof(krls_ts_db_rbf_header));
         // -----
-        write_predictor_kernel_type(fh, kernel_id, true);
-        write_predictor_rbf_header(fh, rbf_kernel_header, true);
-        write_predictor_rbf_predictor(fh, predictor, true);
+        write_predictor_kernel_type(fh, kernel_id);
+        write_predictor_rbf_header(fh, rbf_kernel_header);
+        write_predictor_rbf_predictor(fh, predictor);
 
         return predictor;
     }
@@ -152,8 +154,8 @@ struct krls_pred_db_io {
     /*  pre-header data
      * ================= */
 
-    inline static bool can_read_file(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, 0, SEEK_SET) != 0 )
+    inline static bool can_read_file(std::FILE * fh) {
+        if (std::fseek(fh, 0, SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: can_read_file");
 
         std::remove_const_t<decltype(file_id)> data;  // ensure the type matches the header we are looking for
@@ -164,14 +166,14 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    inline static void write_header_start(std::FILE * fh, const std::uint64_t start_val, bool skip = true) {
-        if ( skip && std::fseek(fh, file_id.size()*sizeof(char), SEEK_SET) != 0 )
+    inline static void write_header_start(std::FILE * fh, const std::uint64_t start_val) {
+        if ( std::fseek(fh, file_id.size()*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_header_start");
 
        krls_pred_db_io::write(fh, static_cast<const void*>(&start_val), sizeof(std::uint64_t), 1, "write_header_start");
     }
-    inline static std::uint64_t read_header_start(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, file_id.size()*sizeof(char), SEEK_SET) != 0 )
+    inline static std::uint64_t read_header_start(std::FILE * fh) {
+        if ( std::fseek(fh, file_id.size()*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_header_start");
 
         std::uint64_t skip_val;
@@ -182,14 +184,14 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    inline static void write_source_url_start(std::FILE * fh, const std::uint64_t start_val, bool skip = true) {
-        if ( skip && std::fseek(fh, file_id.size()*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static void write_source_url_start(std::FILE * fh, const std::uint64_t start_val) {
+        if ( std::fseek(fh, file_id.size()*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_source_url_start");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&start_val), sizeof(std::uint64_t), 1, "write_source_url_start");
     }
-    inline static std::uint64_t read_source_url_start(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, file_id.size()*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0)
+    inline static std::uint64_t read_source_url_start(std::FILE * fh) {
+        if ( std::fseek(fh, file_id.size()*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0)
             throw std::runtime_error("krls_pred_db: failed to seek in: read_source_url_start");
 
         std::uint64_t skip_val;
@@ -200,14 +202,14 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    inline static void write_predictor_start(std::FILE * fh, const std::uint64_t start_val, bool skip = true) {
-        if ( skip && std::fseek(fh, file_id.size()*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static void write_predictor_start(std::FILE * fh, const std::uint64_t start_val) {
+        if (std::fseek(fh, file_id.size()*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_start");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&start_val), sizeof(std::uint64_t), 1, "write_predictor_start");
     }
-    inline static std::uint64_t read_predictor_start(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, file_id.size()*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static std::uint64_t read_predictor_start(std::FILE * fh) {
+        if (std::fseek(fh, file_id.size()*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_start");
 
         std::uint64_t skip_val;
@@ -219,14 +221,14 @@ struct krls_pred_db_io {
     /*  header data
      * ============= */
 
-    inline static void write_header(std::FILE * fh, const krls_ts_db_generic_header header, bool skip = true) {
-        if ( skip && std::fseek(fh, read_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    inline static void write_header(std::FILE * fh, const krls_ts_db_generic_header header) {
+        if ( std::fseek(fh, read_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_header");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&header), sizeof(krls_ts_db_generic_header), 1, "write_header");
     }
-    inline static krls_ts_db_generic_header read_header(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    inline static krls_ts_db_generic_header read_header(std::FILE * fh) {
+        if ( std::fseek(fh, read_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_header");
 
         krls_ts_db_generic_header header;
@@ -237,16 +239,16 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    inline static void write_source_url(std::FILE * fh, std::string url, bool skip = true) {
-        if ( skip && std::fseek(fh, read_source_url_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    inline static void write_source_url(std::FILE * fh, std::string url) {
+        if ( std::fseek(fh, read_source_url_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_source_url");
 
         std::uint64_t source_n = url.size();
         krls_pred_db_io::write(fh, static_cast<void*>(&source_n), sizeof(std::uint64_t), 1, "write_source_url");
         krls_pred_db_io::write(fh, static_cast<void*>(url.data()), sizeof(char), source_n, "write_source_url");
     }
-    inline static std::string read_source_url(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_source_url_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    inline static std::string read_source_url(std::FILE * fh) {
+        if ( std::fseek(fh, read_source_url_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_source_url");
 
         std::uint64_t source_n;
@@ -261,14 +263,14 @@ struct krls_pred_db_io {
     /*  general predictor data
      * ======================== */
 
-    inline static void write_predictor_kernel_type_start(std::FILE * fh, const std::uint64_t start_val, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    inline static void write_predictor_kernel_type_start(std::FILE * fh, const std::uint64_t start_val) {
+        if  (std::fseek(fh, read_predictor_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_kernel_type_start");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&start_val), sizeof(std::uint64_t), 1, "write_predictor_kernel_type_start");
     }
-    inline static std::uint64_t read_predictor_kernel_type_start(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    inline static std::uint64_t read_predictor_kernel_type_start(std::FILE * fh) {
+        if ( std::fseek(fh, read_predictor_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_kernel_type_start");
 
         std::uint64_t skip_val;
@@ -279,14 +281,14 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    inline static void write_predictor_kernel_header_start(std::FILE * fh, const std::uint64_t start_val, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static void write_predictor_kernel_header_start(std::FILE * fh, const std::uint64_t start_val) {
+        if ( std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_kernel_header_start");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&start_val), sizeof(std::uint64_t), 1, "write_predictor_kernel_header_start");
     }
-    inline static std::uint64_t read_predictor_kernel_header_start(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static std::uint64_t read_predictor_kernel_header_start(std::FILE * fh) {
+        if ( std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 1*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_kernel_header_start");
 
         std::uint64_t skip_val;
@@ -297,14 +299,14 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    inline static void write_predictor_blob_start(std::FILE * fh, const std::uint64_t start_val, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static void write_predictor_blob_start(std::FILE * fh, const std::uint64_t start_val) {
+        if ( std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_blob_start");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&start_val), sizeof(std::uint64_t), 1, "write_predictor_blob_start");
     }
-    inline static std::uint64_t read_predictor_blob_start(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
+    inline static std::uint64_t read_predictor_blob_start(std::FILE * fh) {
+        if (std::fseek(fh, read_predictor_start(fh)*sizeof(char) + 2*sizeof(std::uint64_t), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_blob_start");
 
         std::uint64_t skip_val;
@@ -315,14 +317,14 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    static void write_predictor_kernel_type(std::FILE * fh, const krls_kernel_type_identifiers kernel_type, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_kernel_type_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    static void write_predictor_kernel_type(std::FILE * fh, const krls_kernel_type_identifiers kernel_type) {
+        if (  std::fseek(fh, read_predictor_kernel_type_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_kernel_type");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&kernel_type), sizeof(krls_kernel_type_identifiers), 1, "write_predictor_kernel_type");
     }
-    static krls_kernel_type_identifiers read_predictor_kernel_type(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_kernel_type_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    static krls_kernel_type_identifiers read_predictor_kernel_type(std::FILE * fh) {
+        if ( std::fseek(fh, read_predictor_kernel_type_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_kernel_type");
 
         krls_kernel_type_identifiers kernel_type;
@@ -334,14 +336,14 @@ struct krls_pred_db_io {
     /*  radial basis predictor data
      * ============================= */
 
-    static void write_predictor_rbf_header(std::FILE * fh, const krls_ts_db_rbf_header kernel_type, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_kernel_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    static void write_predictor_rbf_header(std::FILE * fh, const krls_ts_db_rbf_header kernel_type) {
+        if ( std::fseek(fh, read_predictor_kernel_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_rbf_header");
 
         krls_pred_db_io::write(fh, static_cast<const void*>(&kernel_type), sizeof(krls_ts_db_rbf_header), 1, "write_predictor_rbf_header");
     }
-    static krls_ts_db_rbf_header read_predictor_rbf_header(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_kernel_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    static krls_ts_db_rbf_header read_predictor_rbf_header(std::FILE * fh) {
+        if ( std::fseek(fh, read_predictor_kernel_header_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_rbf_header");
 
         krls_ts_db_rbf_header kernel_header;
@@ -352,8 +354,8 @@ struct krls_pred_db_io {
 
     // --------------------
 
-    static void write_predictor_rbf_predictor(std::FILE * fh, const prediction::krls_rbf_predictor & predictor, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_blob_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    static void write_predictor_rbf_predictor(std::FILE * fh, const prediction::krls_rbf_predictor & predictor) {
+        if ( std::fseek(fh, read_predictor_blob_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: write_predictor_rbf_predictor");
 
         std::basic_string<char> blob = predictor.to_str_blob();
@@ -362,8 +364,8 @@ struct krls_pred_db_io {
         krls_pred_db_io::write(fh, static_cast<void*>(&blob_size), sizeof(std::uint64_t), 1, "write_predictor_rbf_predictor");
         krls_pred_db_io::write(fh, static_cast<void*>(blob.data()), sizeof(char), blob_size, "write_predictor_rbf_predictor");
     }
-    static prediction::krls_rbf_predictor read_predictor_rbf_predictor(std::FILE * fh, bool skip = true) {
-        if ( skip && std::fseek(fh, read_predictor_blob_start(fh)*sizeof(char), SEEK_SET) != 0 )
+    static prediction::krls_rbf_predictor read_predictor_rbf_predictor(std::FILE * fh) {
+        if ( std::fseek(fh, read_predictor_blob_start(fh)*sizeof(char), SEEK_SET) != 0 )
             throw std::runtime_error("krls_pred_db: failed to seek in: read_predictor_rbf_predictor");
 
         std::uint64_t blob_size;
@@ -502,6 +504,8 @@ public:
 
         if ( ! save_path_exists(fn) ) {
             this->register_from_save(fn, ts, queries, win_thread_close);
+        } else if ( auto it = queries.find("destination"); it != queries.cend() ) {
+            this->move_from_save(fn, ts, queries, overwrite, win_thread_close);
         } else {
             this->update_from_save(fn, ts, queries, win_thread_close);
         }
@@ -512,7 +516,7 @@ public:
         core::utctimespan dt = core::calendar::HOUR;
         if ( auto it = queries.find("dt"); it != queries.cend() ) {
             try {
-                dt = std::stol(it->second);
+                dt = core::seconds(std::stol(it->second));
             } catch ( const std::invalid_argument & ) {
                 throw std::runtime_error(std::string{"krls_pred_db: cannot parse time-step: "}+it->second);
             }
@@ -530,7 +534,7 @@ public:
         wait_for_close_fh();
         const auto ffp = make_full_path(fn);
         writer_file_lock lck(f_mx, ffp);
-        
+
         try {
             if ( ! fs::remove(ffp) ) {
                 throw std::runtime_error(std::string{"krls_pred_db: no predictor named: "}+fn);
@@ -553,8 +557,8 @@ public:
             ts_info info{};
             info.name = fn;
             info.point_fx = static_cast<ts::ts_point_fx>(header.point_fx);
-            info.modified = fs::last_write_time(ffp);
-            info.data_period = core::utcperiod(header.t_start, header.t_end);
+            info.modified = utctime_from_seconds64(fs::last_write_time(ffp));
+            info.data_period = core::utcperiod(utctime_from_seconds64(header.t_start),utctime_from_seconds64(header.t_end));
             return info;
         } else {
             throw std::runtime_error(std::string{"krls_pred_db: no predictor named: "}+fn);
@@ -596,7 +600,7 @@ public:
     ) {
         // request exclusive access
         wait_for_close_fh();
-        const auto ffp = make_full_path(fn);
+        const auto ffp = make_full_path(fn, true);
         writer_file_lock lck(f_mx, ffp);
         // setup file pointer
         std::unique_ptr<std::FILE, close_write_handle> fh;  // zero-initializes deleter
@@ -651,14 +655,14 @@ public:
                 if ( ! allow_gap_periods && period.end < trained_period.start )
                     throw std::runtime_error(std::string{"krls_pred_db: periods with gaps is currently disallowed"});
                 this->train_on_period(predictor, period, source_url);
-                header.t_start = period.start;
+                header.t_start = to_seconds64(period.start);
 
             } else if ( trained_period.end <= period.start ) {  // after
 
                 if ( ! allow_gap_periods && trained_period.end < period.start )
                     throw std::runtime_error(std::string{"krls_pred_db: periods with gaps is currently disallowed"});
                 this->train_on_period(predictor, period, source_url);
-                header.t_end = period.end;
+                header.t_end = to_seconds64(period.end);
 
             } else if (  // overlapping before
                 period.start < trained_period.start  // start before
@@ -666,7 +670,7 @@ public:
             ) {
 
                 this->train_on_period(predictor, core::utcperiod{ period.start, trained_period.start }, source_url);
-                header.t_start = period.start;
+                header.t_start = to_seconds64(period.start);
 
             } else if (  // overlapping after
                 trained_period.end < period.end  // end after
@@ -674,7 +678,7 @@ public:
             ) {
 
                 this->train_on_period(predictor, core::utcperiod{ trained_period.end, period.end }, source_url);
-                header.t_end = period.end;
+                header.t_end = to_seconds64(period.end);
 
             } else if ( trained_period.start <= period.start && period.end <= trained_period.end ) {  // overlapping inside
                 /*
@@ -686,13 +690,13 @@ public:
                 this->train_on_period(predictor, core::utcperiod{ period.start, trained_period.start }, source_url);
                 this->train_on_period(predictor, core::utcperiod{ trained_period.end, period.end }, source_url);
 
-                header.t_start = period.start;
-                header.t_end = period.end;
+                header.t_start = to_seconds64(period.start);
+                header.t_end = to_seconds64(period.end);
 
             } else {
                 throw std::runtime_error(std::string{"krls_pred_db: misaligned periods: "}
-                    + "trained: ["+std::to_string(trained_period.start)+","+std::to_string(trained_period.end)+"), "
-                    + "period: ["+std::to_string(period.start)+","+std::to_string(period.end)+")"
+                    + "trained: ["+std::to_string(to_seconds64(trained_period.start))+","+std::to_string( to_seconds64(trained_period.end))+"), "
+                    + "period: ["+std::to_string(to_seconds64(period.start)) +","+std::to_string(to_seconds64(period.end) )+")"
                 );
             }
 
@@ -702,6 +706,34 @@ public:
 
         } else {
             throw std::runtime_error(std::string{"krls_pred_db: series does not exist: "} + fn);
+        }
+    }
+
+    void move_predictor(
+        const std::string & from_fn,
+        const std::string & to_fn,
+        const bool overwrite = false,
+        const bool win_thread_close = true
+    ) {
+        // request exclusive access to both paths
+        wait_for_close_fh();
+        const auto from_ffp = make_full_path(from_fn);
+        const auto to_ffp = make_full_path(to_fn);
+        writer_file_lock from_lck(f_mx, from_ffp);
+        writer_file_lock to_lck(f_mx, to_ffp);
+        // setup file pointer
+        std::unique_ptr<std::FILE, close_write_handle> fh;  // zero-initializes deleter
+        fh.get_deleter().win_thread_close = win_thread_close;
+        fh.get_deleter().parent = const_cast<krls_pred_db*>(this);
+
+        if ( this->save_path_exists(from_fn) ) {
+            if ( overwrite || ! save_path_exists(to_fn) ) {
+                fs::rename(from_ffp, to_ffp);
+            } else {
+                throw std::runtime_error(std::string{"krls_pred_db: destination id already exist and overwrite not specified"});
+            }
+        } else {
+            throw std::runtime_error(std::string{"krls_pred_db: no data for id: "}+from_fn);
         }
     }
 
@@ -759,6 +791,8 @@ private:
     }
     std::string make_full_path(const std::string& fn, bool create_paths = false) const {
         fs::path fn_path{ fn }, root_path{ root_dir };
+        fn_path.make_preferred();
+        root_path.make_preferred();
         // determine path type
         if (fn_path.is_relative()) {
             fn_path = root_path / fn_path;
@@ -800,7 +834,7 @@ private:
 
         core::utctimespan dt_scaling;
         if ( auto it = queries.find("dt_scaling"); it != queries.cend() ) {
-            dt_scaling = std::stoll(it->second);
+            dt_scaling = core::seconds(std::stoll(it->second));
         } else {
             throw std::runtime_error("krls_pred_db: no time scaling (dt_scaling) in query parameters");
         }
@@ -833,13 +867,28 @@ private:
 
         this->register_rbf_series(fn, source_url, period, dt_scaling, point_fx, krls_dict_size, tolerance, gamma, win_thread_close);
     }
+    void move_from_save(
+        const std::string & fn, const gts_t & ts,
+        const queries_t & queries = queries_t{},
+        const bool overwrite = false,
+        const bool win_thread_close = true
+    ) {
+        std::string to_fn{};
+        if ( auto it = queries.find("destination"); it != queries.cend() ) {
+            to_fn = it->second;
+        } else {
+            throw std::runtime_error{std::string{"krls_pred_db: no destination id to move"}};
+        }
+
+        this->move_predictor(fn, to_fn, overwrite, win_thread_close);
+    }
     void update_from_save(
         const std::string & fn, const gts_t & ts,
         const queries_t & queries = queries_t{},
         bool win_thread_close = true
     ) {
         core::utcperiod period = ts.total_period();
-        
+
         bool allow_gap = false;
         if ( auto it = queries.find("allow_period_gap"); it != queries.cend() ) {
             std::string value = it->second;

@@ -15,7 +15,8 @@ namespace expose {
     using namespace shyft::core;
     using namespace boost::python;
     using namespace std;
-
+    namespace py=boost::python;
+    
     struct TsTransform {
         shared_ptr<shyft::core::pts_t> to_average(utctime start, utctimespan dt, size_t n,const shyft::time_series::dd::apoint_ts& src) {
             return shyft::model_calibration::ts_transform().to_average<shyft::core::pts_t,shyft::time_series::dd::apoint_ts>(start,dt,n,src);
@@ -29,6 +30,19 @@ namespace expose {
         }
         shared_ptr<shyft::core::pts_t> to_average(utctime start, utctimespan dt, size_t n,shared_ptr<shyft::core::pts_t> src) {
             return shyft::model_calibration::ts_transform().to_average<shyft::core::pts_t,shyft::core::pts_t>(start,dt,n,src);
+        }
+        shared_ptr<shyft::core::pts_t> to_average(int64_t start, int64_t dt, size_t n,const shyft::time_series::dd::apoint_ts& src) {
+            return shyft::model_calibration::ts_transform().to_average<shyft::core::pts_t,shyft::time_series::dd::apoint_ts>(seconds(start),seconds(dt),n,src);
+        }
+        shared_ptr<shyft::core::pts_t> to_average(int64_t start, int64_t dt, size_t n,shared_ptr<shyft::time_series::dd::apoint_ts> src) {
+            return shyft::model_calibration::ts_transform().to_average<shyft::core::pts_t,shyft::time_series::dd::apoint_ts>(seconds(start),seconds(dt),n,src);
+        }
+
+        shared_ptr<shyft::core::pts_t> to_average(int64_t start, int64_t dt, size_t n,const shyft::core::pts_t& src) {
+            return shyft::model_calibration::ts_transform().to_average<shyft::core::pts_t,shyft::core::pts_t>(seconds(start),seconds(dt),n,src);
+        }
+        shared_ptr<shyft::core::pts_t> to_average(int64_t start, int64_t dt, size_t n,shared_ptr<shyft::core::pts_t> src) {
+            return shyft::model_calibration::ts_transform().to_average<shyft::core::pts_t,shyft::core::pts_t>(seconds(start),seconds(dt),n,src);
         }
     };
     typedef shyft::time_series::dd::apoint_ts target_ts_t;
@@ -119,7 +133,6 @@ namespace expose {
 
 
     };
-
 
     void target_specification() {
         enum_<model_calibration::target_spec_calc_type>("TargetSpecCalcType")
@@ -277,6 +290,10 @@ namespace expose {
         shared_ptr<shyft::core::pts_t> (TsTransform::*m2)(utctime , utctimespan , size_t ,shared_ptr<shyft::time_series::dd::apoint_ts> )=&TsTransform::to_average;
         shared_ptr<shyft::core::pts_t> (TsTransform::*m3)(utctime , utctimespan , size_t ,const shyft::core::pts_t&) = &TsTransform::to_average;
         shared_ptr<shyft::core::pts_t> (TsTransform::*m4)(utctime , utctimespan , size_t ,shared_ptr<shyft::core::pts_t> ) = &TsTransform::to_average;
+        shared_ptr<shyft::core::pts_t> (TsTransform::*m1i)(int64_t , int64_t , size_t ,const shyft::time_series::dd::apoint_ts& )=&TsTransform::to_average;
+        shared_ptr<shyft::core::pts_t> (TsTransform::*m2i)(int64_t , int64_t , size_t ,shared_ptr<shyft::time_series::dd::apoint_ts> )=&TsTransform::to_average;
+        shared_ptr<shyft::core::pts_t> (TsTransform::*m3i)(int64_t , int64_t , size_t ,const shyft::core::pts_t&) = &TsTransform::to_average;
+        shared_ptr<shyft::core::pts_t> (TsTransform::*m4i)(int64_t , int64_t , size_t ,shared_ptr<shyft::core::pts_t> ) = &TsTransform::to_average;
 
         class_<TsTransform>("TsTransform",
                 "transform the supplied time-series, f(t) interpreted according to its point_interpretation() policy\n"
@@ -285,10 +302,14 @@ namespace expose {
                 " the result ts will have the policy is set to POINT_AVERAGE_VALUE\n"
                 " \note that the resulting ts is a fresh new ts, not connected to the source ts\n"
             )
-            .def("to_average",m1,args("start","dt","n","src"),"")
-            .def("to_average",m2,args("start","dt","n","src"),"")
-            .def("to_average",m3,args("start","dt","n","src"),"")
-            .def("to_average",m4,args("start","dt","n","src"),"")
+            .def("to_average",m1,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")) ,"")
+            .def("to_average",m2,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
+            .def("to_average",m3,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
+            .def("to_average",m4,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
+            .def("to_average",m1i,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
+            .def("to_average",m2i,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
+            .def("to_average",m3i,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
+            .def("to_average",m4i,(py::arg("self"),py::arg("start"),py::arg("dt"),py::arg("n"),py::arg("src")),"")
             ;
         py_api::iterable_converter()
             .from_python< std::vector<TargetSpecificationPts> >()

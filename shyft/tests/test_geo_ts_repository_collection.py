@@ -48,17 +48,17 @@ class GeoTsRepositoryCollectionTestCase(unittest.TestCase):
         ar1 = MetNetcdfDataRepository(epsg, base_dir, filename=f1, allow_subset=True)
         ar2 = MetNetcdfDataRepository(epsg, base_dir, filename=f2, elevation_file=f1, allow_subset=True)
 
-        geo_ts_repository = GeoTsRepositoryCollection([ar1, ar2])
-        sources = geo_ts_repository.get_timeseries(("temperature", "radiation"),
+        geo_ts_repository = GeoTsRepositoryCollection([ar1, ar1, ar2])
+        sources_replace = geo_ts_repository.get_timeseries(("temperature", "radiation"),
                                                    period, geo_location_criteria=bpoly)
 
         with self.assertRaises(GeoTsRepositoryCollectionError) as context:
             GeoTsRepositoryCollection([ar1, ar2], reduce_type="foo")
 
-        geo_ts_repository = GeoTsRepositoryCollection([ar1, ar2], reduce_type="add")
-        with self.assertRaises(GeoTsRepositoryCollectionError) as context:
-            sources = geo_ts_repository.get_timeseries(("temperature", "radiation"),
+        geo_ts_repository = GeoTsRepositoryCollection([ar1, ar1, ar2], reduce_type="add")
+        sources_add = geo_ts_repository.get_timeseries(("temperature", "radiation"),
                                                        period, geo_location_criteria=bpoly)
+        self.assertGreater(len(sources_add["temperature"]), len(sources_replace["temperature"]))
 
     def test_get_forecast_collection(self):
         n_hours = 30

@@ -128,17 +128,23 @@ class TimeSeries(unittest.TestCase):
     def test_ts_factory(self):
         dv = np.arange(self.ta.size())
         v = api.DoubleVector.from_numpy(dv)
-        t = api.UtcTimeVector();
+        t = api.UtcTimeVector()
+        ti = api.Int64Vector()
         for i in range(self.ta.size()):
             t.push_back(self.ta(i).start)
+            ti.append(self.ta(i).start.seconds)
         t.push_back(self.ta(self.ta.size() - 1).end)
         tsf = api.TsFactory()
         ts1 = tsf.create_point_ts(self.ta.size(), self.t, self.d, v)
         ts2 = tsf.create_time_point_ts(self.ta.total_period(), t, v)
+        ts1i = tsf.create_point_ts(self.ta.size(), int(self.t.seconds), int(self.d.seconds), v, interpretation=api.POINT_AVERAGE_VALUE)
+        ts2i = tsf.create_time_point_ts(self.ta.total_period(), times=api.UtcTimeVector(ti), values=v)  # TODO: remove requirement for UtcTimeVector, accept int's
         tslist = api.TsVector()
         tslist.push_back(ts1)
         tslist.push_back(ts2)
         self.assertEqual(tslist.size(), 2)
+        self.assertTrue(ts2 == ts2i)
+        self.assertFalse(ts2 != ts2i)
 
     def test_average_accessor(self):
         dv = np.arange(self.ta.size())
@@ -160,7 +166,7 @@ class TimeSeries(unittest.TestCase):
     def test_ts_transform(self):
         dv = np.arange(self.ta.size())
         v = api.DoubleVector.from_numpy(dv)
-        t = api.UtcTimeVector();
+        t = api.UtcTimeVector()
         for i in range(self.ta.size()):
             t.push_back(self.ta(i).start)
         # t.push_back(self.ta(self.ta.size()-1).end) #important! needs n+1 points to determine n periods in the timeaxis
@@ -174,11 +180,17 @@ class TimeSeries(unittest.TestCase):
 
         tst = api.TsTransform()
         tt1 = tst.to_average(t_start, dt, tax.size(), ts1)
+        tt1i = tst.to_average(int(t_start),int(dt), tax.size(), ts1)
         tt2 = tst.to_average(t_start, dt, tax.size(), ts2)
+        tt2i = tst.to_average(int(t_start), int(dt), tax.size(), ts2)
         tt3 = tst.to_average(t_start, dt, tax.size(), ts3)
+        tt3i  = tst.to_average(int(t_start), int(dt), tax.size(), ts3)
         self.assertEqual(tt1.size(), tax.size())
         self.assertEqual(tt2.size(), tax.size())
         self.assertEqual(tt3.size(), tax.size())
+        self.assertEqual(tt1.time_axis, tt1i.time_axis)
+        self.assertEqual(tt2.time_axis, tt2i.time_axis)
+        self.assertEqual(tt3.time_axis, tt3i.time_axis)
 
     def test_basic_timeseries_math_operations(self):
         """
@@ -622,7 +634,7 @@ class TimeSeries(unittest.TestCase):
 
     def test_a_time_series_vector(self):
         c = api.Calendar()
-        t0 = api.utctime_now()
+        t0 = c.time(2018,7,1)
         dt = api.deltahours(1)
         n = 240
         ta = api.TimeAxisFixedDeltaT(t0, dt, n)
@@ -964,7 +976,7 @@ class TimeSeries(unittest.TestCase):
             self.assertEqual(extended_tsvector[1](t0 + (4*n + i)*dt), 20.0)
 
     def test_rating_curve_ts(self):
-        t0 = api.utctime_now()
+        t0 = api.Calendar().time(2018,7,1)
         ta = api.TimeAxis(t0, api.deltaminutes(30), 48*2)
         data = np.linspace(0, 10, ta.size())
         ts = api.TimeSeries(ta, data, api.POINT_INSTANT_VALUE)
@@ -1072,8 +1084,8 @@ class TimeSeries(unittest.TestCase):
 
         ta = api.TimeAxis(t0, ts_dt, 48*2 + 1)
         # flow data
-        x0 = ta.total_period().start
-        x1 = ta.total_period().end
+        x0 = int(ta.total_period().start)
+        x1 = int(ta.total_period().end)
         x = np.linspace(x0, x1, len(ta))
         flow_data = -0.0000000015*(x - x0)*(x - x1) + 1
         flow_ts = api.TimeSeries(ta, flow_data, api.POINT_AVERAGE_VALUE)

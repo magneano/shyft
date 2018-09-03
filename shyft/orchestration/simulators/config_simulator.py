@@ -126,7 +126,7 @@ class ConfigCalibrator(simulator.DefaultSimulator):
                                        ts_info['start_datetime'] + ts_info['number_of_steps'] * ts_info['run_time_step'])
                 if not self.time_axis.total_period().contains(period):
                     raise ConfigSimulatorError(
-                        "Period {} for target series {} is not within the calibration period {}.".format(
+                        "Period {} for target series {} is not within the full simulation period {}.".format(
                             period.to_string(), ts_info['uid'], self.time_axis.total_period().to_string()))
                 #tsp = repo['repository'].read([ts_info['uid']], period)[ts_info['uid']]
                 t = api.TargetSpecificationPts()

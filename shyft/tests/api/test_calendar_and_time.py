@@ -1,13 +1,14 @@
 ﻿from shyft import api
 import unittest
 import datetime as dt
+import math
 
 
 class Calendar(unittest.TestCase):
-    """Verify and illustrate the Calendar & utctime from the api core, using
+    """Verify and illustrate the Calendar & time from the api core, using
     pyunit. Note that the Calendar not yet support local/dst semantics (but
     plan to do so) Nevertheless, keeping it here allow users of api-Core to
-    use start practicing utctime/calendar perimeter.
+    use start practicing time/calendar perimeter.
     """
 
     def setUp(self):
@@ -39,7 +40,7 @@ class Calendar(unittest.TestCase):
         self.assertEqual(7, osl.diff_units(t0, t1, api.Calendar.DAY))
         self.assertEqual(1, osl.diff_units(t0, t1, api.Calendar.WEEK))
         self.assertEqual(0, osl.diff_units(t0, t1, api.Calendar.MONTH))
-        self.assertEqual(7*24, osl.diff_units(t0, t1, api.deltahours(1)))
+        self.assertEqual(7 * 24, osl.diff_units(t0, t1, api.deltahours(1)))
 
     def test_calendar_add_during_dst(self):
         osl = api.Calendar("Europe/Oslo")
@@ -112,10 +113,12 @@ class Calendar(unittest.TestCase):
         self.assertLess(abs(a - b), 2, 'Should be less than 2 seconds')
 
     def test_utc_time_to_string(self):
-        c1 = api.YMDhms(2000, 1, 2, 3, 4, 5)
-        t = self.std.time(c1)
+        t = self.std.time(2000, 1, 2, 3, 4, 5, 6)
         s = self.std.to_string(t)
-        self.assertEqual(s, "2000-01-02T03:04:05+01")
+        self.assertEqual(s, "2000-01-02T03:04:05.000006+01")
+        t = self.std.time(1960, 1, 2, 3, 4, 5, 6)
+        s = self.std.to_string(t)
+        self.assertEqual(s, "1960-01-02T03:04:05.000006+01")
 
     def test_UtcPeriod_to_string(self):
         c1 = api.YMDhms(2000, 1, 2, 3, 4, 5)
@@ -161,6 +164,7 @@ class Calendar(unittest.TestCase):
         p_0_1 = api.UtcPeriod(t0, t1)
         p_0_3 = api.UtcPeriod(t0, t3)
         assert api.UtcPeriod(t0, t1).trim(utc, utc.MONTH, api.trim_policy.TRIM_IN) == p_0_1
+        assert api.UtcPeriod(t0, t1).trim(utc, 3600 * 24 * 30, api.trim_policy.TRIM_IN) == p_0_1
         assert api.UtcPeriod(t0, t1 + 1).trim(utc, utc.MONTH) == p_0_1
         assert api.UtcPeriod(t1 - 1, t2 + 1).trim(utc, utc.MONTH, api.trim_policy.TRIM_OUT) == p_0_3
 
@@ -209,6 +213,69 @@ class Calendar(unittest.TestCase):
         self.assertEqual(t_str, "1969-12-31T23:00:00Z")
         self.assertEqual(t, api.deltahours(-1))
 
+    def test_time_construct(self):
+        self.assertAlmostEqual(api.time().seconds, 0.0, msg='default value should be 0.0')
+        self.assertAlmostEqual(api.time(3123456).seconds, 3123456, msg='should be constructible from integer type')
+        self.assertAlmostEqual(api.time(3.123456).seconds, 3.123456, msg='should be constructible from float type')
+        self.assertAlmostEqual(api.time('1970-01-01T00:00:23Z').seconds, 23.0, msg='should be constructible from iso 8601 string')
+
+    def test_time_compare(self):
+        self.assertTrue(api.time(123) == api.time(123))
+        self.assertTrue(api.time(123) == 123)
+        self.assertTrue(api.time(123) != api.time(123.2))
+        self.assertTrue(api.time(123) != 123.4)
+        self.assertTrue(api.time(123) <= api.time(123.2))
+        self.assertTrue(api.time(123) <= api.time(123))
+        self.assertTrue(api.time(1234) >= 134)
+        self.assertTrue(api.time(1234) >= 1234)
+        self.assertTrue(api.time(123) < api.time(123.2))
+        self.assertTrue(api.time(1234) > 134)
+
+    def test_time_math(self):
+        t = api.time
+        self.assertAlmostEqual(t(2) + t(2), 4)
+        self.assertAlmostEqual(t(2) + 2,  4)
+        self.assertAlmostEqual(t(2) + 2.2,  4.2)
+
+        self.assertAlmostEqual(t(2) - t(2), 0.0)
+        self.assertAlmostEqual(t(2) - 2,  0)
+        self.assertAlmostEqual(t(2) - 2.2,  -0.2)
+
+        self.assertAlmostEqual(t(2)*t(3), 6.0)
+        self.assertAlmostEqual(t(2)*0.1,  0.2)
+
+        self.assertAlmostEqual(t(2)/t(3), 0.666667)
+        self.assertAlmostEqual(t(2)/0.1,  20.0)
+
+        self.assertAlmostEqual(t(2)//t(3), 0)
+        self.assertAlmostEqual(t(10)//3, 3)
+
+        self.assertAlmostEqual(abs(t(-3)), 3)
+        self.assertAlmostEqual(abs(t(3.2)), 3.2)
+
+        self.assertAlmostEqual( t(10)%3, 1.0)
+
+    def test_time_floor(self):
+        self.assertAlmostEqual(math.floor(api.time(3.2)), 3.0)
+        self.assertAlmostEqual(math.floor(api.time(-3.2)), -4.0)
+
+    def test_time_round(self):
+        self.assertAlmostEqual(round(api.time(3.2)), 3.0)
+        self.assertAlmostEqual(round(api.time(-3.7)), -4.0)
+
+    def test_time_cast(self):
+        self.assertAlmostEqual(int(api.time(10.23)), 10)
+        self.assertAlmostEqual(float(api.time(10.23)), 10.23)
+        self.assertAlmostEqual(api.time(1.23).seconds, 1.23)
+
+    def test_time_large_number(self):
+        a = 1000.0*api.time(1534832966.984426)
+        self.assertIsNotNone(a)
+        b = api.time(a)/1000.0
+        self.assertIsNotNone(b)
+        sb=str(b)
+        self.assertTrue(len(sb)>0)
+        pass
 
 if __name__ == "__main__":
     unittest.main()

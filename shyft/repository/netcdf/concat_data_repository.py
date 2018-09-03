@@ -681,7 +681,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         elif k == 'forecasts_that_cover_period':
             v_shift_first = int(v.start - lead_times_in_sec[nb_lead_intervals_to_drop])
             v_shift_last = int(v.end - lead_times_in_sec[nb_lead_intervals_to_drop + nb_lead_intervals])
-            time_slice = ((time <= v_shift_first) & (time > v_shift_last))
+            time_slice = ((time <= v_shift_first) & (time >= v_shift_last))
             if not any(time_slice):
                 raise ConcatDataRepositoryError(
                     "No forecasts found that cover period {} with restrictions 'nb_lead_intervals_to_drop'={} "
@@ -753,12 +753,12 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
             p = v
             if ak == "precipitation_amount_acc":
                 # De-accumulate
-                f = api.deltahours(1) / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
+                f = 3600.0 / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
                 res = fcn(np.clip((p[:, 1:, :, :] - p[:, :-1, :, :]) * f[np.newaxis, :, np.newaxis, np.newaxis], 0.0, 1000.0))
             elif ak == "precipitation_amount":
                 # TODO: check with Yisak that this is understood correctly
                 # f = api.deltahours(1) / lead_time[1:]  # conversion from mm/delta_t to mm/1hour
-                f = api.deltahours(1) / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
+                f = 3600.0 / (lead_time[1:] - lead_time[:-1])  # conversion from mm/delta_t to mm/1hour
                 res = fcn(np.clip(p[:, 1:, :, :] * f[np.newaxis, :, np.newaxis, np.newaxis], 0.0, 1000.0))
             return res
 

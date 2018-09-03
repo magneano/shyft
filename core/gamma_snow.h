@@ -338,7 +338,7 @@ namespace shyft {
                     const double max_albedo = p.max_albedo;
                     const double snow_cv = p.effective_snow_cv(forest_fraction,altitude);
                     const double albedo_range = max_albedo -  min_albedo;
-                    const double dt_in_days = dt/double(calendar::DAY);
+                    const double dt_in_days = to_seconds(dt)/to_seconds(calendar::DAY);
                     const double slow_albedo_decay_rate = 0.5*albedo_range*dt_in_days/p.slow_albedo_decay_rate;
                     const double fast_albedo_decay_rate = pow(2.0, -dt_in_days/p.fast_albedo_decay_rate);
 
@@ -365,13 +365,13 @@ namespace shyft {
                     effect += 0.98*sigma*pow(vapour_pressure/T_k, 6.87e-2)*pow(T_k, 4);
 
                     if (T > 0.0 && snow < gamma_snow::tol) // Why not if (rain > 0.0)?
-                        effect += rain*T*water_heat/(double)dt;
+                        effect += rain*T*water_heat/to_seconds(dt);
                     if (T <= 0.0 && rain < gamma_snow::tol)
-                        effect += snow*T*ice_heat/(double)dt;
+                        effect += snow*T*ice_heat/to_seconds(dt);
 
                     if (p.calculate_iso_pot_energy) {
                         double iso_effect = effect - BB0 + turb*(T + 1.7*(vapour_pressure - 6.12));
-                        iso_pot_energy += iso_effect*(double)dt/melt_heat;
+                        iso_pot_energy += iso_effect*to_seconds(dt)/melt_heat;
                     }
 
                     double sst = std::min(0.0, 1.16*T - 2.09);
@@ -385,7 +385,7 @@ namespace shyft {
                     surface_heat = p.surface_magnitude*ice_heat*sst*0.5;  // New surface heat; always nonpositive since sst <= 0.
                     delta_sh += surface_heat;
 
-                    double energy = effect*(double)dt;
+                    double energy = effect*to_seconds(dt);
                     if (delta_sh > 0.0) energy -= delta_sh;                 // Surface energy is a sink, but not a source
 
                     double potential_melt = std::max(0.0, energy/melt_heat);          // Potential snowmelt in mm.

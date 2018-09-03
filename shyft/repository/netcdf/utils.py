@@ -491,7 +491,7 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
             if ta.timeaxis_type == api.TimeAxisType.FIXED:
                 dt = ta.time(1) - ta.time(0)
                 n = int(idx_end - idx_start)
-                time_axis[key] = api.TimeAxis(int(ta.time_points[idx_start]), dt, n)
+                time_axis[key] = api.TimeAxis(int(ta.time_points[idx_start]), int(dt), n)
             else:
                 time_points = api.UtcTimeVector(ta.time_points[idx_start:idx_end].tolist())
                 t_end = ta.time_points[idx_end]
@@ -578,14 +578,14 @@ def dummy_var(input_src_types: list, utc_period: "api.UtcPeriod", geo_location_c
             that the f(t) can be evaluated over the requested period.
     """
 
-    nint = (utc_period.end - utc_period.start) / ts_interval
+    nint = (utc_period.end.seconds - utc_period.start.seconds) / ts_interval
 
     def _ta(t):
         t0 = int(t[0])
         t1 = int(t[1])
         return api.TimeAxis(t0, t1 - t0, len(t))
 
-    times = np.linspace(utc_period.start, utc_period.end, nint, ts_interval)
+    times = np.linspace(utc_period.start.seconds, utc_period.end.seconds, nint, ts_interval)
 
     ta = _ta(times)
     #TODO: could make more sophisticated to get mid point, etc.

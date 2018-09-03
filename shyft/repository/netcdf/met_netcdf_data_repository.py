@@ -406,7 +406,7 @@ class MetNetcdfDataRepository(interfaces.GeoTsRepository):
             factor = 1.
             if unit in ['Mg/m^2', 'm']:  # from m (Mg/m2) to mm (kg/m2) and from mm/delta_t to mm/1hour
                 factor = 1000.
-            f = factor * api.deltahours(1) / (t[1:] - t[:-1])
+            f = factor * 3600. / (t[1:] - t[:-1]) # assume t is in units of second
             return np.clip((p[1:, :] - p[:-1, :]) * f[:, np.newaxis], 0.0, 1000.0)
 
         def rad_acc_conv(r, t):  # from W s/m2 to W/m2

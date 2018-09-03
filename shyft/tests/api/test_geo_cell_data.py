@@ -23,6 +23,8 @@ class GeoCellData(unittest.TestCase):
         gcd.routing_info.id = 3
         self.assertAlmostEqual(gcd.routing_info.distance, 13000.0)
         self.assertAlmostEqual(gcd.routing_info.id, 3)
+        gcd.set_catchment_id(10) # verify it works
+        self.assertEqual(gcd.catchment_id(), 10)
 
     def test_land_type_fractions(self):
         """ 

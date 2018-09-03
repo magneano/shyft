@@ -20,6 +20,12 @@ using core::utcperiod;
 using core::utctime;
 using core::utctimespan;
 
+// compute in ticks is faster than seconds
+// area needs to be scaled down to units of seconds
+// we use _a_seconds for that, and _to_ticks to
+inline double _a_seconds(const double& a) {return a/utctime::period::den;}
+inline int64_t _to_ticks(const utctime&t) {return t.count();}
+
 /** \brief compute non_nan_integral|average for a linear interpreted time-series
   *
   * For each interval in the specified time-axis (continuous)
@@ -95,6 +101,7 @@ using core::utctimespan;
   * \param avg if true compute the average else compute integral
   * \return a vector<double>[ta.size()] with computed values, integral or true average
  */
+
 template < class TA,class TS>
 vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
     vector<double> r(ta.size(),nan);
@@ -115,13 +122,12 @@ vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
     point e_p;
     bool e_finite{false};
     const size_t n=ts.size();
-
     double a{0};// the constants for line
     double b{0};// f(t) = a*t + b, computed only when needed
 
     for(size_t i=0;i<ta.size();++i) {
         double area{0.0}; // integral of non-nan f(x), area
-        utctimespan t_sum{0};  // sum of non-nan time-axis
+        int64_t t_sum{0};  // sum of non-nan time-axis
         const auto p {ta.period(i)};
 
         //---- find first finite point of a partition
@@ -130,7 +136,7 @@ vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
                 ++s;
                 if(s+1>=n) {// we are out of points searching for non-nan
                     if(t_sum)
-                        r[i] = avg? area/t_sum: area;
+                        r[i] = avg? area/t_sum: _a_seconds(area);
                     return r;//-> we are completely done
                 }
                 s_p=ts.get(s); // we need only value here.. could optimize
@@ -140,7 +146,7 @@ vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
 
         if(s_p.t >= p.end) { // are we out of this interval? skip to next ta.period
             if(t_sum)
-                r[i] = avg? area/t_sum: area;// stash this result if any
+                r[i] = avg? area/t_sum: _a_seconds(area);// stash this result if any
             continue;
         }
 
@@ -150,7 +156,7 @@ vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
                 e= s+1;// get next point from s
                 if(e==n) {// we are at the end, and left-value of s is nan
                     if(t_sum)
-                        r[i] = avg? area/t_sum: area;//stash result if any
+                        r[i] = avg? area/t_sum: _a_seconds(area);//stash result if any
                     return r;// -> we are completely done
                 }
                 e_p = ts.get(e);
@@ -158,8 +164,8 @@ vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
                 if(e_finite) {// yahoo! two points, we can then..
                     // compute equation for the line f(t) = a*t + b
                     // given points s_p and e_p
-                    a = (e_p.v - s_p.v)/double(e_p.t - s_p.t);
-                    b = s_p.v - a*double(s_p.t);
+                    a = (e_p.v - s_p.v)/_to_ticks(e_p.t - s_p.t);
+                    b = s_p.v - a*_to_ticks(s_p.t);
                 } else {
                     s=e;// got nan, restart search s_finite
                     s_finite=false;//
@@ -171,11 +177,11 @@ vector<double> accumulate_linear(const TA&ta, const TS& ts, bool avg) {
             auto s_t = max(s_p.t,p.start);// clip to interval p
             auto e_t = min(e_p.t,p.end); // recall that the points can be anywhere
             // then compute non-nan area and non-nan t_sum
-            utctimespan dt{e_t-s_t};
-            area +=  (a*(s_t + e_t)*0.5 + b)*dt;// avg.value * dt
+            const int64_t dt{ _to_ticks(e_t-s_t)};
+            area +=  (0.5*a*_to_ticks((s_t+e_t)) + b)*dt;// avg.value * dt
             t_sum += dt;
             if(e_p.t >= p.end) { // are we done in this time-step ?
-                r[i] = avg? area/t_sum: area;// stash result
+                r[i] = avg? area/t_sum: _a_seconds(area);// stash result
                 continue; // using same s, as it could extend into next p
             }
             // else advance start to next point, that is; the current end-point
@@ -209,7 +215,7 @@ vector<double> accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
 
     for(size_t i=0;i<ta.size();++i) {
         double area{0.0}; // integral of non-nan f(x), area
-        utctimespan t_sum{0};  // sum of non-nan time-axis
+        int64_t t_sum{0};  // sum of non-nan time-axis
         const auto p {ta.period(i)};
 
         //---- find first finite point of a partition
@@ -218,7 +224,7 @@ vector<double> accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
                 ++s;
                 if(s>=n) {// we are out of points searching for non-nan
                     if(t_sum)
-                        r[i] = avg? area/t_sum: area;
+                        r[i] = avg? area/t_sum: _a_seconds(area);
                     return r;//-> we are completely done
                 }
                 s_p=ts.get(s); // we need only value here.. could optimize
@@ -228,7 +234,7 @@ vector<double> accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
 
         if(s_p.t >= p.end) { // are we out of this interval? skip to next ta.period
             if(t_sum)
-                r[i] = avg? area/t_sum: area;// stash this result if any
+                r[i] = avg? area/t_sum:_a_seconds( area);// stash this result if any
             continue;
         }
         //---- find end-point of a partition
@@ -243,7 +249,7 @@ vector<double> accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
         //compute_partition: we got a valid partition, defined by two points
         auto s_t = max(s_p.t,p.start);// clip to interval p
         auto e_t = min(e_p.t,p.end); // recall that the points can be anywhere
-        utctimespan dt{e_t-s_t};
+        int64_t dt{_to_ticks(e_t-s_t)};
         area +=  s_p.v*dt;
         t_sum += dt;
         if ( e_p.t <= p.end && s+1 <n) {// should&can we advance s
@@ -251,7 +257,7 @@ vector<double> accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
             s_finite=e_finite;
             ++s;
             if(e_p.t == p.end) {
-                r[i] = avg? area/t_sum: area;// stash result
+                r[i] = avg? area/t_sum:_a_seconds(area);// stash result
                 continue;// skip to next interval
             }
             if(s_finite)
@@ -260,11 +266,14 @@ vector<double> accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
                 goto search_s_finite;
         }
         // keep s, next interval.
-        r[i] = avg? area/t_sum: area;// stash result
+        r[i] = avg? area/t_sum:_a_seconds( area);// stash result
 
         if(s+1>=n && p.end >= tp.end)
            return r;// finito
     }
     return r;
 }
+//#undef _to_ticks
+//#undef _a_seconds
+
 }} // shyft.time_series
