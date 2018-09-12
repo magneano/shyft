@@ -76,10 +76,13 @@ if [ ! ${python_tst} -eq 0 ]; then
 		if [ -d miniconda ]; then
 			rm -rf miniconda
 		fi;
-		if [ ! -f Miniconda3-${minconda_ver}-Windows-x86_64.exe ]; then
-			${WGET}  http://repo.continuum.io/miniconda/Miniconda3-${minconda_ver}-Windows-x86_64.exe
+		if [ ! -f Miniconda3-${miniconda_ver}-Windows-x86_64.exe ]; then
+			${WGET}  http://repo.continuum.io/miniconda/Miniconda3-${miniconda_ver}-Windows-x86_64.exe
 		fi;
-		echo 'start /wait "" .\Miniconda3-${minconda_ver}-Windows-x86_64.exe /InstallationType=JustMe /S /D=%cd%\miniconda' >install_miniconda.cmd
+        if [ ! -f Miniconda3-Windows-x86_64.exe ]; then
+            cp Miniconda3-${miniconda_ver}-Windows-x86_64.exe Miniconda3-Windows-x86_64.exe
+        fi;
+		echo 'start /wait "" .\Miniconda3-Windows-x86_64.exe /InstallationType=JustMe /S /D=%cd%\miniconda' >install_miniconda.cmd
 		./install_miniconda.cmd
 		# Update conda to latest version, assume we start with 4.3 which
 		# requires PATH to be set
