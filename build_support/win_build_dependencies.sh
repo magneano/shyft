@@ -93,7 +93,7 @@ if [ ! ${python_tst} -eq 0 ]; then
 		new_conda_version=$(conda --version | sed "s/conda \(.*\)/\1/")
 		echo "New conda version is ${new_conda_version}"
 		conda install numpy=${numpy_ver}
-		conda create -n shyft_env python=3.6 pyyaml numpy=${numpy_ver} netcdf4 gdal matplotlib requests nose coverage pip shapely  pyproj
+		conda create -n shyft_env python=3.7 pyyaml numpy=${numpy_ver} netcdf4 gdal matplotlib requests nose coverage pip shapely  pyproj
 	else
 		export PATH="${WORKSPACE}/miniconda:${WORKSPACE}/miniconda/Scripts:${WORKSPACE}/miniconda/Dlls:$PATH"
 	fi;
