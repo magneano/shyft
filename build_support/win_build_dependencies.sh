@@ -6,7 +6,7 @@ armadillo_name=armadillo-9.100.5
 dlib_name=dlib-${SHYFT_DLIB_VERSION:-19.15}
 boost_ver=${SHYFT_BOOST_VERSION:-1_68}_0
 numpy_ver=${SHYFT_BOOST_NUMPY_VERSION:-1.14}
-cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
+cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER  -DCMAKE_SYSTEM_VERSION=10.0"
 echo ---------------
 echo Windows Update/build shyft-dependencies
 echo WORKSPACE..............: ${WORKSPACE}
