@@ -94,6 +94,17 @@ class TimeAxis(unittest.TestCase):
         self.assertEqual(len(tp), n + 1)
         self.assertEqual(len(api.TimeAxis(c, t0, dt, 0).time_points), 0)
 
+    def test_timeaxis_time_points_double(self):
+        dt = 1.5
+        n = 240
+        t0 = 0
+        ta = api.TimeAxis(t0, dt, n)
+        tp = ta.time_points_double
+        self.assertIsNotNone(tp)
+        self.assertEqual(len(tp), n + 1)
+        self.assertEqual(len(api.TimeAxis(t0, dt, 0).time_points_double), 0)
+        self.assertEqual(ta.time_points_double[1], 1.5)
+
 
 if __name__ == "__main__":
     unittest.main()
