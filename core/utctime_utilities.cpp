@@ -48,7 +48,7 @@ utctime create_from_iso8601_string(const std::string&s) {
     if (s.back() == 'Z' && 6 == sscanf(s.c_str(), "%d-%d-%dT%d:%d:%fZ", &y, &M, &d, &h, &m, &sec)) {
         return  calendar().time(y, M, d, h, m, 0) + utctimespan{ int64_t(round(utctimespan::period::den*sec / utctimespan::period::num)) };
 
-    } else if (6 < sscanf(s.c_str(), "%d-%d-%dT%d:%d:%f%d:%d", &y, &M, &d, &h, &m, &sec, &tzh, &tzm)) {
+    } else if (8 == sscanf(s.c_str(), "%d-%d-%dT%d:%d:%f%d:%d", &y, &M, &d, &h, &m, &sec, &tzh, &tzm)) {
         if (tzh < 0) tzm = -tzm;    // Fix the sign on minutes.
         utctime t = calendar().time(y, M, d, h, m, 0) + utctimespan{ int64_t(round(utctimespan::period::den*sec / utctimespan::period::num)) };
         t -= deltahours(tzh) + deltaminutes(tzm);

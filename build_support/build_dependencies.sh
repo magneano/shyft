@@ -6,12 +6,13 @@ armadillo_name=armadillo-9.100.5
 dlib_name=dlib-19.15
 boost_ver=1_68_0
 pybind11_ver=v2.2.3
+miniconda_ver=4.5.4
 cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
 echo ---------------
 echo Update/build shyft dependencies
 echo SHYFT_WORKSPACE........: ${SHYFT_WORKSPACE}
 echo SHYFT_DEPENDENCIES_DIR.: ${SHYFT_DEPENDENCIES_DIR}
-echo PACKAGES...............: miniconda w/shyft_env, doctest, boost_${boost_ver}, ${armadillo_name}, ${dlib_name} 
+echo PACKAGES...............: miniconda ${miniconda_ver} w/shyft_env, doctest, boost_${boost_ver}, ${armadillo_name}, ${dlib_name} 
 
 # A helper function to compare versions
 function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
@@ -66,7 +67,7 @@ if [ ! -d miniconda/bin ]; then
         rm -rf miniconda
     fi;
     if [ ! -f miniconda.sh ]; then
-        wget  -O miniconda.sh http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        wget  -O miniconda.sh http://repo.continuum.io/miniconda/Miniconda3-${miniconda_ver}-Linux-x86_64.sh
     fi;
     bash miniconda.sh -b -p ${SHYFT_WORKSPACE}/miniconda
 
@@ -97,7 +98,7 @@ if [ ! -d miniconda/bin ]; then
     fi
 
     conda install numpy
-    conda create -n shyft_env python=3.6 pyyaml numpy libgfortran netcdf4 cftime gdal matplotlib requests nose coverage pip shapely  pyproj
+    conda create -n shyft_env python=3.6 pyyaml numpy netcdf4 cftime gdal matplotlib requests nose coverage pip shapely  pyproj
     ln -s ${SHYFT_WORKSPACE}/miniconda/include/python3.6m ${SHYFT_WORKSPACE}/miniconda/include/python3.6
     ln -s ${SHYFT_WORKSPACE}/miniconda/envs/shyft_env/include/python3.6m ${SHYFT_WORKSPACE}/miniconda/envs/shyft_env/include/python3.6 
 fi;

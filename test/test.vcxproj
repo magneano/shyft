@@ -134,6 +134,7 @@
     <ClCompile Include="calibration_test.cpp" />
     <ClCompile Include="cell_builder_test.cpp" />
     <ClCompile Include="api_test.cpp" />
+    <ClCompile Include="dtss_krls_pred_db_test.cpp" />
     <ClCompile Include="dtss_mutex_test.cpp" />
     <ClCompile Include="dtss_stress_test.cpp" />
     <ClCompile Include="dtss_test.cpp" />

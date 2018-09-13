@@ -113,3 +113,14 @@ class Vectors(unittest.TestCase):
         self.assertEqual(len(gcdv), 5)
         for i in range(5):
             self.assertEqual(gcdv[i].catchment_id(), i)
+        g2 = api.GeoCellDataVector(gcdv)  # copy construct a new
+        self.assertTrue(g2 == gcdv)
+        g2[0].set_catchment_id(10)
+        self.assertTrue(g2 != gcdv)
+        # serialize
+        gcdv_s= gcdv.serialize()
+        self.assertGreater(len(gcdv_s),2)
+        gcdv_deserialized = api.GeoCellDataVector.deserialize(gcdv_s)
+        self.assertIsNotNone(gcdv_deserialized)
+        self.assertTrue(gcdv_deserialized == gcdv)
+

@@ -12,6 +12,10 @@ See file COPYING for more details **/
 #include "core/geo_cell_data.h"
 #include "core/time_series_dd.h"
 #include "api/api.h"
+#include "core/core_serialization.h"
+#include "core/core_archive.h"
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
 
 //#include <boost/python/raw_function.hpp>
 
@@ -30,6 +34,39 @@ namespace expose {
         import_array();
         return nullptr;
     }
+
+    template<class T>
+    static T x_arg(const py::tuple& args, size_t i) {
+        if (py::len(args) + 1 < (int)i)
+            throw std::runtime_error("missing arg #" + std::to_string(i) + std::string(" in time"));
+        py::object o = args[i];
+        py::extract<T> xtract_arg(o);
+        return xtract_arg();
+    }
+
+    /* helper to expose serialize and deserialize */
+    struct geo_cell_data_vector_ext {
+        static py::object serialize_to_string(const py::tuple& args, const py::dict & kwargs) {
+            const auto& gcd = x_arg<const vector<shyft::core::geo_cell_data>&>(args, 0);
+            // serialize to binary string
+            //
+            std::ostringstream bs;
+            core_oarchive oa(bs,core_arch_flags);
+            oa<<core_nvp("geo_cell_data_vector", gcd);
+            bs.flush();
+            auto bss = bs.str();
+            return py::object(vector<char>(begin(bss),end(bss)));
+        }
+        static py::object deserialize_from_string(const py::tuple& args, const py::dict & kwargs) {
+            auto bss = x_arg<vector<char>>(args, 0);
+            //-- de-serialize from
+            istringstream xmli(string(bss.data(),bss.size()));
+            core_iarchive ia(xmli, core_arch_flags);
+            vector<geo_cell_data> gcd;
+            ia>>core_nvp("geo_cell_data_vector", gcd);
+            return py::object(gcd);
+        }
+    };
 
     ats_vector create_tsv_from_np(const gta_t& ta, const numpy_boost<double,2>& a ,ts::ts_point_fx point_fx) {
         ats_vector r;
@@ -131,6 +168,14 @@ namespace expose {
         class_<GeoCellDataVector>("GeoCellDataVector", "A vector, list, of GeoCellData")
             .def(vector_indexing_suite<GeoCellDataVector>())
             .def(init<const GeoCellDataVector&>(args("const_ref_v")))
+            .def(self==self)
+            .def(self!=self)
+            .def("serialize",py::raw_function(&geo_cell_data_vector_ext::serialize_to_string,1),
+                 doc_intro("serialize to a binary byte vector")
+            )
+            .def("deserialize", py::raw_function(&geo_cell_data_vector_ext::deserialize_from_string, 1),
+                 doc_intro("deserialize from a binary to GeoCellDataVector")
+            ).staticmethod("deserialize")
             ;
         py_api::iterable_converter().from_python<GeoCellDataVector>();
     }
