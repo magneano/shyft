@@ -7,13 +7,12 @@ if(_IMPORT_PREFIX STREQUAL "/")
     set(_IMPORT_PREFIX "")
 endif()
 
-message("***************")
-message(${_IMPORT_PREFIX})
-message("***************")
-
 set(shyft_core_INCLUDE_DIRS ${_IMPORT_PREFIX}/include)
 if(MSVC)
     set(shyft_core_LIBRARIES debug ${_IMPORT_PREFIX}/lib/shyft_core_debug.lib optimized ${_IMPORT_PREFIX}/lib/shyft_core.lib)
 else()
     set(shyft_core_LIBRARIES ${_IMPORT_PREFIX}/lib/libshyft_core.a)
 endif()
+
+message(STATUS "Shyft core library:")
+message(STATUS "  ${shyft_core_LIBRARIES}")
