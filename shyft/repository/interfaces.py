@@ -1,6 +1,7 @@
 # This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
 # See file COPYING for more details **/
 from abc import ABCMeta, abstractmethod
+from copy import deepcopy
 from shyft import api
 
 """Module description: This module contain the abstract base-classes for the
@@ -45,7 +46,7 @@ the shyft.api.
 """
 
 
-class RegionModelRepository(object):
+class RegionModelRepository:
     """
     Interface for RegionModel objects.
 
@@ -99,7 +100,7 @@ class RegionModelRepository(object):
             "Method 'get_region_model' not implemented for repository {}.".format(self.__class__.__name__))
 
 
-class StateInfo(object):
+class StateInfo:
     """
     Keeps needed information for a persisted region model state.  Currently,
     the StateInfo of a region model is unique to the model, but we plan to do
@@ -134,7 +135,7 @@ class StateInfo(object):
         self.tags = tags
 
 
-class StateRepository(object):
+class StateRepository:
     """
     Provides the needed functionality to maintain state for a region-model.
 
@@ -229,10 +230,12 @@ class StateRepository(object):
         raise NotImplementedError(
             "Method 'delete_state' not implemented for repository {}.".format(self.__class__.__name__))
 
-class ForecastSelectionCriteriaError(Exception):
-   pass
 
-class ForecastSelectionCriteria(object):
+class ForecastSelectionCriteriaError(Exception):
+    pass
+
+
+class ForecastSelectionCriteria:
     """
     A fc_selection_criteria is a tuple which specifies the collection of forecasts to be returned by
     GeoTsRepository methods get_forecast_collection and get_forecast_ensemble_collection.
@@ -265,11 +268,13 @@ class ForecastSelectionCriteria(object):
     fc_selection_criteria.criterion
     Out: ('latest_available_forecasts', {'forecasts_older_than': 1516431600, 'number_of_forecasts': 1})
     """
+
     def __init__(self, **kwargs):
-        cri_lst = [(k, v) for k, v in kwargs.items()]
+        cri_lst = [(k, deepcopy(v)) if k in ['latest_available_forecasts', 'forecasts_at_reference_times']
+                   else (k, v) for k, v in kwargs.items()]
         is_not_none = [cri[1] is not None for cri in cri_lst]
         if sum(is_not_none) != 1:
-           raise ForecastSelectionCriteriaError('Only one of the selection criteria should be specified!')
+            raise ForecastSelectionCriteriaError('Only one of the selection criteria should be specified!')
         self._selected_criterion = cri_lst[is_not_none.index(True)]
         self._validate()
 
@@ -280,35 +285,38 @@ class ForecastSelectionCriteria(object):
     def _validate(self):
         k, v = self._selected_criterion
         if k == 'forecasts_created_within_period':
-           if not isinstance(v, api.UtcPeriod):
-               raise ForecastSelectionCriteriaError(
-                   "'forecasts_created_within_period' selection criteria should be of type api.UtcPeriod.")
+            if not isinstance(v, api.UtcPeriod):
+                raise ForecastSelectionCriteriaError(
+                    "'forecasts_created_within_period' selection criteria should be of type api.UtcPeriod.")
         elif k == 'forecasts_with_start_within_period':
-           if not isinstance(v, api.UtcPeriod):
-               raise ForecastSelectionCriteriaError(
-                   "'forecasts_with_start_within_period' selection criteria should be of type api.UtcPeriod.")
+            if not isinstance(v, api.UtcPeriod):
+                raise ForecastSelectionCriteriaError(
+                    "'forecasts_with_start_within_period' selection criteria should be of type api.UtcPeriod.")
         elif k == 'forecasts_that_cover_period':
-           if not isinstance(v, api.UtcPeriod):
-               raise ForecastSelectionCriteriaError(
-                   "'forecasts_that_cover_period' selection criteria should be of type api.UtcPeriod.")
+            if not isinstance(v, api.UtcPeriod):
+                raise ForecastSelectionCriteriaError(
+                    "'forecasts_that_cover_period' selection criteria should be of type api.UtcPeriod.")
         elif k == 'forecasts_that_intersect_period':
-           if not isinstance(v, api.UtcPeriod):
-               raise ForecastSelectionCriteriaError(
-                   "'forecasts_that_intersect_period' selection criteria should be of type api.UtcPeriod.")
+            if not isinstance(v, api.UtcPeriod):
+                raise ForecastSelectionCriteriaError(
+                    "'forecasts_that_intersect_period' selection criteria should be of type api.UtcPeriod.")
         elif k == 'latest_available_forecasts':
-           if not all([isinstance(v, dict), isinstance(v['number_of_forecasts'], int),
-                       isinstance(v['forecasts_older_than'], (int, api.time))]):
-               raise ForecastSelectionCriteriaError(
-                   "'latest_available_forecasts' selection criteria should be of type dict with keys "
-                   "'number_of_forecasts' and 'forecasts_older_than' and values of type int or api.time.")
+            v['forecasts_older_than'] = api.time(v['forecasts_older_than'])
+            if not all([isinstance(v, dict), isinstance(v['number_of_forecasts'], int)]):
+                raise ForecastSelectionCriteriaError(
+                    "'latest_available_forecasts' selection criteria should be of type dict with keys "
+                    "'number_of_forecasts' and 'forecasts_older_than', and with values of type int and "
+                    "api.time respectively.")
         elif k == 'forecasts_at_reference_times':
-           if not isinstance(v, list):
-               raise ForecastSelectionCriteriaError(
-                   "'forecasts_at_reference_times' selection criteria should be of type list.")
+            if not isinstance(v, list):
+                raise ForecastSelectionCriteriaError(
+                    "'forecasts_at_reference_times' selection criteria should be of type list.")
+            v[:] = [api.time(t) for t in v]
         else:
-           raise ForecastSelectionCriteriaError("Unrecognized forecast selection criteria.")
+            raise ForecastSelectionCriteriaError("Unrecognized forecast selection criteria.")
 
-class GeoTsRepository(object):
+
+class GeoTsRepository:
     """
     Interface for GeoTsRepository (Geo Located Timeseries) objects.
 
@@ -486,7 +494,8 @@ class GeoTsRepository(object):
             "Interface method 'get_forecast_ensemble_collection' not implemented for repository {}.".format(
                 self.__class__.__name__))
 
-class InterpolationParameterRepository(object):
+
+class InterpolationParameterRepository:
     """
     """
     __metaclass__ = ABCMeta
@@ -507,7 +516,7 @@ class InterpolationParameterRepository(object):
             "Interface method 'get_parameters' not implemented for repository {}.".format(self.__class__.__name__))
 
 
-class BoundingRegion(object):
+class BoundingRegion:
     __metaclass__ = ABCMeta
 
     @abstractmethod
@@ -562,7 +571,7 @@ class InterfaceError(Exception):
     pass
 
 
-class TsStoreItem(object):
+class TsStoreItem:
     """Represent a minimal mapping between the destination_id in the
     ts-store (like SmG, ts-name), and the lambda/function that from a
     supplied model extracts, and provides a ts possibly
@@ -586,7 +595,7 @@ class TsStoreItem(object):
         self.extract_method = extract_method
 
 
-class TimeseriesStore(object):
+class TimeseriesStore:
     """Represent a repository, that is capable of storing time-series
     (with almost no metadata, or they are provided elsewhere) Typical
     example would be Powel SmG, a netcdf-file-based ts-store etc.
@@ -629,7 +638,7 @@ class TimeseriesStore(object):
         return self.tss.store(tsid_ts_map, is_forecast)
 
 
-class GeoLocationRepository(object):
+class GeoLocationRepository:
     """
     Responsible for providing geo-locations for specified gis-identifiers
     It plays a similar role as TsRepository, but this one just

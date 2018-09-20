@@ -28,7 +28,7 @@ if [ ! -d ${armadillo_name} ]; then
     fi;
     tar -xf ${armadillo_name}.tar.xz
     pushd ${armadillo_name}
-    cmake -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -DDETECT_HDF5=false -DCMAKE_INSTALL_LIBDIR=lib ${cmake_common}
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -DDETECT_HDF5=false -DCMAKE_INSTALL_LIBDIR=lib ${cmake_common}
     make install
     popd
 fi;
@@ -43,7 +43,7 @@ if [ ! -d ${dlib_name} ]; then
     pushd ${dlib_name}
     mkdir -p build
     dlib_cfg="-DDLIB_PNG_SUPPORT=0 -DDLIB_GIF_SUPPORT=0 -DDLIB_LINK_WITH_SQLITE3=0 -DDLIB_NO_GUI_SUPPORT=1 -DDLIB_DISABLE_ASSERTS=1 -DDLIB_JPEG_SUPPORT=0 -DDLIB_USE_BLAS=0 -DDLIB_USE_LAPACK=0 -DBUILD_SHARED_LIBS=ON"
-    cd build && cmake .. -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -DCMAKE_INSTALL_LIBDIR=lib ${cmake_common} ${dlib_cfg} && cmake --build . --config Debug --target install
+    cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${SHYFT_DEPENDENCIES_DIR} -DCMAKE_INSTALL_LIBDIR=lib ${cmake_common} ${dlib_cfg} && cmake --build . --target install
     popd
 fi;
 echo Done ${dlib_name}
