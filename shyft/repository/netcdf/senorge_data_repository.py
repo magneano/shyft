@@ -9,11 +9,10 @@ from shyft import api
 from shyft import shyftdata_dir
 from .. import interfaces
 from .time_conversion import convert_netcdf_time
-from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, _make_time_slice, _get_files, dummy_var
+from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, dummy_var, create_geo_ts_type_map
 
 class SeNorgeDataRepositoryError(Exception):
     pass
-
 
 class SeNorgeDataRepository(interfaces.GeoTsRepository):
     """
@@ -37,7 +36,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             Unique coordinate system id for result coordinates.
             Currently "32632" and "32633" are supported.
         directory: string
-            Path to directory holding one or possibly more WRF data files.
+            Path to directory holding the data files.
             os.path.isdir(directory) should be true, or exception is raised.
         filename: string, optional
             Name of netcdf file in directory that contains spatially
@@ -50,8 +49,6 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         """
         directory = os.path.expandvars(directory)
         self._directory = directory
-        if filename is None:
-            filename = "seNorge2_PREC1d_grid_2015"
         self._filename = filename
         self.allow_subset = allow_subset
         if not os.path.isdir(directory):
@@ -75,30 +72,14 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             "radiation": "radiation",
             "wind_speed": "wind_speed",
             "relative_humidity": "relative_humidity"
-            }
-
-        self.var_units = {"mean_temperature": ['C'],
-                          "precipitation_amount": ['kg/m^2', 'Mg/m^2', 'm', 'mm'],
-                          "x_wind_10m": ['m/s'],
-                          "y_wind_10m": ['m/s'],
-                          "integral_of_surface_downwelling_shortwave_flux_in_air_wrt_time": ['W s/m^2'],
-                          }
-
-        # Fields that need an additional timeslice because the measure average values
-        # self._shift_fields = ("PREC_ACC_NC", "SWDOWN")
-        self._shift_fields = ()
-
-    """
-            self.wrf_shyft_map = {
-                "T2": "temperature",
-                "HGT": "z",
-                "PREC_ACC_NC": "precipitation",
-                "U10": "x_wind",
-                "V10": "y_wind",
-                "SWDOWN": "radiation",
-                "Q2": "mixing_ratio",
-                "PSFC": "pressure"}
-    """
+        }
+        self.series_type = {
+            "relative_humidity": api.POINT_AVERAGE_VALUE,
+            "temperature": api.POINT_AVERAGE_VALUE,
+            "precipitation": api.POINT_AVERAGE_VALUE,
+            "radiation": api.POINT_AVERAGE_VALUE,
+            "wind_speed": api.POINT_AVERAGE_VALUE
+        }
 
     def get_timeseries(self, input_source_types, utc_period, geo_location_criteria=None):
         """
@@ -106,41 +87,19 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         """
 
         # for these variables we use 'dummy' data
-        if any(a in input_source_types for a in ('radiation', 'wind_speed', 'relative_hum')):
+        # TODO: not a good check. If mixed dummmy and non-dummy it will fail. Please fix!
+        if any(a in input_source_types for a in ('radiation', 'wind_speed', 'relative_humidity')):
             return dummy_var(input_source_types, utc_period, geo_location_criteria)
 
         else:
             filename = os.path.join(self._directory, self._filename)
             if not os.path.isfile(filename):
-                if re.compile(self._filename).groups > 0:  # check if it is a filename-pattern
-                    filename = _get_files(self._directory, self._filename, utc_period.start, SeNorgeDataRepositoryError)
-                else:
-                    raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
+                #if re.compile(self._filename).groups > 0:  # check if it is a filename-pattern
+                #    filename = _get_files(self._directory, self._filename, utc_period.start, SeNorgeDataRepositoryError)
+                #else:
+                raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
             with Dataset(filename) as dataset:
                 return self._get_data_from_dataset(dataset, input_source_types, utc_period, geo_location_criteria)
-
-
-
-    """
-    def _calculate_rel_hum(self, T2, PSFC, Q2):
-        # constants
-        EZERO = 6.112
-        ESLCON1 = 17.67
-        ESLCON2 = 29.65
-        CELKEL = 273.15
-        RD = 287.
-        RV = 461.6
-        EPS = 0.622
-
-        # calculation
-        RH = np.empty_like(T2)
-        es = EZERO * np.exp(ESLCON1 * (T2 - CELKEL) / (T2 - ESLCON2))
-        qvs = EPS * es / (0.01 * PSFC - (1.0 - EPS) * es)
-        RH = Q2 / qvs
-        RH[RH > 1.0] = 1.0
-        RH[RH < 0.0] = 0.0
-        return RH
-    """
 
     def _check_and_get_coord_vars(self, dataset, var_types):
         cs = []
@@ -157,7 +116,6 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         if not time:
             raise SeNorgeDataRepositoryError("Time variable not found in dataset.")
         time = convert_netcdf_time(time.units, time)
-
 
         if 'Y' in coord_names[0]:
             x = dataset.variables.get("X", None)
@@ -189,7 +147,6 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
 
     def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria, ensemble_member=None):
 
-
         #copied from met_netcdf repo
         # Check for presence and consistency of coordinate variables
         time, x_var, y_var, data_cs, coord_conv = self._check_and_get_coord_vars(dataset, input_source_types)
@@ -198,8 +155,15 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                                                                data_cs.proj4, self.shyft_cs, geo_location_criteria,
                                                                self._padding, SeNorgeDataRepositoryError)
 
+        # "The daily precipitation (comment: and temperature) for day D has been defined as the accumulated
+        # precipitation between 06:00 UTC of day D − 1  and 06:00 UTC of day D".
+        # https://www.earth-syst-sci-data.net/10/235/2018/essd-10-235-2018.pdf
+        # Here: time points are interpreted in datasert as UTC 00:00 of day D.
+        #time = time - 18. * 3600.  # Correcting dataset time to true utc time (18.00 hours earlier than
+                                   # stated in dataset, e.g. 1957-01-01 00:00 -> 1956-12-31 06:00).
+        time = time + 6. * 3600.  #
         # Make temporal slilce
-        time_slice, issubset = _make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
+        time_slice, issubset = self._make_time_slice(time, utc_period, SeNorgeDataRepositoryError)
 
 
         raw_data = {}
@@ -223,17 +187,8 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                                                   geo_location_criteria)
             assert np.linalg.norm(x - _x) < 1.0e-10  # x/y coordinates should match
             assert np.linalg.norm(y - _y) < 1.0e-10
-        elif any([nm in dataset.variables.keys() for nm in ['altitude', 'surface_geopotential']]):
-            var_nm = ['altitude', 'surface_geopotential'][
-                [nm in dataset.variables.keys() for nm in ['altitude', 'surface_geopotential']].index(True)]
-            z_data = dataset.variables[var_nm]
-            z = _slice_var_2D(z_data, x_var.name, y_var.name, x_slice, y_slice, x_inds, y_inds,
-                              SeNorgeDataRepositoryError)
-            if var_nm == 'surface_geopotential':
-                z /= self._G
         else:
-            raise SeNorgeDataRepositoryError("No elevations found in dataset"
-                                               ", and no elevation file given.")
+            raise SeNorgeDataRepositoryError("No elevation file given.")
 
         # Make sure requested fields are valid, and that dataset contains the requested data.
 
@@ -253,8 +208,34 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         else:
             returned_data = _numpy_to_geo_ts_vec(self._transform_raw(raw_data, time[time_slice]),#, issubset=issubset),
                                                  x, y, z, SeNorgeDataRepositoryError)
+            data = self._transform_raw(raw_data, time[time_slice])
+            geo_pts = api.GeoPointVector.create_from_x_y_z(*[api.DoubleVector_FromNdArray(arr) for arr in [x, y, z]])
+            shape = list(data.values())[0][0].shape
+            ndim = len(shape)
+            geo_ts = {key: create_geo_ts_type_map[key](ta, geo_pts, arr[:, :].transpose(), self.series_type[key])
+                      for key, (arr, ta) in data.items()}
         return returned_data
 
+    def _make_time_slice(self, time, utc_period, err):
+        UTC = api.Calendar()
+        del_t = int(time[1]-time[0])
+        if utc_period is None:
+            # If period is None set period to be from start to end of dataset time dimension
+            utc_period = api.UtcPeriod(int(time[0]), int(time[-1])+del_t)
+        idx_min = np.argmin(time-del_t <= utc_period.start) - 1  # raise error if result is -1
+        idx_max = np.argmax(time >= utc_period.end)  # raise error if result is 0
+        if idx_min < 0:
+            raise err(
+                "The earliest time in repository ({}) is later than the start of the period for which data is "
+                "requested ({})".format(UTC.to_string(int(time[0]-del_t)), UTC.to_string(utc_period.start)))
+        if idx_max == 0:
+            raise err(
+                "The latest time in repository ({}) is earlier than the end of the period for which data is "
+                "requested ({})".format(UTC.to_string(int(time[-1])), UTC.to_string(utc_period.end)))
+
+        issubset = True if idx_max < len(time) - 1 else False
+        time_slice = slice(idx_min, idx_max + 1)
+        return time_slice, issubset
 
 
     def _read_elevation_file(self, filename, x_var_name, y_var_name, geo_location_criteria):
@@ -277,44 +258,23 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         We need full time if deaccumulating
         """
 
-        def noop_time(t):
-            t0 = int(t[0])
-            t1 = int(t[1])
-            return api.TimeAxis(t0, t1 - t0, len(t))
-
         def dacc_time(t):
-            t0 = int(t[0])
-            t1 = int(t[1])
-            return noop_time(t) if issubset else api.TimeAxis(t0, t1 - t0, len(t) - 1)
+            del_t = t[1] - t[0]
+            t0 = t[0]-del_t
+            return api.TimeAxis(t0, del_t, len(t))
 
         def noop_space(x):
             return x
 
         def air_temp_conv(T):
-            return T 
+            return T
 
         def prec_conv(p):
             # return p[1:]
             return p/24. # mm/day -> mm/h
 
-        # def prec_acc_conv(p):
-        #    return np.clip(p[1:] - p[:-1], 0.0, 1000.0)
-
-        def rad_conv(r):
-            # dr = r[1:] - r[:-1]
-            # return np.clip(dr/(time[1] - time[0]), 0.0, 5000.0)
-            return r
-        """
-        convert_map = {"wind_speed": lambda x, t: (noop_space(x), noop_time(t)),
-                       "relative_humidity_2m": lambda x, t: (noop_space(x), noop_time(t)),
-                       "T2": lambda x, t: (air_temp_conv(x), noop_time(t)),
-                       "SWDOWN": lambda x, t: (rad_conv(x), noop_time(t)),
-                       "PREC_ACC_NC": lambda x, t: (prec_conv(x), noop_time(t))}
-        # "precipitation_amount_acc": lambda x, t: (prec_acc_conv(x), dacc_time(t))}
-        """
-
-        convert_map = {"mean_temperature": lambda x, t, u: (air_temp_conv(x), noop_time(t)),
-                       "precipitation_amount": lambda x, t, u: (prec_conv(x), noop_time(t))}
+        convert_map = {"mean_temperature": lambda x, t, u: (air_temp_conv(x), dacc_time(t)),
+                       "precipitation_amount": lambda x, t, u: (prec_conv(x), dacc_time(t))}
 
         res = {}
         for k, (v, ak, unit) in data.items():
