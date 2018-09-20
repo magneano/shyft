@@ -39,45 +39,6 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         self.assertTrue(p0.size() == n_days + 1)
         self.assertTrue(p0.time(0), period.start)
 
-#         # Number test:
-#         # asserting shyft-sources time series are same as time series of
-#         # corresponding location in senorge dataset.
-#         dset = Dataset(path.join(base_dir, f1))
-#         lat = dset.variables["Y"]
-#         lon = dset.variables["X"]
-#
-#         senorge_data = {}
-#
-#         senorge_data["temperature"] = dset.variables["mean_temperature"][:]
-#
-#         data_cs =  "+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0" #"+init=EPSG:32633"
-#         target_cs = "+init=EPSG:32633"
-#         data_proj = Proj(data_cs)
-#         target_proj = Proj(target_cs)
-#         lon_m, lat_m = np.meshgrid(lon, lat)
-#         x, y = transform(data_proj, target_proj, lon_m[:], lat_m[:])
-#
-#
-#         for name, senorge_d in senorge_data.items():
-#             srs = sources[name]
-#             for i, s in enumerate(srs):
-#                 mp = s.mid_point()
-#                 x_ts, y_ts, z_ts = mp.x, mp.y, mp.z
-#                 ts = s.ts
-#                 ts_values = ts.v.to_numpy()
-#
-#                 # find indixes in senorge-dataset
-#                 m = (x == x_ts) & (y == y_ts)
-#                 idxs = np.where(m > 0)
-# #                x_idx, y_idx = idxs[0][0], idxs[1][0]  # assumung geo-location is unique in dataset
-# #                self.assertTrue(all(ts_values == senorge_d[:n_hours + 1, x_idx, y_idx]),
-# #                                "senorge and shyft-TS of {} are not the same.".format(name))
-#                 # if i ==0:
-#                 #    plt.figure()
-#                 #    plt.plot(ts_values)
-#                 #    plt.title([name])
-#                 #    plt.show()
-
     def test_get_dummy(self):
         """
         #Simple regression test of dummy variables from `utils.dummy_var`

@@ -87,11 +87,22 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         """
 
         # for these variables we use 'dummy' data
-        # TODO: not a good check. If mixed dummmy and non-dummy it will fail. Please fix!
-        if any(a in input_source_types for a in ('radiation', 'wind_speed', 'relative_humidity')):
-            return dummy_var(input_source_types, utc_period, geo_location_criteria)
-
-        else:
+        sources = {}
+        input_source_types_dummy = \
+            [ist for ist in input_source_types if ist in ('radiation',
+                                                          'wind_speed',
+                                                          'relative_humidity')]  # for these variables we use 'dummy' data
+        input_source_types_real = \
+            [ist for ist in input_source_types if ist in ('temperature',
+                                                          'precipitation')]
+        input_source_types_remaining = [ist for ist in input_source_types if
+                                   ist not in input_source_types_dummy and ist not in input_source_types_real]
+        if input_source_types_remaining:
+            raise SeNorgeDataRepositoryError("Input source types {} not supported".format(input_source_types_remaining))
+        if input_source_types_dummy:
+            sources_dummy = dummy_var(input_source_types_dummy, utc_period, geo_location_criteria)
+            sources.update(sources_dummy)
+        if input_source_types_real:
             filename = os.path.join(self._directory, self._filename)
             if not os.path.isfile(filename):
                 #if re.compile(self._filename).groups > 0:  # check if it is a filename-pattern
@@ -99,7 +110,9 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                 #else:
                 raise SeNorgeDataRepositoryError("File '{}' not found".format(filename))
             with Dataset(filename) as dataset:
-                return self._get_data_from_dataset(dataset, input_source_types, utc_period, geo_location_criteria)
+                sources_real = self._get_data_from_dataset(dataset, input_source_types_real, utc_period, geo_location_criteria)
+            sources.update(sources_real)
+        return sources
 
     def _check_and_get_coord_vars(self, dataset, var_types):
         cs = []
@@ -270,7 +283,6 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             return T
 
         def prec_conv(p):
-            # return p[1:]
             return p/24. # mm/day -> mm/h
 
         convert_map = {"mean_temperature": lambda x, t, u: (air_temp_conv(x), dacc_time(t)),
