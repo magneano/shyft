@@ -24,6 +24,7 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         n_days = 5
         t0 = api.YMDhms(1957, 1, 2)
         utc = api.Calendar()  # No offset gives Utc
+        step = api.deltahours(24)
         period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_days*24))
 
         base_dir = path.join(shyftdata_dir, "repository", "senorge_data_repository")
@@ -38,6 +39,34 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         p0 = sources["temperature"][0].ts
         self.assertTrue(p0.size() == n_days + 1)
         self.assertTrue(p0.time(0), period.start)
+
+        # check boundaries of period
+        t0 = utc.time(1956, 12, 31, 6)  # referring to begin of first utc period in test senorge-dataset
+        t1 = utc.time(1957, 1, 10, 6)  # referring to end of last utc period in test senorge-dataset
+        period = api.UtcPeriod(t0, t1)
+        sources = senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
+        self.assertTrue(sources['temperature'][0].ts.total_period() == period)
+
+        t0 = utc.time(1956, 12, 31, 6, 1) # should expand series to earlier start time
+        t1 = utc.time(1957, 1, 10, 5, 59) # should expand series to later end time
+        period = api.UtcPeriod(t0, t1)
+        sources = senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
+        self.assertTrue(sources['temperature'][0].ts.total_period().start < period.start)
+        self.assertTrue(sources['temperature'][0].ts.total_period().end > period.end)
+
+        t0 = utc.time(1956, 12, 31, 5, 59)  # out of range
+        period = api.UtcPeriod(t0, t1)
+        with self.assertRaises(SeNorgeDataRepositoryError) as context:
+            senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
+        self.assertEqual("The earliest time in repository (1956-12-31T06:00:00Z) is later than the start of the period for which data is requested (1956-12-31T05:59:00Z)", context.exception.args[0])
+
+        t0 = utc.time(1956, 12, 31, 6, 1)
+        t1 = utc.time(1957, 1, 10, 6, 1) # out of range
+        period = api.UtcPeriod(t0, t1)
+        with self.assertRaises(SeNorgeDataRepositoryError) as context:
+            senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
+        self.assertEqual("The latest time in repository (1957-01-10T06:00:00Z) is earlier than the end of the period for which data is requested (1957-01-10T06:01:00Z)", context.exception.args[0])
+
 
     def test_get_dummy(self):
         """
@@ -55,14 +84,24 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
         f1 = "senorge_test.nc"
 
         senorge1 = SeNorgeDataRepository(EPSG, base_dir, filename=f1, allow_subset=True)
-        senorge1_data_names = ("radiation",)
+        senorge1_data_names = ("radiation","temperature","wind_speed")
         sources = senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
-        self.assertTrue(len(sources) > 0)
-
         self.assertTrue(set(sources) == set(senorge1_data_names))
-        p0 = sources["radiation"][0].ts
-        self.assertTrue(p0.size() == n_days)
-        self.assertTrue(p0.time(0), period.start)
+        r0 = sources["radiation"][0].ts
+        p0 = sources["temperature"][0].ts
+        self.assertTrue(p0.total_period().start <= period.start and p0.total_period().end >= period.end)
+        self.assertTrue(r0.time(0), period.start)
+
+        t0 = api.YMDhms(1957, 1)
+        period = api.UtcPeriod(utc.time(t0), utc.time(t0) + api.deltahours(n_days * 23))
+        sources = senorge1.get_timeseries(senorge1_data_names, period, geo_location_criteria=bpoly)
+        r0 = sources["radiation"][0].ts
+        p0 = sources["temperature"][0].ts
+        self.assertTrue(p0.total_period().start <= period.start and p0.total_period().end >= period.end)
+        self.assertTrue(r0.time(0) == period.start)
+        self.assertTrue(r0.time_axis.time(1) - r0.time_axis.time(0) == 86400)
+
+
 
 
 
@@ -195,15 +234,11 @@ class SeNorgeDataRepositoryTestCase(unittest.TestCase):
                                    allow_subset=allow_subset)
         with self.assertRaises(SeNorgeDataRepositoryError) as context:
             reader.get_timeseries(data_names, period, geo_location_criteria=bpoly)
-        self.assertEqual("Could not find all data fields", context.exception.args[0])
+        self.assertEqual("Input source types ['foo'] not supported", context.exception.args[0])
         allow_subset = True
         reader = SeNorgeDataRepository(EPSG, base_dir, filename=filename,
                                    allow_subset=allow_subset)
-        try:
-            sources = reader.get_timeseries(data_names, period, geo_location_criteria=bpoly)
-        except SeNorgeDataRepositoryError as e:
-            self.fail("AromeDataRepository.get_timeseries(data_names, period, None) "
-                      "raised AromeDataRepositoryError unexpectedly.")
+        sources = reader.get_timeseries(data_names, period, geo_location_criteria=bpoly)
         self.assertEqual(len(sources), len(data_names)-1)
 
 
