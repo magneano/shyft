@@ -75,7 +75,8 @@ TEST_CASE("dtss_krls_db_register_update_read_rbf_series") {
     const auto latest_time = utc.time(2017, 5, 1);
     auto period = utcperiod{ earliest_time, middle_time };
     const auto krls_dt = 6*calendar::HOUR;
-    const auto point_fx = shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE;
+    const auto init_point_fx = shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE;
+    const auto other_point_fx = shyft::time_series::ts_point_fx::POINT_INSTANT_VALUE;
     const std::size_t krls_dict_size = 1000000;
     const double krls_tolerance = 0.001;
     const double rbfk_gamma = 0.001;
@@ -85,8 +86,15 @@ TEST_CASE("dtss_krls_db_register_update_read_rbf_series") {
     int callback_call_count = 0;
     double data_offset = 0;
     std::function<ts_vector_t(const std::string &, utcperiod, bool, bool)> server_read_cb =
-        [&callback_call_count, &period, &data_offset, point_fx, data_dt](const std::string &, utcperiod, bool, bool) -> ts_vector_t
+        [&callback_call_count, &period, &data_offset, init_point_fx, other_point_fx, data_dt](const std::string &, utcperiod, bool, bool) -> ts_vector_t
     {
+        shyft::time_series::ts_point_fx point_fx;
+        if ( callback_call_count % 2 == 0 ) {
+            point_fx = init_point_fx;
+        } else {
+            point_fx = other_point_fx;
+        }
+
         callback_call_count += 1;
 
         // construct time axis
@@ -109,7 +117,7 @@ TEST_CASE("dtss_krls_db_register_update_read_rbf_series") {
     krls_db_t krls_db{ krls_server_path.string(), server_read_cb };
 
     // register a new series
-    krls_db.register_rbf_series(krls_name, source_url, period, krls_dt, point_fx, krls_dict_size, krls_tolerance, rbfk_gamma);
+    krls_db.register_rbf_series(krls_name, source_url, period, krls_dt, init_point_fx, krls_dict_size, krls_tolerance, rbfk_gamma);
     // --------------------
     FAST_CHECK_EQ( callback_call_count, 1 );
     FAST_CHECK_UNARY( fs::exists(krls_server_path / krls_name) );
@@ -121,6 +129,7 @@ TEST_CASE("dtss_krls_db_register_update_read_rbf_series") {
     // --------------------
     FAST_CHECK_EQ( callback_call_count, 1 );
     FAST_REQUIRE_EQ( n, result_ts.size() );
+    FAST_CHECK_EQ( result_ts.fx_policy, init_point_fx );
     for ( std::size_t i = 10; i < n; ++i ) {  // skip 10 samples because of initial error
         FAST_CHECK_EQ( result_ts.value(i), doctest::Approx(callback_call_count*i/double(data_dt)).epsilon(0.1).scale(1) );  // epsilon is percent difference
     }
@@ -136,6 +145,7 @@ TEST_CASE("dtss_krls_db_register_update_read_rbf_series") {
     result_ts = krls_db.predict_time_series(krls_name, predict_ta);
     // --------------------
     FAST_REQUIRE_EQ( n, result_ts.size() );
+    FAST_CHECK_EQ( result_ts.fx_policy, other_point_fx );
     for ( std::size_t i = 10; i < n; ++i ) {  // skip 10 samples because of initial error
         FAST_CHECK_EQ( result_ts.value(i), doctest::Approx(data_offset + callback_call_count*i/double(data_dt)).epsilon(0.1).scale(1) );  // epsilon is percent difference
     }
