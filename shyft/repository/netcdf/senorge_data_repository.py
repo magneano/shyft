@@ -1,7 +1,6 @@
 # This file is part of Shyft. Copyright 2015-2018 SiH, JFB, OS, YAS, Statkraft AS
 # See file COPYING for more details **/
-# questions: sven.decker@geo.uio.no
-import re
+# questions: f.n.matt@geo.uio.no, sven.decker@geo.uio.no
 import os
 import numpy as np
 from netCDF4 import Dataset
@@ -9,7 +8,7 @@ from shyft import api
 from shyft import shyftdata_dir
 from .. import interfaces
 from .time_conversion import convert_netcdf_time
-from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, dummy_var, create_geo_ts_type_map
+from .utils import _limit_2D, _slice_var_2D, _numpy_to_geo_ts_vec, create_geo_ts_type_map
 
 class SeNorgeDataRepositoryError(Exception):
     pass
@@ -24,7 +23,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
 
     """
 
-    def __init__(self, epsg, directory, filename=None, elevation_file=None, padding=5000., allow_subset=False):
+    def __init__(self, epsg, directory=None, filename=None, elevation_file=None, padding=5000., allow_subset=False):
         """
         Construct the netCDF4 dataset reader for data for seNorge v2 datasets,
 
@@ -47,7 +46,8 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             Allow extraction of a subset of the given source fields
             instead of raising exception.
         """
-        directory = os.path.expandvars(directory)
+        if directory is not None:
+            directory = os.path.expandvars(directory)
         self._directory = directory
         self._filename = filename
         self.allow_subset = allow_subset
@@ -65,7 +65,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         self.shyft_cs = "+init=EPSG:{}".format(epsg)
         self._padding = padding
 
-        # Field names and mappings
+        # Field names, mappings, and point interpretations
         self.senorge_shyft_map = {
             "mean_temperature": "temperature",
             "precipitation_amount": "precipitation",
@@ -97,10 +97,10 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                                                           'precipitation')]
         input_source_types_remaining = [ist for ist in input_source_types if
                                    ist not in input_source_types_dummy and ist not in input_source_types_real]
-        if input_source_types_remaining:
+        if input_source_types_remaining and not self.allow_subset:
             raise SeNorgeDataRepositoryError("Input source types {} not supported".format(input_source_types_remaining))
         if input_source_types_dummy:
-            sources_dummy = dummy_var(input_source_types_dummy, utc_period, geo_location_criteria)
+            sources_dummy = self.dummy_var(input_source_types_dummy, utc_period, geo_location_criteria)
             sources.update(sources_dummy)
         if input_source_types_real:
             filename = os.path.join(self._directory, self._filename)
@@ -158,9 +158,9 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         return time, x, y, data_cs, coord_conv
 
 
-    def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria, ensemble_member=None):
+    def _get_data_from_dataset(self, dataset, input_source_types, utc_period, geo_location_criteria):
 
-        #copied from met_netcdf repo
+        # copied from met_netcdf repo
         # Check for presence and consistency of coordinate variables
         time, x_var, y_var, data_cs, coord_conv = self._check_and_get_coord_vars(dataset, input_source_types)
 
@@ -185,14 +185,9 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
             if k in self.senorge_shyft_map.keys():
                 var = self.senorge_shyft_map.get(k, None)
                 if var in input_source_types:
-                # if k in self._shift_fields and issubset:  # Add one to time slice
-                #     data_time_slice = slice(time_slice.start, time_slice.stop + 1)  # to supply the extra value that is needed for accumulated variables
-                # else:
-                #     data_time_slice = time_slice
                     data = dataset.variables[k]
                     pure_arr = _slice_var_2D(data, x_var.name, y_var.name, x_slice, y_slice, x_inds, y_inds, SeNorgeDataRepositoryError,
-                                         # slices={'time': data_time_slice, 'ensemble_member': ensemble_member})
-                                         slices={'time': time_slice, 'ensemble_member': ensemble_member})
+                                         slices={'time': time_slice, 'ensemble_member': None})
                     raw_data[self.senorge_shyft_map[k]] = pure_arr, k, data.units
 
         if self.elevation_file is not None:
@@ -205,28 +200,12 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
 
         # Make sure requested fields are valid, and that dataset contains the requested data.
 
-        if not self.allow_subset and not (set(raw_data.keys()).issuperset(input_source_types)):
-            raise SeNorgeDataRepositoryError("Could not find all data fields")
+        if not (set(raw_data.keys()).issuperset(input_source_types)):
+            missing = [i for i in input_source_types if i not in raw_data.keys()]
+            raise SeNorgeDataRepositoryError("Database is missing data fields: {}".format(missing))
 
-        if ensemble_member is None and 'ensemble_member' in data.dimensions:
-            dims_flat = [d for d in data.dimensions if d in ['time', 'ensemble_member', x_var.name]]
-            ens_dim_idx = dims_flat.index('ensemble_member')
-            ens_slice = len(dims_flat) * [slice(None)]
-            returned_data = []
-            for i in range(dataset.dimensions['ensemble_member'].size):
-                ens_slice[ens_dim_idx] = i
-                ensemble_raw = {k: (raw_data[k][0][ens_slice], raw_data[k][1], raw_data[k][2]) for k in raw_data.keys()}
-                returned_data.append(_numpy_to_geo_ts_vec(self._transform_raw(ensemble_raw, time[time_slice]),#, issubset=issubset)
-                                                          x, y, z, SeNorgeDataRepositoryError))
-        else:
-            returned_data = _numpy_to_geo_ts_vec(self._transform_raw(raw_data, time[time_slice]),#, issubset=issubset),
-                                                 x, y, z, SeNorgeDataRepositoryError)
-            data = self._transform_raw(raw_data, time[time_slice])
-            geo_pts = api.GeoPointVector.create_from_x_y_z(*[api.DoubleVector_FromNdArray(arr) for arr in [x, y, z]])
-            shape = list(data.values())[0][0].shape
-            ndim = len(shape)
-            geo_ts = {key: create_geo_ts_type_map[key](ta, geo_pts, arr[:, :].transpose(), self.series_type[key])
-                      for key, (arr, ta) in data.items()}
+        returned_data = _numpy_to_geo_ts_vec(self._transform_raw(raw_data, time[time_slice]),
+                                             x, y, z, SeNorgeDataRepositoryError)
         return returned_data
 
     def _make_time_slice(self, time, utc_period, err):
@@ -246,7 +225,7 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
                 "The latest time in repository ({}) is earlier than the end of the period for which data is "
                 "requested ({})".format(UTC.to_string(int(time[-1])), UTC.to_string(utc_period.end)))
 
-        issubset = True if idx_max < len(time) - 1 else False
+        issubset = True if idx_max < len(time) - 1 else False # TODO: Isn't it also subset if shortened in the begininng?
         time_slice = slice(idx_min, idx_max + 1)
         return time_slice, issubset
 
@@ -292,5 +271,77 @@ class SeNorgeDataRepository(interfaces.GeoTsRepository):
         for k, (v, ak, unit) in data.items():
             res[k] = convert_map[ak](v, time, unit)
         return res
+
+    def dummy_var(self, input_src_types: list, utc_period: "api.UtcPeriod", geo_location_criteria, ts_interval=86400):
+        """
+        Purpose is to provide dummy radiation, humidity and wind_speed
+        called from `get_timeseries` method of a `shyft.GeoTsRepository`
+
+        Will return one source 'station', from the lower left corner of the
+        center of the bounding box. Shyft interpolation will take care of
+        the rest...
+
+        Returns a timeseries covering the period at the interval defined by ts_interval.
+
+        Parameters
+        ----------
+            input_source_types: list
+                List of source types to retrieve (precipitation,temperature..)
+            utc_period: api.UtcPeriod
+                The utc time period that should (as a minimum) be covered.
+            geo_location_criteria: {shapely.geometry.Polygon, shapely.geometry.MultiPolygon}
+                Polygon defining the boundary for selecting points. All points located inside this boundary will be fetched.
+            ts_interval: int [86400]
+                describes the interval used to calculate the periodicity of the timeseries
+
+        Returns
+        -------
+        geo_loc_ts: dictionary
+                dictionary keyed by source type, where values are api vectors of geo
+                located timeseries.
+                Important notice: The returned time-series should at least cover the
+                requested period. It could return *more* data than in
+                the requested period, but must return sufficient data so
+                that the f(t) can be evaluated over the requested period.
+        """
+        utc = api.Calendar() # can use utc calendar as input in utc period
+        n_steps = utc.diff_units(utc_period.start, utc_period.end, ts_interval)
+        if utc_period.end > utc.add(utc_period.start, ts_interval, n_steps):
+            n_steps += 1
+
+        ta = api.TimeAxis(utc_period.start.seconds, ts_interval, n_steps)
+
+        # TODO: could make more sophisticated to get mid point, etc.
+        x, y, urx, ury = geo_location_criteria.bounds
+        x = np.array([x])
+        y = np.array([y])
+        z = np.array([1000])
+
+        geo_pts = api.GeoPointVector.create_from_x_y_z(*[api.DoubleVector_FromNdArray(arr) for arr in [x, y, z]])
+
+        data = {}
+
+        # TODO: this is where the 'dummy' data is generated. Could be made more robust, quick fix for now
+        for var in input_src_types:
+            if var == 'radiation':
+                data[var] = (np.ones((ta.size(), len(x))) * 50.0, ta)
+            if var == 'wind_speed':
+                data[var] = (np.ones((ta.size(), len(x))) * 2.0, ta)
+            if var == 'relative_humidity':
+                data[var] = (np.ones((ta.size(), len(x))) * 0.6, ta)
+
+        ndim = len(list(data.values())[0][0].shape)
+
+        if ndim == 4:
+            raise (RepositoryUtilsError("Dummy not implemented for ensembles"))
+        elif ndim == 3:
+            raise (RepositoryUtilsError("Dummy not implemented for ensembles"))
+        elif ndim == 2:
+            geo_ts = {key: create_geo_ts_type_map[key](ta, geo_pts, arr[:, :].transpose(), self.series_type[key])
+                      for key, (arr, ta) in data.items()}
+        else:
+            raise RepositoryUtilsError(
+                "Number of dimensions, ndim, of Numpy array to be converted to shyft GeoTsVector not 2<=ndim<=4.")
+        return geo_ts
 
 
