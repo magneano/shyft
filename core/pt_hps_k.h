@@ -16,6 +16,8 @@ See file COPYING for more details **/
 #include "precipitation_correction.h"
 #include "unit_conversion.h"
 #include "routing.h"
+#include "mstack_param.h"
+
 namespace shyft {
   namespace core {
     namespace pt_hps_k {
@@ -29,6 +31,7 @@ namespace shyft {
             typedef precipitation_correction::parameter precipitation_correction_parameter_t;
             typedef glacier_melt::parameter glacier_parameter_t;
             typedef routing::uhg_parameter routing_parameter_t;
+            typedef mstack_parameter mstack_parameter_t;
 
             pt_parameter_t pt;
             hps_parameter_t hps;
@@ -37,6 +40,7 @@ namespace shyft {
             precipitation_correction_parameter_t p_corr;
             glacier_parameter_t gm;
             routing_parameter_t routing;
+            mstack_parameter_t msp;
 
             parameter(const pt_parameter_t& pt,
                         const hps_parameter_t& hps,
@@ -44,9 +48,10 @@ namespace shyft {
                         const kirchner_parameter_t& kirchner,
                         const precipitation_correction_parameter_t& p_corr,
                         glacier_parameter_t gm = glacier_parameter_t(),
-                        routing_parameter_t routing=routing_parameter_t()
+                        routing_parameter_t routing=routing_parameter_t(),
+                        mstack_parameter_t msp=mstack_parameter_t()
                       ) // for backwards compatibility pass default glacier parameter
-             : pt(pt), hps(hps), ae(ae), kirchner(kirchner), p_corr(p_corr), gm(gm),routing(routing) { /* Do nothing */ }
+             : pt(pt), hps(hps), ae(ae), kirchner(kirchner), p_corr(p_corr), gm(gm),routing(routing),msp{msp} { /* Do nothing */ }
 
 			parameter()=default;
 			parameter(const parameter&)=default;
@@ -54,7 +59,7 @@ namespace shyft {
 			parameter& operator=(const parameter &c)=default;
 			parameter& operator=(parameter&&c)=default;
             ///< Calibration support, size is the total number of calibration parameters
-            size_t size() const { return 23; }
+            size_t size() const { return 24; }
 
             void set(const vector<double>& p) {
                 if (p.size() != size())
@@ -83,6 +88,7 @@ namespace shyft {
                 routing.velocity = p[i++];
                 routing.alpha = p[i++];
                 routing.beta  = p[i++];
+                msp.reservoir_direct_response_fraction = p[i++];
             }
             //
             ///< calibration support, get the value of i'th parameter
@@ -111,6 +117,7 @@ namespace shyft {
                     case 20:return routing.velocity;
                     case 21:return routing.alpha;
                     case 22:return routing.beta;
+                    case 23:return msp.reservoir_direct_response_fraction;
 
                 default:
                     throw runtime_error("pt_hp_k parameter accessor:.get(i) Out of range.");
@@ -144,6 +151,7 @@ namespace shyft {
                     "routing.velocity",
                     "routing.alpha",
                     "routing.beta",
+                    "msp.reservoir_direct_response_fraction"
 				};
                 if (i >= size())
                     throw runtime_error("pt_hps_k parameter accessor:.get_name(i) Out of range.");
@@ -227,7 +235,7 @@ namespace shyft {
             state.hps.distribute(parameter.hps,false);// fixup state to match parameter dimensions for snow-bins, but only if they are empty
 
             R response;
-            const double total_lake_fraction = geo_cell_data.land_type_fractions_info().lake() + geo_cell_data.land_type_fractions_info().reservoir();
+            const double total_lake_fraction = geo_cell_data.land_type_fractions_info().lake() + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
             const double kirchner_fraction = 1 - glacier_fraction;
             const double cell_area_m2 = geo_cell_data.area();

@@ -582,7 +582,7 @@ private:
 
             // write header
             ts_db_header new_header{
-                old_header.point_fx, old_header.ta_type,
+                new_ts.fx_policy, old_header.ta_type,
                 static_cast<uint32_t>((tn - t0) / new_ts.ta.f.dt), utcperiod{ t0, tn },T::version()
             };
             // -----
@@ -664,7 +664,7 @@ private:
 
             // write header
             ts_db_header new_header{
-                old_header.point_fx, old_header.ta_type,
+                new_ts.fx_policy, old_header.ta_type,
                 static_cast<uint32_t>(new_ts.ta.c.cal->diff_units(t0, tn, new_ts.ta.c.dt)),
                 utcperiod{ t0, tn },
                 T::version()
@@ -768,7 +768,7 @@ private:
 
             // write header
             ts_db_header new_header{
-                old_header.point_fx, old_header.ta_type,
+                new_ts.fx_policy, old_header.ta_type,
                 static_cast<uint32_t>(merged_t.size() - 1),
                 utcperiod{ merged_t.at(0), merged_t.at(merged_t.size() - 1) },
                 T::version()
@@ -787,10 +787,6 @@ private:
         }
     }
     void check_ta_alignment(FILE * fh, const ts_db_header & old_header, const time_axis::generic_dt & old_ta, const gts_t & ats) const {
-        if (ats.fx_policy != old_header.point_fx) {
-            throw runtime_error("dtss_store: cannot merge with different point interpretation");
-        }
-        // -----
         if (ats.ta.gt != old_header.ta_type) {
             throw runtime_error("dtss_store: cannot merge with different ta type");
         } else {
@@ -798,7 +794,10 @@ private:
             switch (old_header.ta_type) {
             case time_axis::generic_dt::FIXED:
             {
-                if (old_ta.f.dt != ats.ta.f.dt || (old_ta.f.t - ats.ta.f.t).count() % old_ta.f.dt.count() != 0) {
+                // refuse to merge into old second base storage. Old series should be converted
+                if ( old_header.is_seconds() && ats.ta.f.t.count() % core::seconds{1}.count() != 0 ) {
+                    throw runtime_error("dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+                } else if (old_ta.f.dt != ats.ta.f.dt || (old_ta.f.t - ats.ta.f.t).count() % old_ta.f.dt.count() != 0) {
                     throw runtime_error("dtss_store: cannot merge unaligned fixed_dt");
                 }
             } break;
@@ -806,9 +805,14 @@ private:
             {
                 if (ats.ta.c.cal->tz_info->tz.tz_name == old_ta.c.cal->tz_info->tz.tz_name) {
                     utctimespan remainder;
-                    ats.ta.c.cal->diff_units(old_ta.c.t, ats.ta.c.t, old_ta.c.dt, remainder);
-                    if (old_ta.c.dt != ats.ta.c.dt || remainder != utctimespan{0}) {
-                        throw runtime_error("dtss_store: cannot merge unaligned calendar_dt");
+                    ats.ta.c.cal->diff_units(ats.ta.c.t, seconds{0}, seconds{1}, remainder);
+                    if ( old_header.is_seconds() && remainder.count() != 0 ) {
+                        throw runtime_error("dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+                    } else {
+                        ats.ta.c.cal->diff_units(old_ta.c.t, ats.ta.c.t, old_ta.c.dt, remainder);
+                        if (old_ta.c.dt != ats.ta.c.dt || remainder != utctimespan{0}) {
+                            throw runtime_error("dtss_store: cannot merge unaligned calendar_dt");
+                        }
                     }
                 } else {
                     throw runtime_error("dtss_store: cannot merge calendar_dt with different calendars");

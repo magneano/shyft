@@ -20,6 +20,8 @@ See file COPYING for more details **/
 #include "glacier_melt.h"
 #include "unit_conversion.h"
 #include "routing.h"
+#include "mstack_param.h"
+
 namespace shyft {
 	namespace core {
 		namespace hbv_stack {
@@ -45,6 +47,7 @@ namespace shyft {
 				typedef precipitation_correction::parameter precipitation_correction_parameter_t;
                 typedef glacier_melt::parameter glacier_parameter_t;
             	typedef routing::uhg_parameter routing_parameter_t;
+                typedef mstack_parameter mstack_parameter_t;
 
 				parameter(const pt_parameter_t& pt,
 					const snow_parameter_t& snow,
@@ -53,8 +56,10 @@ namespace shyft {
 					const tank_parameter_t& tank,
 					const precipitation_correction_parameter_t& p_corr,
                     glacier_parameter_t gm = glacier_parameter_t(),
-					routing_parameter_t routing=routing_parameter_t())
-					: pt(pt), snow(snow), ae(ae), soil(soil), tank(tank), p_corr(p_corr),gm(gm),routing(routing)  { /*Do nothing */}
+					routing_parameter_t routing=routing_parameter_t(),
+                    mstack_parameter_t msp=mstack_parameter_t()
+                )
+					: pt(pt), snow(snow), ae(ae), soil(soil), tank(tank), p_corr(p_corr),gm(gm),routing(routing),msp{msp}  { /*Do nothing */}
 
 				parameter()=default;
 				parameter(const parameter&)=default;
@@ -70,8 +75,10 @@ namespace shyft {
 				precipitation_correction_parameter_t p_corr;
                 glacier_parameter_t gm;
                 routing_parameter_t routing;
+                mstack_parameter_t msp;
+
 				///<calibration support, needs vector interface to params, size is the total count
-				size_t size() const { return 21; }
+				size_t size() const { return 22; }
 				///<calibration support, need to set values from ordered vector
 				void set(const vector<double>& p) {
 					if (p.size() != size())
@@ -98,6 +105,7 @@ namespace shyft {
          	        routing.alpha = p[i++];
                		routing.beta  = p[i++];
                		gm.direct_response = p[i++];
+                    msp.reservoir_direct_response_fraction=p[i++];
 				}
 
 				///< calibration support, get the value of i'th parameter
@@ -124,6 +132,7 @@ namespace shyft {
                     case 18:return routing.alpha;
                     case 19:return routing.beta;
                     case 20:return gm.direct_response;
+                    case 21:return msp.reservoir_direct_response_fraction;
 					default:
 						throw runtime_error("HBV_stack Parameter Accessor:.get(i) Out of range.");
 					}
@@ -153,7 +162,8 @@ namespace shyft {
 						"routing.velocity",
 						"routing.alpha",
 						"routing.beta",
-						"gm.direct_response"
+						"gm.direct_response",
+                        "msp.reservoir_direct_response_fraction"
 					};
 					if (i >= size())
 						throw runtime_error("hbv_stack Parameter Accessor:.get_name(i) Out of range.");
@@ -304,7 +314,7 @@ namespace shyft {
                 const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
                 const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
             	const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
-                const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir();// only direct response on reservoirs
+                const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
                 const double land_fraction = 1 - direct_response_fraction;
                 const double cell_area_m2 = geo_cell_data.area();
                 const double glacier_area_m2 = geo_cell_data.area()*glacier_fraction;//const double forest_fraction = geo_cell_data.land_type_fractions_info().forest();
