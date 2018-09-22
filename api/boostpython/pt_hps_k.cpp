@@ -33,7 +33,7 @@ namespace expose {
                               "Contains the parameters to the methods used in the PTHPSK assembly\n"
                               "priestley_taylor,hbv_physical_snow,actual_evapotranspiration,precipitation_correction,kirchner\n"
                 )
-                .def(init<const priestley_taylor::parameter&,const hbv_physical_snow::parameter&,const actual_evapotranspiration::parameter&,const kirchner::parameter&,const precipitation_correction::parameter&,py::optional<glacier_melt::parameter,routing::uhg_parameter>>(args("pt","hps","ae","k","p_corr","gm","routing"),"create object with specified parameters"))
+                .def(init<const priestley_taylor::parameter&,const hbv_physical_snow::parameter&,const actual_evapotranspiration::parameter&,const kirchner::parameter&,const precipitation_correction::parameter&,py::optional<glacier_melt::parameter,routing::uhg_parameter,mstack_parameter>>(args("pt","hps","ae","k","p_corr","gm","routing","msp"),"create object with specified parameters"))
                 .def(init<const parameter&>(args("p"),"clone a parameter"))
                 .def_readwrite("pt",&parameter::pt,"priestley_taylor parameter")
 				.def_readwrite("ae", &parameter::ae, "actual evapotranspiration parameter")
@@ -42,6 +42,7 @@ namespace expose {
                 .def_readwrite("kirchner",&parameter::kirchner,"kirchner parameter")
                 .def_readwrite("p_corr",&parameter::p_corr,"precipitation correction parameter")
                 .def_readwrite("routing",&parameter::routing,"routing cell-to-river catchment specific parameters")
+                .def_readwrite("msp",&parameter::msp,"contains the method stack parameters")
                 .def("size",&parameter::size,"returns total number of calibration parameters")
                 .def("set",&parameter::set,args("p"),"set parameters from vector/list of float, ordered as by get_name(i)")
                 .def("get",&parameter::get,args("i"),"return the value of the i'th parameter, name given by .get_name(i)")

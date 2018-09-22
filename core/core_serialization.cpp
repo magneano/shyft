@@ -34,6 +34,7 @@ See file COPYING for more details **/
 #include "pt_ss_k.h"
 #include "pt_hs_k.h"
 #include "pt_hps_k.h"
+#include "mstack_param.h"
 // then include stuff you need like vector,shared, base_obj,nvp etc.
 
 
@@ -202,6 +203,14 @@ void shyft::core::geo_cell_data::serialize(Archive& ar, const unsigned int versi
     & core_nvp("routing",routing)
     ;
 }
+
+template <class Archive>
+void shyft::core::mstack_parameter::serialize(Archive& ar, const unsigned int version) {
+    ar
+    & core_nvp("r_drf",reservoir_direct_response_fraction)
+    ;
+}
+
 //-- state serialization
 template <class Archive>
 void shyft::core::hbv_snow::state::serialize(Archive & ar, const unsigned int file_version) {

@@ -33,4 +33,6 @@ model_parameters:
     alpha: 0.9
     beta: 3.0
     velocity: 0.0
+  msp:
+    reservoir_direct_response_fraction: 1.0
 

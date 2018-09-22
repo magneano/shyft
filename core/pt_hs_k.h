@@ -19,6 +19,8 @@ See file COPYING for more details **/
 #include "precipitation_correction.h"
 #include "unit_conversion.h"
 #include "routing.h"
+#include "mstack_param.h"
+
 namespace shyft {
   namespace core {
     namespace pt_hs_k {
@@ -32,6 +34,7 @@ namespace shyft {
             typedef precipitation_correction::parameter precipitation_correction_parameter_t;
             typedef glacier_melt::parameter glacier_parameter_t;
             typedef routing::uhg_parameter routing_parameter_t;
+            typedef mstack_parameter mstack_parameter_t;
 
             pt_parameter_t pt;
             snow_parameter_t hs;
@@ -40,16 +43,17 @@ namespace shyft {
             precipitation_correction_parameter_t p_corr;
             glacier_parameter_t gm;
             routing_parameter_t routing;
-
+            mstack_parameter_t msp;
             parameter(const pt_parameter_t& pt,
                         const snow_parameter_t& snow,
                         const ae_parameter_t& ae,
                         const kirchner_parameter_t& kirchner,
                         const precipitation_correction_parameter_t& p_corr,
                         glacier_parameter_t gm = glacier_parameter_t(),
-                        routing_parameter_t routing=routing_parameter_t()
+                        routing_parameter_t routing=routing_parameter_t(),
+                        mstack_parameter_t msp=mstack_parameter_t()
                       ) // for backwards compatibility pass default glacier parameter
-             : pt(pt), hs(snow), ae(ae), kirchner(kirchner), p_corr(p_corr), gm(gm),routing(routing) { /* Do nothing */ }
+             : pt(pt), hs(snow), ae(ae), kirchner(kirchner), p_corr(p_corr), gm(gm),routing(routing),msp{msp} { /* Do nothing */ }
 
 			parameter()=default;
 			parameter(const parameter&)=default;
@@ -57,7 +61,7 @@ namespace shyft {
 			parameter& operator=(const parameter &c)=default;
 			parameter& operator=(parameter&&c)=default;
             ///< Calibration support, size is the total number of calibration parameters
-            size_t size() const { return 17; }
+            size_t size() const { return 18; }
 
             void set(const vector<double>& p) {
                 if (p.size() != size())
@@ -80,6 +84,7 @@ namespace shyft {
                 routing.alpha = p[i++];
                 routing.beta  = p[i++];
                 gm.direct_response = p[i++];
+                msp.reservoir_direct_response_fraction=p[i++];
             }
             //
             ///< calibration support, get the value of i'th parameter
@@ -102,6 +107,7 @@ namespace shyft {
                     case 14:return routing.alpha;
                     case 15:return routing.beta;
                     case 16:return gm.direct_response;
+                    case 17:return msp.reservoir_direct_response_fraction;
 
                 default:
                     throw runtime_error("pt_hs_k parameter accessor:.get(i) Out of range.");
@@ -128,7 +134,8 @@ namespace shyft {
                     "routing.velocity",
                     "routing.alpha",
                     "routing.beta",
-                    "gm.direct_response"
+                    "gm.direct_response",
+                    "msp.reservoir_direct_response_fraction"
 				};
                 if (i >= size())
                     throw runtime_error("pt_hs_k parameter accessor:.get_name(i) Out of range.");
@@ -213,7 +220,7 @@ namespace shyft {
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
             const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
             const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
-            const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir();// only direct response on reservoirs
+            const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
             const double kirchner_fraction = 1 - direct_response_fraction;
             const double cell_area_m2 = geo_cell_data.area();
             const double glacier_area_m2 = geo_cell_data.area()*glacier_fraction;

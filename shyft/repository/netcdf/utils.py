@@ -348,7 +348,7 @@ def _slice_var_1D(nc_var, xy_var_name, xy_slice, xy_mask, slices={}): # , time_s
     data_slice[dims.index(xy_var_name)] = xy_slice
     #data_slice[dims.index("time")] = time_slice  # data_time_slice
     xy_slice_mask = [xy_mask[xy_slice] if dim == xy_var_name else slice(None) for dim in dims]
-    pure_arr = nc_var[data_slice][xy_slice_mask]
+    pure_arr = nc_var[data_slice][tuple(xy_slice_mask)]
     if isinstance(pure_arr, np.ma.core.MaskedArray):
         # print(pure_arr.fill_value)
         pure_arr = pure_arr.filled(np.nan)
@@ -384,9 +384,9 @@ def _slice_var_2D(nc_var, x_var_name, y_var_name, x_slice, y_slice, x_inds, y_in
             return nc_var[data_slice][new_slice][slc]
         else:
             new_slice[dims.index(hgt_dim_nm)] = 0
-            return nc_var[data_slice][new_slice]
+            return nc_var[data_slice][tuple(new_slice)]
     elif len(extra_dim) == 0:
-        return nc_var[data_slice][new_slice]
+        return nc_var[data_slice][tuple(new_slice)]
     else:
         raise err("Variable '{}' has more dimensions than required.".format(nc_var.name))
 
