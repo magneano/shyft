@@ -22,7 +22,7 @@ class ConfigSimulationTestCase(unittest.TestCase):
 
     def test_run_geo_ts_data_config_simulator(self):
         # These config files are versioned in shyft-data git
-        config_dir = path.join(shyftdata_dir, "neanidelv/yaml_config")
+        config_dir = path.join(shyftdata_dir, "neanidelv", "yaml_config")
         config_file = path.join(config_dir, "neanidelva_simulation.yaml")
         config_section = "neanidelva"
         cfg = YAMLSimConfig(config_file, config_section, overrides={'config': {'number_of_steps': 168}})

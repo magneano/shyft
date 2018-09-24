@@ -269,6 +269,30 @@ TEST_CASE("test_mass_balance") {
         expected_discharge =2.778e-5;
         FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.01e-5));
     }
+    SUBCASE("reservoir_direct_response") {
+        // verify that glacier melt goes through kirchner according to gm.direct_response
+        // glac lake, reservoir
+        land_type_fractions ltf(0.0,0.0,0.5,0.0,0.5);// 50-50 rsv unspecified
+        gcd.set_land_type_fractions(ltf);
+        state.kirchner.q=1e-4;// so small, that it's close to zero
+        state.gs.lwc=0.0;// no snow, should have direct response, 3 mm/h, over the cell_area
+        state.gs.acc_melt=-1;// should be no snow, should go straight through
+
+        parameter.msp.reservoir_direct_response_fraction=1.0;// all direct(default)
+        pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
+        double expected_discharge =0.5*mmh_to_m3s(prec.value(0),cell_area);
+        FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.001));
+
+        parameter.msp.reservoir_direct_response_fraction=0.5;//  direct
+        pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
+        expected_discharge =0.5*(0.5*mmh_to_m3s(prec.value(0),cell_area));
+        FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.001));
+
+        parameter.msp.reservoir_direct_response_fraction=0.0;// no direct
+        pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
+        expected_discharge =2.778e-5;
+        FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.01e-5));
+    }
 }
 
 }

@@ -205,6 +205,22 @@ time_points:numpy.array(dtype=np.int64)
    [ time_axis.time(i) ].append(time_axis.total_period().end)
 """)
 
+TimeAxis.time_points_double = property( lambda self: time_axis_extract_time_points_as_utctime(self).to_numpy_double() ,doc= \
+"""
+extract all time-points from a TimeAxis with microseconds
+like
+[ time_axis.time(i) ].append(time_axis.total_period().end) if time_axis.size() else []
+
+Parameters
+----------
+time_axis : TimeAxis
+
+Returns
+-------
+time_points:numpy.array(dtype=np.float64)
+   [ time_axis.time(i) ].append(time_axis.total_period().end)
+""")
+
 # fix up property on timeseries
 TimeSeries.time_axis = property(lambda self: self.get_time_axis(), doc="returns the time_axis of the timeseries")
 TimeSeries.__len__ = lambda self: self.size()
