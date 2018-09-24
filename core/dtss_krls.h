@@ -497,16 +497,17 @@ public:
 
 public:
     void save(const std::string & fn, const gts_t & ts, bool overwrite = true, const queries_t & queries = queries_t{}, bool win_thread_close = true) {
-        // remove if we should overwrite and it exist
-        if ( overwrite && save_path_exists(fn) ) {
-            fs::remove(fs::path(make_full_path(fn)));
-        }
-
         if ( ! save_path_exists(fn) ) {
+            // reinitialize
+            if ( overwrite && save_path_exists(fn) ) {
+                fs::remove(fs::path(make_full_path(fn)));
+            }
             this->register_from_save(fn, ts, queries, win_thread_close);
         } else if ( auto it = queries.find("destination"); it != queries.cend() ) {
+            // rename/move a predictor
             this->move_from_save(fn, ts, queries, overwrite, win_thread_close);
         } else {
+            // update a predictor
             this->update_from_save(fn, ts, queries, win_thread_close);
         }
     }
@@ -909,6 +910,7 @@ private:
         ts_vector_t vec = this->server_read_cb(source_url, period, false, false);
 
         if ( vec.size() > 0 ) {
+            predictor.set_predicted_ts_point_policy(vec[0].point_interpretation());
             for ( auto && ts : vec ) {
                 predictor.train(ts);
             }

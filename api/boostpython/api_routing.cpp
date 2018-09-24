@@ -98,11 +98,27 @@ namespace expose {
             .def("network_contains_directed_cycle",&routing::river_network::network_contains_directed_cycle,"True if network have cycles detected")
             ;
     }
+    
+    void mstack_parameter_x() {
+        py::class_<mstack_parameter>("MethodStackParameter",
+            "Contains the parameters for the method-stack,\n"
+            "related to inter-method and routing behaviour\n"
+            )
+            .def(py::init<const mstack_parameter&>(py::args("clone"),"make a clone"))
+            .def_readwrite("reservoir_direct_response_fraction",&mstack_parameter::reservoir_direct_response_fraction,
+                 doc_intro(
+                     "range 0..1, default 1.0, e.g. all precipitation on a reservoir goes to direct response\n"
+                     " - set to 0.0, then all precipitation is routed as pr. standard for the stack\n"
+                )
+             )
+            ;
+    }
 
     void routing() {
         routing_path_info();
         routing_ugh_parameter();
         routing_river();
         routing_river_network();
+        mstack_parameter_x();
     }
 }

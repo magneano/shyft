@@ -17,6 +17,8 @@ def utctime_from_datetime(dt: Union[datetime, int]) -> int:
     """ converts input datetime to 1970s utc based time"""
     if isinstance(dt, int):
         return dt
+    if isinstance(dt,api.time):
+        return dt
     if not isinstance(dt, datetime):
         raise RuntimeError(f"Invalid type passed for argument,'dt' was '{dt.__class__}' expected int or datetime.")
     utc_calendar = api.Calendar()
