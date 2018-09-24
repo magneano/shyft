@@ -11,10 +11,6 @@ from functools import partial
 from shapely.geometry import MultiPoint, Polygon, MultiPolygon
 from shyft import api
 
-class RepositoryUtilsError(Exception):
-    pass
-
-
 UTC = api.Calendar()
 
 source_type_map = {"relative_humidity": api.RelHumSource,
@@ -543,3 +539,5 @@ def create_ncfile(data_file, variables, dimensions, ncattrs=None):
             dtype, dims, attrs = content
             dset.createVariable(name, dtype, dims)
             dset[name].setncatts(attrs)
+
+        # dset.close()
