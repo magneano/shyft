@@ -725,7 +725,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
         def forecast_t(t, daccumulated_var=False):
             dt_last = lead_time[-1] - lead_time[-2]
             nb_ext_lead_times = len(lead_time) - 1 if daccumulated_var else len(lead_time)
-            t_all = (np.repeat(t, nb_ext_lead_times).reshape(len(t), nb_ext_lead_times) + lead_time[0:nb_ext_lead_times]).astype(np.int64)
+            t_all = (np.repeat(t, nb_ext_lead_times).reshape(len(t), nb_ext_lead_times) + lead_time[0:nb_ext_lead_times]).astype('int64')
             if np.all(t_all[:, 1:] - t_all[:, :-1] == dt_last):  # fixed_dt time axis
                 return [api.TimeAxis(int(tp[0]), int(dt_last), len(tp)) for tp in t_all]
             else:  # point_type time axis
