@@ -275,12 +275,15 @@ namespace shyft {
             apoint_ts derivative(derivative_method dm=derivative_method::default_diff) const;
             apoint_ts accumulate(const gta_t& ta) const;
             apoint_ts time_shift(utctimespan dt) const;
+            apoint_ts pow(double a) const;
+            apoint_ts pow(const apoint_ts& other) const;
             apoint_ts max(double a) const;
             apoint_ts min(double a) const;
             apoint_ts max(const apoint_ts& other) const;
             apoint_ts min(const apoint_ts& other) const;
             static apoint_ts max(const apoint_ts& a, const apoint_ts& b);
             static apoint_ts min(const apoint_ts& a, const apoint_ts& b);
+            static apoint_ts pow(const apoint_ts& a, const apoint_ts& b);
             ats_vector partition_by(const calendar& cal, utctime t, utctimespan partition_interval, size_t n_partitions, utctime common_t0) const;
             apoint_ts convolve_w(const std::vector<double>& w, shyft::time_series::convolve_policy conv_policy) const;
             apoint_ts abs() const;
@@ -1633,7 +1636,7 @@ namespace shyft {
          *   The iop_t is used as the operation element of the abin_op_ts class
          */
         enum iop_t:int8_t {
-            OP_NONE,OP_ADD,OP_SUB,OP_DIV,OP_MUL,OP_MIN,OP_MAX
+            OP_NONE,OP_ADD,OP_SUB,OP_DIV,OP_MUL,OP_MIN,OP_MAX,OP_POW
         };
 
         /** do_bind helps to defer the computation cost of the
@@ -1863,6 +1866,10 @@ namespace shyft {
         apoint_ts min(const apoint_ts& lhs,double           rhs) ;
         apoint_ts min(double           lhs,const apoint_ts& rhs) ;
 
+        apoint_ts pow(const apoint_ts& lhs,const apoint_ts& rhs) ;
+        apoint_ts pow(const apoint_ts& lhs,double           rhs) ;
+        apoint_ts pow(double           lhs,const apoint_ts& rhs) ;
+
         ///< percentiles, need to include several forms of time_axis for python
         std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list,const gta_t & ta,const vector<int>& percentiles);
         std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list,const time_axis::fixed_dt & ta,const vector<int>& percentiles);
@@ -2024,7 +2031,11 @@ namespace shyft {
             }
             ats_vector min(ats_vector const& x) const;
             ats_vector max(ats_vector const& x) const;
-
+            
+            ats_vector pow(double x) const {ats_vector r;r.reserve(size());for (auto const &ts : *this) r.push_back(ts.pow(x)); return r;}
+            ats_vector pow(apoint_ts const& x) const {ats_vector r;r.reserve(size());for (auto const &ts : *this) r.push_back(ts.pow(x)); return r;}
+            ats_vector pow(ats_vector const& x) const ;
+            
             apoint_ts forecast_merge(utctimespan lead_time,utctimespan fc_interval) const;
             ats_vector average_slice(utctimespan t0_offset,utctimespan dt, int n) const ;
             double nash_sutcliffe(apoint_ts const &obs,utctimespan t0_offset,utctimespan dt, int n) const ;
@@ -2076,6 +2087,12 @@ namespace shyft {
         ats_vector max(ats_vector const &a, apoint_ts const & b);
         ats_vector max(apoint_ts const &b, ats_vector const &a);
         ats_vector max(ats_vector const &a, ats_vector const & b);
+
+        ats_vector pow(ats_vector const &a, double b);
+        ats_vector pow(double b, ats_vector const &a);
+        ats_vector pow(ats_vector const &a, apoint_ts const & b);
+        ats_vector pow(apoint_ts const &b, ats_vector const &a);
+        ats_vector pow(ats_vector const &a, ats_vector const & b);
     }
 	}
     namespace time_series {

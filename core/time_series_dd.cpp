@@ -71,6 +71,7 @@ namespace shyft{
 			case iop_t::OP_MUL:return a * b;
 			case iop_t::OP_MAX:return std::max(a, b);
 			case iop_t::OP_MIN:return std::min(a, b);
+            case iop_t::OP_POW:return std::pow(a, b);
 			case iop_t::OP_NONE:break;// just fall to exception
 			}
 			throw std::runtime_error("unsupported shyft::api::iop_t");
@@ -112,6 +113,11 @@ namespace shyft{
 		apoint_ts min(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MIN, rhs)); }
 		apoint_ts min(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MIN, rhs)); }
 
+		apoint_ts pow(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts>(lhs, iop_t::OP_POW, rhs)); }
+		apoint_ts pow(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_POW, rhs)); }
+		apoint_ts pow(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_POW, rhs)); }
+
+		
 		double abin_op_ts::value_at(utctime t) const {
 			if (!time_axis().total_period().contains(t))
 				return nan;
@@ -127,6 +133,7 @@ namespace shyft{
 			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] / r[i]); return x;
 			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::max(l[i], r[i])); return x;
 			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::min(l[i], r[i])); return x;
+            case OP_POW:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::pow(l[i], r[i])); return x;
 			default: break;
 			}
 			throw runtime_error("Unsupported operation " + to_string(int(op)));
@@ -140,6 +147,7 @@ namespace shyft{
 			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) l[i] /= r[i]; return;
 			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) l[i] = std::max(l[i], r[i]); return;
 			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) l[i] = std::min(l[i], r[i]); return;
+			case OP_POW:for (size_t i = 0; i < r.size(); ++i) l[i] = std::pow(l[i], r[i]); return;
 			default: break;
 			}
 			throw runtime_error("Unsupported operation " + to_string(int(op)));
@@ -152,6 +160,7 @@ namespace shyft{
 			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) r[i] = l[i] / r[i]; return;
 			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(l[i], r[i]); return;
 			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(l[i], r[i]); return;
+			case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l[i], r[i]); return;
 			default: break;
 			}
 			throw runtime_error("Unsupported operation " + to_string(int(op)));
@@ -707,6 +716,10 @@ namespace shyft{
 		apoint_ts apoint_ts::max(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::max(a, b); }
 		apoint_ts apoint_ts::min(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::min(a, b); }
 
+        apoint_ts apoint_ts::pow(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::pow(a, b); }
+		apoint_ts apoint_ts::pow(double a) const { return shyft::time_series::dd::pow(*this, a); }
+		apoint_ts apoint_ts::pow(const apoint_ts& other) const { return shyft::time_series::dd::pow(*this, other); }
+
 		apoint_ts apoint_ts::convolve_w(const std::vector<double> &w, shyft::time_series::convolve_policy conv_policy) const {
 			return apoint_ts(std::make_shared<convolve_w_ts>(*this, w, conv_policy));
 		}
@@ -847,6 +860,7 @@ namespace shyft{
 				case OP_DIV:for (const auto&v : r_v) r.emplace_back(l / v); return r;
 				case OP_MAX:for (const auto&v : r_v) r.emplace_back(std::max(v, l)); return r;
 				case OP_MIN:for (const auto&v : r_v) r.emplace_back(std::min(v, l)); return r;
+                case OP_POW:for (const auto&v : r_v) r.emplace_back(std::pow(l, v)); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			} else {
@@ -859,6 +873,7 @@ namespace shyft{
 				case OP_DIV:for (size_t i = 0; i < r.size(); ++i) r[i] = l / r[i]; return r;
 				case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(r[i], l); return r;
 				case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(r[i], l); return r;
+				case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l,r[i]); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			}
@@ -885,6 +900,7 @@ namespace shyft{
 				case OP_DIV:for (const auto&lv : *lhs_v) r.emplace_back(lv / rv); return r;
 				case OP_MAX:for (const auto&lv : *lhs_v) r.emplace_back(std::max(lv, rv)); return r;
 				case OP_MIN:for (const auto&lv : *lhs_v) r.emplace_back(std::min(lv, rv)); return r;
+				case OP_POW:for (const auto&lv : *lhs_v) r.emplace_back(std::pow(lv, rv)); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			} else {
@@ -897,6 +913,7 @@ namespace shyft{
 				case OP_DIV:for (size_t i = 0; i < l.size(); ++i) l[i] /= r; return l;
 				case OP_MAX:for (size_t i = 0; i < l.size(); ++i) l[i] = std::max(l[i], r); return l;
 				case OP_MIN:for (size_t i = 0; i < l.size(); ++i) l[i] = std::min(l[i], r); return l;
+                case OP_POW:for (size_t i = 0; i < l.size(); ++i) l[i] = std::pow(l[i], r); return l;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			}
@@ -1059,6 +1076,13 @@ namespace shyft{
 			ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].max(x[i]));
 			return r;
 		}
+
+		ats_vector ats_vector::pow(ats_vector const& x) const {
+			if (size() != x.size()) throw runtime_error(string("ts-vector pow require same sizes: lhs.size=") + std::to_string(size()) + string(",rhs.size=") + std::to_string(x.size()));
+			ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].pow(x[i]));
+			return r;
+		}
+
 		ats_vector ats_vector::inside(double min_v,double max_v,double nan_v, double inside_v, double outside_v) const {
             ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].inside(min_v,max_v,nan_v,inside_v,outside_v));
 			return r;
@@ -1074,6 +1098,25 @@ namespace shyft{
 		ats_vector max(ats_vector const &a, apoint_ts const & b) { return a.max(b); }
 		ats_vector max(apoint_ts const &b, ats_vector const &a) { return a.max(b); }
 		ats_vector max(ats_vector const &a, ats_vector const & b) { return a.max(b); }
+
+		ats_vector pow(ats_vector const &a, double b) { return a.pow(b); }
+		ats_vector pow(double b, ats_vector const &a) { 
+            ats_vector r;
+            r.reserve(a.size());
+            for(const auto&ts:a) 
+                r.push_back(pow(b,ts));
+            return r; 
+        }
+		ats_vector pow(ats_vector const &a, apoint_ts const & b) { return a.pow(b); }
+		ats_vector pow(apoint_ts const &b, ats_vector const &a) { 
+            ats_vector r;
+            r.reserve(a.size());
+            for(const auto&ts:a) 
+                r.push_back(pow(b,ts));
+            return r;             
+        }
+		ats_vector pow(ats_vector const &a, ats_vector const & b) { return a.pow(b); }
+
 		apoint_ts  ats_vector::forecast_merge(utctimespan lead_time, utctimespan fc_interval) const {
 			//verify arguments
 			if (lead_time.count() < 0)
