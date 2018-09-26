@@ -8,10 +8,11 @@ from .time_conversion import convert_netcdf_time
 from shyft.repository.interfaces import GeoTsRepository, ForecastSelectionCriteria
 from shyft.repository.netcdf.concat_data_repository import ConcatDataRepository
 from shyft.repository.netcdf.met_netcdf_data_repository import MetNetcdfDataRepository
-import numpy as np
-from .utils  import _clip_ensemble_of_geo_timeseries
+# import numpy as np
+import datetime as dt
+from shyft.repository.netcdf.utils  import _clip_ensemble_of_geo_timeseries
 
-
+UTC = api.Calendar()
 
 class WXRepositoryError(Exception):
     pass
@@ -73,8 +74,15 @@ class WXRepository(GeoTsRepository):
         """
         wx_repo = self.wx_repo
         if self.allow_year_shift and utc_period is not None:
-            d_t = (utc_period.start - int(wx_repo.time[0]))//(365 * 24 * 3600) * 365 * 24 * 3600
-            utc_start_shifted = utc_period.start - d_t
+            utc_start_date = dt.datetime.utcfromtimestamp(utc_period.start)
+            repo_date_start = dt.datetime.utcfromtimestamp(int(wx_repo.time[0]))
+            utc_start_tt = utc_start_date.timetuple()
+            if utc_start_tt.tm_yday + utc_start_tt.tm_sec >= repo_date_start.timetuple().tm_yday + repo_date_start.timetuple().tm_sec:
+                utc_start_shifted_year = repo_date_start.timetuple().tm_year
+            else:
+                utc_start_shifted_year = repo_date_start.timetuple().tm_year + 1
+            utc_start_shifted = UTC.time(utc_start_shifted_year, utc_start_tt.tm_mon, utc_start_tt.tm_mday,  utc_start_tt.tm_hour)
+            d_t = utc_period.start - utc_start_shifted
             utc_end_shifted = utc_period.end - d_t
             utc_period_shifted = api.UtcPeriod(utc_start_shifted, utc_end_shifted)
         else:
