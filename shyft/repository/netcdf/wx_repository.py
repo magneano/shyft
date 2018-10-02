@@ -141,8 +141,6 @@ class WXParallelizationRepository(GeoTsRepository):
             File path to netcdf file containing truth scenario. If not None, truth scenario
             will be concatenated onto start of ensemble. Note that netcdf file containing
             truth scenarios must have same format as synthetic scenarios
-        flattened: bool
-            Flags whether grid_points are flattened
         cache_data: bool
             Use cache data if True
         numb_years: int
@@ -201,6 +199,25 @@ class WXParallelizationRepository(GeoTsRepository):
             scen = self.cache
         self.parallelized_years, wx_scen_parallelized = parallelize_geo_timeseries(scen[0], utc_period, self.numb_years)
         return wx_scen_parallelized
+
+    def get_forecast_ensemble(self, input_source_types, utc_period, t_c, geo_location_criteria=None):
+        """
+        Same as get_timeseries since no time_stamp structure to filename
+
+        Parameters
+        ----------
+        see interfaces.GeoTsRepository
+
+        Returns
+        -------
+        see interfaces.GeoTsRepository
+        """
+        print("WXParallelizationRepository.get_forecast_ensembles")
+        t_total = time.time()
+        res = self.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria=geo_location_criteria)
+        elapsed_time = time.time() - t_total
+        print("Total time for WXParallelizationRepository.get_forecast_ensembles: {}".format(elapsed_time))
+        return res
 
 
 
