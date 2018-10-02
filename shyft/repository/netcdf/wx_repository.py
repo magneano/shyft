@@ -10,7 +10,9 @@ from shyft.repository.netcdf.concat_data_repository import ConcatDataRepository
 from shyft.repository.netcdf.met_netcdf_data_repository import MetNetcdfDataRepository
 # import numpy as np
 import datetime as dt
-from shyft.repository.netcdf.utils  import _clip_ensemble_of_geo_timeseries
+from shyft.repository.netcdf.utils import _clip_ensemble_of_geo_timeseries
+from shyft.repository.netcdf.utils import parallelize_geo_timeseries
+from shyft.repository.netcdf.utils import merge_ensemble_geo_timeseries
 
 UTC = api.Calendar()
 
@@ -21,18 +23,20 @@ class WXRepository(GeoTsRepository):
 
     def __init__(self, epsg, filename, padding=15000., flattened=False, allow_year_shift=True, cache_data=True):
         """
-        Construct the netCDF4 dataset reader for concatenated gridded forecasts and initialize data retrieval.
+        Repository for reading ensemble weather scenarios
 
         Parameters
         ----------
         epsg: string
             Unique coordinate system id for result coordinates. Currently "32632" and "32633" are supported.
         filename: string
-            Path to netcdf file containing concatenated forecasts
+            Path to netcdf file containing weather data
         flattened: bool
             Flags whether grid_points are flattened
         allow_year_shift: bool
             Flags whether shift of years is allowed
+        cache_data: bool
+            Use cache data if True
         """
         self.allow_year_shift = allow_year_shift
         self.cache_data = cache_data
@@ -59,10 +63,9 @@ class WXRepository(GeoTsRepository):
                                 "radiation": api.RadiationSourceVector,
                                 "wind_speed": api.WindSpeedSourceVector}
 
-    def get_timeseries_ensemble(self, input_source_types, utc_period, geo_location_criteria=None):
+    def get_forecast_ensemble(self, input_source_types, utc_period, t_c, geo_location_criteria=None):
         """
-        Get ensemble of shyft source vectors of time series covering utc_period
-        for input_source_types.
+        Same as get_timeseries since no time_stamp structure to filename
 
         Parameters
         ----------
@@ -71,6 +74,26 @@ class WXRepository(GeoTsRepository):
         Returns
         -------
         see interfaces.GeoTsRepository
+        """
+        print("WXRepository.get_forecast_ensembles")
+        t_total = time.time()
+        res = self.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria=geo_location_criteria)
+        elapsed_time = time.time() - t_total
+        print("Total time for WXRepository.get_forecast_ensembles: {}".format(elapsed_time))
+        return res
+
+    def get_timeseries_ensemble(self, input_source_types, utc_period, geo_location_criteria=None):
+        """
+            Get ensemble of shyft source vectors of time series covering utc_period
+            for input_source_types.
+
+            Parameters
+            ----------
+            see interfaces.GeoTsRepository
+
+            Returns
+            -------
+            see interfaces.GeoTsRepository
         """
         wx_repo = self.wx_repo
         if self.allow_year_shift and utc_period is not None:
@@ -98,21 +121,83 @@ class WXRepository(GeoTsRepository):
                     for src in geo_ts]) for key, geo_ts in ens.items()} for ens in raw_ens]
         return _clip_ensemble_of_geo_timeseries(res, utc_period, WXRepositoryError)
 
-    def get_forecast_ensemble(self, input_source_types, utc_period, t_c, geo_location_criteria=None):
+
+class WXParallelizationRepositoryError(Exception):
+    pass
+
+class WXParallelizationRepository(GeoTsRepository):
+
+    def __init__(self, epsg, filename, truth_file=None, padding=15000., cache_data=True):
         """
-        Same as get_timeseries since no time_stamp structure to filename
+        Repository for fetching parallelized weather years.
 
         Parameters
         ----------
-        see interfaces.GeoTsRepository
-
-        Returns
-        -------
-        see interfaces.GeoTsRepository
+        epsg: string
+            Unique coordinate system id for result coordinates. Currently "32632" and "32633" are supported.
+        filename: string
+            Path to netcdf file containing weather data
+        truth_file: file_path
+            File path to netcdf file containing truth scenario. If not None, truth scenario
+            will be concatenated onto start of ensemble. Note that netcdf file containing
+            truth scenarios must have same format as synthetic scenarios
+        flattened: bool
+            Flags whether grid_points are flattened
+        cache_data: bool
+            Use cache data if True
         """
-        print("WXRepository.get_forecast_ensembles")
-        t_total = time.time()
-        res = self.get_timeseries_ensemble(input_source_types, utc_period, geo_location_criteria=geo_location_criteria)
-        elapsed_time = time.time() - t_total
-        print("Total time for WXRepository.get_forecast_ensembles: {}".format(elapsed_time))
-        return res
+        self.cache_data = cache_data
+        self.cache = None
+        self.truth_file = truth_file
+        self.syn_repo = WXRepository(epsg, filename, padding=padding, flattened=True, allow_year_shift=True, cache_data=False)
+        if truth_file is not None:
+            self.truth_repo = WXRepository(epsg, truth_file, padding=padding, flattened=True, allow_year_shift=False, cache_data=False)
+
+    def get_timeseries_ensemble(self, input_source_types, utc_period, geo_location_criteria=None):
+        """
+             Get ensemble of shyft source vectors of time series covering utc_period
+             for input_source_types.
+
+             Parameters
+             ----------
+             see interfaces.GeoTsRepository
+
+             Returns
+             -------
+             see interfaces.GeoTsRepository
+        """
+
+        if self.cache is None:
+            if self.truth_file is not None:
+                truth_end_time = self.truth_repo.wx_repo.time[0] + self.truth_repo.wx_repo.lead_times_in_sec[-1]
+                # Shift time period for synthetic scenario so they overlap truth scenario
+                syn_start_time = self.syn_repo.wx_repo.time[0]
+                syn_end_time = self.syn_repo.wx_repo.time[0] + self.syn_repo.wx_repo.lead_times_in_sec[-1]
+                truth_end_date = dt.datetime.utcfromtimestamp(int(truth_end_time))
+                syn_start_date = dt.datetime.utcfromtimestamp(int(syn_start_time))
+                syn_start_tt = syn_start_date.timetuple()
+                if truth_end_date.timetuple().tm_yday + truth_end_date.timetuple().tm_sec >= syn_start_tt.tm_yday + syn_start_tt.tm_sec:
+                    syn_start_shifted_year = truth_end_date.timetuple().tm_year
+                else:
+                    syn_start_shifted_year = truth_end_date.timetuple().tm_year - 1
+                syn_start_time_shifted = UTC.time(syn_start_shifted_year, syn_start_date.month, syn_start_date.day,
+                                                  syn_start_date.hour)
+                d_t = syn_start_time - syn_start_time_shifted
+                syn_end_time_shifted = syn_end_time - d_t
+                syn_period_shifted = api.UtcPeriod(syn_start_time_shifted, syn_end_time_shifted)
+                # get (shifted) time series for synthetic series
+                scen = self.syn_repo.get_timeseries_ensemble(input_source_types, syn_period_shifted, geo_location_criteria=geo_location_criteria)
+                # get truth and merge
+                truth_scen = self.truth_repo.get_timeseries_ensemble(input_source_types, None, geo_location_criteria=geo_location_criteria)
+                scen = merge_ensemble_geo_timeseries(truth_scen, scen)
+            else:
+                scen = self.syn_repo.get_timeseries_ensemble(input_source_types, None, geo_location_criteria=geo_location_criteria)
+            if self.cache_data:
+                self.cache = scen
+        else:
+            scen = self.cache
+        self.parallelized_years, wx_scen_parallelized = parallelize_geo_timeseries(scen[0], utc_period)
+        return wx_scen_parallelized
+
+
+
