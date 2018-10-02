@@ -550,7 +550,7 @@ def _convert_time_series_to_fixed_dt(ts):
     return ts
 
 
-def parallelize_geo_timeseries(geo_ts_dict, utc_period):
+def parallelize_geo_timeseries(geo_ts_dict, utc_period, numb_years=None):
     """
     Parallelize (yearly) geo_ts and return as ensemble of fixed_dt time series
 
@@ -561,11 +561,13 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period):
         api vectors of geo located time series over the same time axis
     utc_period: api.UtcPeriod
         The utc time period that should (as a minimum) be covered
+    numb_years: int
+        Limits number of years to return. If None return as many as possible.
         
     Returns
     -------
-        Tuple containing list of years useed in parallelization and associated 
-        list of dictionaries keyed by time series type, where values are api 
+        Tuple containing list of years useed in parallelization and associated
+        list of dictionaries keyed by time series type, where values are api
         vectors of geo located time series over the same time axis
     """
     ta_orig = geo_ts_dict[list(geo_ts_dict.keys())[0]][0].ts.time_axis
@@ -576,7 +578,10 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period):
     n = utc_period.diff_units(UTC, dt) + 1 
     ensemble = []
     years = []
-    for y in range(first_year_in_ts, last_year_in_ts +1):
+    numb_years = last_year_in_ts - first_year_in_ts if numb_years is None else numb_years
+    counter = 0
+    while counter < numb_years:
+        y = first_year_in_ts + counter # for y in range(first_year_in_ts, last_year_in_ts + 1):
         period_to_shift = UTC.time(utc_period_start_date.year, utc_period_start_date.month, utc_period_start_date.day) \
                           - UTC.time(y, utc_period_start_date.month, utc_period_start_date.day)
         ta_shifted = api.TimeAxis(utc_period.start - period_to_shift, dt, n)
@@ -585,6 +590,7 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period):
                                                 s.ts.average(ta_shifted).time_shift(period_to_shift)) for s in geo_ts]) 
                                                 for key, geo_ts in geo_ts_dict.items()})
             years.append(y)
+            counter += 1
     return years, ensemble
 
 def create_ncfile(data_file, variables, dimensions, ncattrs=None):

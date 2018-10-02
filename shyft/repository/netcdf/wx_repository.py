@@ -9,7 +9,7 @@ from shyft.repository.interfaces import GeoTsRepository, ForecastSelectionCriter
 from shyft.repository.netcdf.concat_data_repository import ConcatDataRepository
 from shyft.repository.netcdf.met_netcdf_data_repository import MetNetcdfDataRepository
 # import numpy as np
-import datetime as dt
+import datetime
 from shyft.repository.netcdf.utils import _clip_ensemble_of_geo_timeseries
 from shyft.repository.netcdf.utils import parallelize_geo_timeseries
 from shyft.repository.netcdf.utils import merge_ensemble_geo_timeseries
@@ -97,14 +97,14 @@ class WXRepository(GeoTsRepository):
         """
         wx_repo = self.wx_repo
         if self.allow_year_shift and utc_period is not None:
-            utc_start_date = dt.datetime.utcfromtimestamp(utc_period.start)
-            repo_date_start = dt.datetime.utcfromtimestamp(int(wx_repo.time[0]))
-            utc_start_tt = utc_start_date.timetuple()
-            if utc_start_tt.tm_yday + utc_start_tt.tm_sec >= repo_date_start.timetuple().tm_yday + repo_date_start.timetuple().tm_sec:
+            utc_start_date = datetime.datetime.utcfromtimestamp(utc_period.start)
+            repo_date_start = datetime.datetime.utcfromtimestamp(int(wx_repo.time[0]))
+            if utc_start_date.timetuple().tm_yday + utc_start_date.timetuple().tm_sec >= \
+                    repo_date_start.timetuple().tm_yday + repo_date_start.timetuple().tm_sec:
                 utc_start_shifted_year = repo_date_start.timetuple().tm_year
             else:
                 utc_start_shifted_year = repo_date_start.timetuple().tm_year + 1
-            utc_start_shifted = UTC.time(utc_start_shifted_year, utc_start_tt.tm_mon, utc_start_tt.tm_mday,  utc_start_tt.tm_hour)
+            utc_start_shifted = UTC.time(utc_start_shifted_year, utc_start_date.month, utc_start_date.day,  utc_start_date.hour)
             d_t = utc_period.start - utc_start_shifted
             utc_end_shifted = utc_period.end - d_t
             utc_period_shifted = api.UtcPeriod(utc_start_shifted, utc_end_shifted)
@@ -127,7 +127,7 @@ class WXParallelizationRepositoryError(Exception):
 
 class WXParallelizationRepository(GeoTsRepository):
 
-    def __init__(self, epsg, filename, truth_file=None, padding=15000., cache_data=True):
+    def __init__(self, epsg, filename, truth_file=None, padding=15000., cache_data=True, numb_years=None):
         """
         Repository for fetching parallelized weather years.
 
@@ -145,10 +145,13 @@ class WXParallelizationRepository(GeoTsRepository):
             Flags whether grid_points are flattened
         cache_data: bool
             Use cache data if True
+        numb_years: int
+            Limits number of years to return. If None return as many as possible.
         """
         self.cache_data = cache_data
         self.cache = None
         self.truth_file = truth_file
+        self.numb_years = numb_years
         self.syn_repo = WXRepository(epsg, filename, padding=padding, flattened=True, allow_year_shift=True, cache_data=False)
         if truth_file is not None:
             self.truth_repo = WXRepository(epsg, truth_file, padding=padding, flattened=True, allow_year_shift=False, cache_data=False)
@@ -173,10 +176,10 @@ class WXParallelizationRepository(GeoTsRepository):
                 # Shift time period for synthetic scenario so they overlap truth scenario
                 syn_start_time = self.syn_repo.wx_repo.time[0]
                 syn_end_time = self.syn_repo.wx_repo.time[0] + self.syn_repo.wx_repo.lead_times_in_sec[-1]
-                truth_end_date = dt.datetime.utcfromtimestamp(int(truth_end_time))
-                syn_start_date = dt.datetime.utcfromtimestamp(int(syn_start_time))
-                syn_start_tt = syn_start_date.timetuple()
-                if truth_end_date.timetuple().tm_yday + truth_end_date.timetuple().tm_sec >= syn_start_tt.tm_yday + syn_start_tt.tm_sec:
+                truth_end_date = datetime.datetime.utcfromtimestamp(int(truth_end_time))
+                syn_start_date = datetime.datetime.utcfromtimestamp(int(syn_start_time))
+                if truth_end_date.timetuple().tm_yday + truth_end_date.timetuple().tm_sec >= \
+                        syn_start_date.timetuple().tm_yday + syn_start_date.timetuple().tm_sec:
                     syn_start_shifted_year = truth_end_date.timetuple().tm_year
                 else:
                     syn_start_shifted_year = truth_end_date.timetuple().tm_year - 1
@@ -196,7 +199,7 @@ class WXParallelizationRepository(GeoTsRepository):
                 self.cache = scen
         else:
             scen = self.cache
-        self.parallelized_years, wx_scen_parallelized = parallelize_geo_timeseries(scen[0], utc_period)
+        self.parallelized_years, wx_scen_parallelized = parallelize_geo_timeseries(scen[0], utc_period, self.numb_years)
         return wx_scen_parallelized
 
 
