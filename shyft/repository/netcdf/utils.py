@@ -10,6 +10,7 @@ from shapely.prepared import prep
 from functools import partial
 from shapely.geometry import MultiPoint, Polygon, MultiPolygon
 from shyft import api
+import datetime
 
 UTC = api.Calendar()
 
@@ -469,6 +470,11 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err, allow_shorter_pe
         The utc time period that should (as a minimum) be covered.
     allow_shorter_period: bool, optional
         may return ts for shorter period if time_axis does not cover utc_period
+        
+    Returns
+    -------
+        List of dictionaries keyed by time series type, where values are
+        api vectors of geo located time series over the same time axis
     """
     if utc_period is None:
         return ensemble
@@ -512,7 +518,74 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err, allow_shorter_pe
                                               for s in geo_ts]) for key, geo_ts in f.items()} for f in ensemble]
 
 
+def merge_ensemble_geo_timeseries(first_geo_ts, second_geo_ts, fixed_dt=True):
+    """
+    Merge two geo_ts
 
+    Parameters
+    ----------
+    first_geo_ts: list
+        List of dictionaries keyed by time series type, where values are
+        api vectors of geo located time series over the same time axis
+    second_geo_ts: api.UtcPeriod
+        The utc time period that should (as a minimum) be covered
+    fixed_dt: bool, optional
+        Return as TimeAxisType.FIXED if True
+        
+    Returns
+    -------
+        List of dictionaries keyed by time series type, where values are
+        api vectors of geo located time series over the same time axis
+    """
+    return [{key: source_vector_map[key]([source_type_map[key](f_geo_ts.mid_point(), 
+                                          _convert_time_series_to_fixed_dt(f_geo_ts.ts.extend(s_geo_ts.ts)))
+                                          for f_geo_ts, s_geo_ts in zip(f[key], s[key])]) for key in f}
+                                          for f, s in zip(first_geo_ts, second_geo_ts)]
+
+def _convert_time_series_to_fixed_dt(ts):
+    if ts.time_axis.timeaxis_type != api.TimeAxisType.FIXED:
+        dt = int(ts.time_axis.time_points[1] - ts.time_axis.time_points[0])
+        n = ts.time_axis.total_period().diff_units(UTC, dt)
+        ts = ts.average(api.TimeAxis(int(ts.time_axis.time_points[0]), dt, n))
+    return ts
+
+
+def parallelize_geo_timeseries(geo_ts_dict, utc_period):
+    """
+    Parallelize (yearly) geo_ts and return as ensemble of fixed_dt time series
+
+    Parameters
+    ----------
+    geo_ts_dict: dict
+        Dictionary keyed by time series type, where values are
+        api vectors of geo located time series over the same time axis
+    utc_period: api.UtcPeriod
+        The utc time period that should (as a minimum) be covered
+        
+    Returns
+    -------
+        Tuple containing list of years useed in parallelization and associated 
+        list of dictionaries keyed by time series type, where values are api 
+        vectors of geo located time series over the same time axis
+    """
+    ta_orig = geo_ts_dict[list(geo_ts_dict.keys())[0]][0].ts.time_axis
+    first_year_in_ts = datetime.datetime.utcfromtimestamp(ta_orig.time_points[0]).year
+    last_year_in_ts = datetime.datetime.utcfromtimestamp(ta_orig.time_points[-1]).year
+    utc_period_start_date = datetime.datetime.utcfromtimestamp(utc_period.start)
+    dt = int(ta_orig.time_points[1] - ta_orig.time_points[0])
+    n = utc_period.diff_units(UTC, dt) + 1 
+    ensemble = []
+    years = []
+    for y in range(first_year_in_ts, last_year_in_ts +1):
+        period_to_shift = UTC.time(utc_period_start_date.year, utc_period_start_date.month, utc_period_start_date.day) \
+                          - UTC.time(y, utc_period_start_date.month, utc_period_start_date.day)
+        ta_shifted = api.TimeAxis(utc_period.start - period_to_shift, dt, n)
+        if ta_orig.total_period().contains(ta_shifted.total_period()):
+            ensemble.append({key: source_vector_map[key]([source_type_map[key](s.mid_point(), 
+                                                s.ts.average(ta_shifted).time_shift(period_to_shift)) for s in geo_ts]) 
+                                                for key, geo_ts in geo_ts_dict.items()})
+            years.append(y)
+    return years, ensemble
 
 def create_ncfile(data_file, variables, dimensions, ncattrs=None):
     """
