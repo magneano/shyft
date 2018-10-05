@@ -588,7 +588,7 @@ namespace shyft {
             virtual void set_point_interpretation(ts_point_fx /* point_interpretation*/) { ; }
             virtual const gta_t& time_axis() const { return ts->time_axis(); }
             virtual utcperiod total_period() const { return ts?time_axis().total_period():utcperiod{}; }
-            virtual size_t index_of(utctime t) const { return ts?string::npos:ts->index_of(t); }
+            virtual size_t index_of(utctime t) const { return ts?ts->index_of(t):string::npos; }
             virtual size_t size() const { return ts?ts->size():0; }
             virtual utctime time(size_t i) const { return ts->time(i); };
             virtual double value(size_t i) const;
