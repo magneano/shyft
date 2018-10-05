@@ -35,7 +35,7 @@ class InsideTimeSeries(unittest.TestCase):
         data = np.array(values, dtype='float64')
         data_ta = TimeAxis(utc.time(2015, 1, 1), 3600, len(data))
 
-        orig = TimeSeries(data_ta, data, point_interpretation_policy.POINT_AVERAGE_VALUE)
+        orig = TimeSeries(data_ta, data, POINT_AVERAGE_VALUE)
         orig_derivative_inside_inf = orig.derivative(derivative_method.BACKWARD).inside(-float('inf'), float('inf'), 0,
                                                                                         1, 0)
 
