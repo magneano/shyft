@@ -21,7 +21,7 @@ class WXRepositoryError(Exception):
 
 class WXRepository(GeoTsRepository):
 
-    def __init__(self, epsg, filename, padding=15000., flattened=False, allow_year_shift=True, cache_data=True):
+    def __init__(self, epsg, filename, padding=15000., flattened=True, allow_year_shift=True, cache_data=True):
         """
         Repository for reading ensemble weather scenarios
 
@@ -99,8 +99,8 @@ class WXRepository(GeoTsRepository):
         if self.allow_year_shift and utc_period is not None:
             utc_start_date = datetime.datetime.utcfromtimestamp(utc_period.start)
             repo_date_start = datetime.datetime.utcfromtimestamp(int(wx_repo.time[0]))
-            if utc_start_date.timetuple().tm_yday + utc_start_date.timetuple().tm_sec >= \
-                    repo_date_start.timetuple().tm_yday + repo_date_start.timetuple().tm_sec:
+            if utc_start_date.timetuple().tm_yday + utc_start_date.timetuple().tm_hour >= \
+                    repo_date_start.timetuple().tm_yday + repo_date_start.timetuple().tm_hour:
                 utc_start_shifted_year = repo_date_start.timetuple().tm_year
             else:
                 utc_start_shifted_year = repo_date_start.timetuple().tm_year + 1
@@ -176,8 +176,8 @@ class WXParallelizationRepository(GeoTsRepository):
                 syn_end_time = self.syn_repo.wx_repo.time[0] + self.syn_repo.wx_repo.lead_times_in_sec[-1]
                 truth_end_date = datetime.datetime.utcfromtimestamp(int(truth_end_time))
                 syn_start_date = datetime.datetime.utcfromtimestamp(int(syn_start_time))
-                if truth_end_date.timetuple().tm_yday + truth_end_date.timetuple().tm_sec >= \
-                        syn_start_date.timetuple().tm_yday + syn_start_date.timetuple().tm_sec:
+                if truth_end_date.timetuple().tm_yday + truth_end_date.timetuple().tm_hour >= \
+                        syn_start_date.timetuple().tm_yday + syn_start_date.timetuple().tm_hour:
                     syn_start_shifted_year = truth_end_date.timetuple().tm_year
                 else:
                     syn_start_shifted_year = truth_end_date.timetuple().tm_year - 1
