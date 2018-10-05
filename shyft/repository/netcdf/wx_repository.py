@@ -23,7 +23,7 @@ class WXRepository(GeoTsRepository):
 
     def __init__(self, epsg, filename, padding=15000., flattened=True, allow_year_shift=True, cache_data=True):
         """
-        Repository for reading ensemble weather scenarios
+        Repository for reading ensemble weather scenarios from netcdf file.
 
         Parameters
         ----------
@@ -129,7 +129,8 @@ class WXParallelizationRepository(GeoTsRepository):
 
     def __init__(self, epsg, filename, truth_file=None, padding=15000., cache_data=True, numb_years=None):
         """
-        Repository for fetching parallelized weather years.
+        Reads weather scenario from file. Get_timeseire_ensemble and get_forecast_ensemble returns
+        ensemble of weather scenarios using parallelization.
 
         Parameters
         ----------
