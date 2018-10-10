@@ -511,7 +511,7 @@ class ConcatDataRepository(interfaces.GeoTsRepository):
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", message="invalid value encountered in greater")
                     warnings.filterwarnings("ignore", message="invalid value encountered in less_equal")
-                    pure_arr = data[data_slice][xy_slice_mask][time_slice_mask]
+                    pure_arr = data[tuple(data_slice)][tuple(xy_slice_mask)][tuple(time_slice_mask)]
 
                 if 'ensemble_member' not in dims: # add axis for 'ensemble_member'
                     pure_arr = pure_arr[:,:,np.newaxis,:]
