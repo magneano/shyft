@@ -67,4 +67,4 @@ conda build --numpy $numpy_version conda_recipe
 
 # Upload conda package
 filename=$(conda build --numpy $numpy_version --output conda_recipe)
-anaconda upload --force --user energycorp ${filename}
+anaconda upload --no-progress --force --user energycorp ${filename}
