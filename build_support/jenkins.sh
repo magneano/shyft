@@ -36,10 +36,6 @@ conda activate shyft_env
 export SHYFT_DEPENDENCIES_DIR=$WORKSPACE/shyft_dependencies
 export PYTHONPATH=$WORKSPACE/shyft
 
-# Purge previously built conda packages to save disk space
-conda build purge-all
-conda clean --all -y
-
 # Build shyft
 cd $WORKSPACE/shyft
 mkdir -p build
@@ -71,4 +67,4 @@ conda build --numpy $numpy_version conda_recipe
 
 # Upload conda package
 filename=$(conda build --numpy $numpy_version --output conda_recipe)
-anaconda upload --force --user energycorp ${filename}
+anaconda upload --no-progress --force --user energycorp ${filename}
