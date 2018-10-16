@@ -1,4 +1,5 @@
 # CMake configuration for tests
+cmake_minimum_required(VERSION 3.12)
 
 set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_test.cpp cell_builder_test.cpp dtss_test.cpp
     gamma_snow_test.cpp glacier_melt_test.cpp gridpp_test.cpp hbv_actual_evapotranspiration_test.cpp hbv_snow_test.cpp hbv_soil_test.cpp
