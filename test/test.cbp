@@ -124,9 +124,6 @@
 		<Unit filename="hbv_soil_test.cpp">
 			<Option virtualFolder="methods/" />
 		</Unit>
-		<Unit filename="radiation_test.cpp">
-			<Option virtualFolder="methods/" />
-		</Unit>
 		<Unit filename="hbv_stack_test.cpp">
 			<Option virtualFolder="method_stacks/" />
 		</Unit>
