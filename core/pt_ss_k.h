@@ -222,6 +222,10 @@ namespace shyft {
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
             const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
             const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
+            const double no_snow_storage_fraction = geo_cell_data.land_type_fractions_info().reservoir() + geo_cell_data.land_type_fractions_info().lake();
+            const double kirchner_routed_prec =  geo_cell_data.land_type_fractions_info().reservoir()*(1.0-parameter.msp.reservoir_direct_response_fraction) + geo_cell_data.land_type_fractions_info().lake();
+            const double snow_storage_fraction = 1.0 - no_snow_storage_fraction;// on this part, snow builds up, and melts.-> season time-response
+
             const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
             const double kirchner_fraction = 1 - direct_response_fraction;
             const double cell_area_m2 = geo_cell_data.area();
@@ -251,7 +255,7 @@ namespace shyft {
                     parameter.ae.ae_scale_factor, std::max(state.snow.sca, glacier_fraction),  // a evap only on non-snow/non-glac area
                     period.timespan());
                 double gm_mmh= shyft::m3s_to_mmh(response.gm_melt_m3s, cell_area_m2);
-                kirchner.step(period.start, period.end, state.kirchner.q, response.kirchner.q_avg, response.snow.outflow + gm_routed*gm_mmh, response.ae.ae); //all units mm/h over 'same' area
+                kirchner.step(period.start, period.end, state.kirchner.q, response.kirchner.q_avg, response.snow.outflow*snow_storage_fraction + prec*kirchner_routed_prec + gm_routed*gm_mmh, response.ae.ae); //all units mm/h over 'same' area
 
                 response.total_discharge =
                       std::max(0.0, prec - response.ae.ae)*direct_response_fraction // when it rains, remove ae. from direct response
