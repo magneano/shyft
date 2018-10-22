@@ -16,15 +16,13 @@ namespace shyft::core {
     namespace radiation {
 
         struct calculator {
-            calendar utc;
+
             double doy; // day of the year
-            double hour;
+            double delta = 0.1; // declination of the earth, positive for northern hemisphere summer
             double omega; // earth hour angle
 
             double s = 0.0; // horizontal slope, should be calculated from normal vector
             double gamma = 0.0; // surface aspect angle, 0 -- due south, -pi/2 -- due east, pi/2 -- due west, +-pi -- due north
-
-            double delta = 0.1; // declination of the earth, positive for northern hemisphere summer
 
             double phi = 0.0 ;// latitude, should be available from cell?
 
@@ -33,15 +31,7 @@ namespace shyft::core {
             double rso = 0.0; // clear sky solar radiation for inclined surface [W/m2]
 
             double alpha = 0.1; // albedo
-
-            /** \tparam V is typically arma::vec */
-            template <class V>
-            double real_radiation(double latitude, utctime t, const V & surface_normal) {
-                doy=utc.day_of_year(t);
-                hour = utc.calendar_units(t).hour;
-                return hour;
-            }
-            const double gsc = 1367; // W/m2 -- solar constant
+            double local_time = 0.0;
 
             /** \brief computes instantaneous extraterrestrial solar radiation
              * \param latitude (phi)
@@ -49,11 +39,12 @@ namespace shyft::core {
              * \param surface normal */
 
             template <class V>
-            double ra_radiation(double latitude, utctime t, const V & surface_normal){
-                phi = latitude;
+            double ra_radiation(double latitude, double longitude,  utctime t, const V & surface_normal){
+                compute_doy(t);
+                local_time = utc.calendar_units(t).hour;
                 delta = 23.45*pi/180*sin(2*pi*(284+doy)/36.25); // earth declination angle based on eq.(3.1) https://www.itacanet.org/the-sun-as-a-source-of-energy/part-3-calculating-solar-angles/
-                omega = utc.calendar_units(t).hour; // earth  hour angle /// TODO convert time to hour angle (HRA)
-                compute_costt(omega);
+                omega = hour_angle(utc.calendar_units(t).hour); // earth hour angle
+                compute_costt(omega, latitude);
                 ra = gsc*cos_tt*(1+0.0033*cos(doy*2*pi/365)); // eq.(1)
                 rahor = gsc*cos_tthor*(1+0.0033*cos(doy*2*pi/365)); // eq.(1) with cos(theta)hor
                 // std::cout<<ra<<std::endl;
@@ -62,9 +53,7 @@ namespace shyft::core {
             /** \brief computes instantaneous clear-sky radiation  for inclined surfaces*/
             template <class C>
             double rso_cs_radiation(utctime t, const C& cell){
-                double longitude = 0.0; // longitude should come from cell? ///TODO get from cell, ask if we have it somewhere, or need to calculate from coordinates, where is wgs84?
-                omega = hour_angle(longitude,utc.calendar_units(t).hour); // hour angle
-                double tau_swo; // broadband atmospheric transmissivity for shortwave radiation for cloud-free conditions
+                omega = hour_angle(utc.calendar_units(t).hour); // hour angle
                 double W; //equivalent depth of precipitable water in the atmosphere[mm]
                 double P = 101.325;// [kPa] atmospheric pressure /// TODO calculate as a function of elevation (should be available for cell) cell.midpoint().z?
                 double ea = 101.325; //[kPa] actual vapor pressure ///TODO: calculate mean saturation pressure from temperature, next actual vapor pressure from relative humidity data
@@ -90,15 +79,17 @@ namespace shyft::core {
 
                 double fb = Kbo/Kbohor*ra/rahor;//eq.(34)
                 double fia = (1 - Kbohor)*(1+pow(Kbohor/(Kbohor+Kdohor),0.5)*pow(sin(s/2),3))*fi + fb*Kbohor; //eq.(33)
-                rso = Kbo*ra + (fia*Kdo + alpha*(1-fi)*(Kbo+Kdo))*rahor; // eq.(37)
+                rso = Kbo*ra + (fia*Kdo + alpha*(1-fi)*(Kbo+Kdo))*rahor; // eq.(37)     direct beam + diffuse + reflected
                 return rso; // eq.(37)
             }
         private:
+            const double gsc = 1367; // W/m2 -- solar constant    
+            calendar utc;
             double a, b, c, cos_tt, cos_tthor;
             /** \brief computes necessary geometric parameters
              * \param omega -- hour angle
              * */
-            void compute_costt(double omega){
+            void compute_costt(double omega, double phi){
                 a = sin(delta)*cos(phi)*sin(s)*cos(gamma) - sin(delta)*sin(phi)*cos(s); // eq.11a
                 b = cos(delta)*cos(phi)*cos(s) + cos(delta)*sin(phi)*sin(s)*cos(gamma);//eq 11b
                 c = cos(delta)*sin(s)*sin(gamma);
@@ -126,15 +117,20 @@ namespace shyft::core {
             }
             /**\brief computes solar hour angle from local time
              * ref.: https://www.pveducation.org/pvcdrom/properties-of-sunlight/solar-time
+             * \param lt -- local time (LT) [h]
              * \param longitute
-             * \param lt - local time [h]*/
-            double hour_angle(double longitude, double lt){
-                double DTutc = 0.0; // [hour], difference of LT from UTC///TODO get timezone from utctime utilities
-                double LSTM = 15*DTutc; // local standard time meridian
-                double B = 360/365*(doy-81);
+             * \param tz -- time zone [h], difference of LT from UTC
+             * we use UTC, so longitude = 0.0, tz = 0.0 */
+            double hour_angle(double lt, double longitude=0.0, double tz=0.0){
+                double LSTM = 15*tz; // local standard time meridian
+                double B = 360/365*(doy)*(-81);
                 double EoT = 9.87*sin(2*B) - 7.3*cos(B) - 1.5*sin(B);// equation of time
-                double TC = 4*(longitude - LSTM) + EoT; //time correction factor
-                double LST = lt + TC/60; // loacl solar time
+                /*double M = 2*pi/365.2596358*doy*pi/180;
+                double EoT = -7.659*sin(M)+9.863*sin(2*M+3.5932);//https://en.wikipedia.org/wiki/Equation_of_time*/
+
+                double TC = 4*(longitude - LSTM) + EoT; //time correction factor including EoT correction for Earth eccentricity
+                double LST = lt - TC/60; // local solar time
+
                 return 15*(LST-12);
             }
             void compute_doy(utctime t){
@@ -169,14 +165,35 @@ TEST_SUITE("radiation") {
     using shyft::core::calendar;
     using shyft::test::cell;
     using std::vector;
+    using shyft::core::utctime;
     // test basics: creation, etc
-    
-    TEST_CASE("compute_real_radiation") {
+    // /TODO: prepare set of tests: 1. check vapor pressure result, 2. check atm_pressure vs elevation
+
+    TEST_CASE("check_earth_angles"){
         calculator r;
-        FAST_CHECK_EQ(r.real_radiation(1.0,calendar::HOUR*25,1),doctest::Approx(1));
-        FAST_CHECK_EQ(r.ra_radiation(1.0,calendar::HOUR*25,1),doctest::Approx(1)); // should fail
+        calendar utc_cal;
+        double lat = 56.0;
+        double lon = 66.31;
+        utctime t1, t2, t3;
+        t1 = utc_cal.time(1970, 1, 1, 10, 30, 0, 0);
+        t2 = utc_cal.time(1970, 6, 1, 12, 0, 0, 0);
+        t3 = utc_cal.time(1970, 9, 1, 23, 30, 0, 0);
+        r.ra_radiation(lat, lon, t1, 1);
+        FAST_CHECK_EQ(r.doy, doctest::Approx(1.0));// doy 1
+        FAST_CHECK_EQ(r.omega, doctest::Approx(-0.93));// earth hour angle
+        FAST_CHECK_EQ(r.delta, doctest::Approx(-0.31194));// earth declination angle
+        FAST_CHECK_EQ(r.local_time, doctest::Approx(10));// earth declination angle
+        r.ra_radiation(lat, lon, t2, 1);
+        FAST_CHECK_EQ(r.doy, doctest::Approx(152.0));// doy 1 June
+        FAST_CHECK_EQ(r.omega, doctest::Approx(15.59));// earth hour angle
+        FAST_CHECK_EQ(r.delta, doctest::Approx(0.070585));// earth declination angle
+        r.ra_radiation(lat, lon, t3, 1);
+        FAST_CHECK_EQ(r.doy, doctest::Approx(244.0));// doy 1 September
+        FAST_CHECK_EQ(r.omega, doctest::Approx(15.59));// earth hour angle
+        FAST_CHECK_EQ(r.delta, doctest::Approx(0.070585));// earth declination angle
+
     }
-    
+
     TEST_CASE("surface_normal_from_cells") {
         vector<cell> cells;
         auto r= surface_normal(cells);
