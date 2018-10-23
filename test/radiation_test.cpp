@@ -3,6 +3,7 @@
 #include "core/geo_cell_data.h"
 #include <armadillo>
 #include <vector>
+#include <chrono>
 #include <boost/math/constants/constants.hpp>
 
 namespace shyft::core {
@@ -11,6 +12,7 @@ namespace shyft::core {
     using std::sin;
     using std::pow;
     using std::exp;
+    using namespace std;
     const double pi = boost::math::constants::pi<double>();
 
     namespace radiation {
@@ -31,7 +33,8 @@ namespace shyft::core {
             double rso = 0.0; // clear sky solar radiation for inclined surface [W/m2]
 
             double alpha = 0.1; // albedo
-            double local_time = 0.0;
+            string local_time_str;
+            double local_time;
 
             /** \brief computes instantaneous extraterrestrial solar radiation
              * \param latitude (phi)
@@ -41,9 +44,13 @@ namespace shyft::core {
             template <class V>
             double ra_radiation(double latitude, double longitude,  utctime t, const V & surface_normal){
                 compute_doy(t);
-                local_time = utc.calendar_units(t).hour;
-                delta = 23.45*pi/180*sin(2*pi*(284+doy)/36.25); // earth declination angle based on eq.(3.1) https://www.itacanet.org/the-sun-as-a-source-of-energy/part-3-calculating-solar-angles/
-                omega = hour_angle(utc.calendar_units(t).hour); // earth hour angle
+                auto c = utc.calendar_units(t);
+                auto us = c.micro_second;
+                local_time_str = utc.to_string(t);
+                local_time = utc.calendar_units(t).hour + utc.calendar_units(t).minute/60.0;
+                delta = 0.39795*cos(0.98563*(doy-173)*pi/180); //http://mypages.iit.edu/~maslanka/SolarGeo.pdf
+//                delta = 23.45*pi/180*sin(2*pi*(284+doy)/36.25); // earth declination angle based on eq.(3.1) https://www.itacanet.org/the-sun-as-a-source-of-energy/part-3-calculating-solar-angles/
+                omega = hour_angle(utc.calendar_units(t).hour+utc.calendar_units(t).minute/60.0); // earth hour angle
                 compute_costt(omega, latitude);
                 ra = gsc*cos_tt*(1+0.0033*cos(doy*2*pi/365)); // eq.(1)
                 rahor = gsc*cos_tthor*(1+0.0033*cos(doy*2*pi/365)); // eq.(1) with cos(theta)hor
@@ -131,7 +138,7 @@ namespace shyft::core {
                 double TC = 4*(longitude - LSTM) + EoT; //time correction factor including EoT correction for Earth eccentricity
                 double LST = lt - TC/60; // local solar time
 
-                return 15*(LST-12);
+                return 15*(lt-12);
             }
             void compute_doy(utctime t){
                 doy = utc.day_of_year(t);
@@ -169,7 +176,7 @@ TEST_SUITE("radiation") {
     // test basics: creation, etc
     // /TODO: prepare set of tests: 1. check vapor pressure result, 2. check atm_pressure vs elevation
 
-    TEST_CASE("check_earth_angles"){
+    TEST_CASE("check_doy"){
         calculator r;
         calendar utc_cal;
         double lat = 56.0;
@@ -179,18 +186,49 @@ TEST_SUITE("radiation") {
         t2 = utc_cal.time(1970, 6, 1, 12, 0, 0, 0);
         t3 = utc_cal.time(1970, 9, 1, 23, 30, 0, 0);
         r.ra_radiation(lat, lon, t1, 1);
-        FAST_CHECK_EQ(r.doy, doctest::Approx(1.0));// doy 1
-        FAST_CHECK_EQ(r.omega, doctest::Approx(-0.93));// earth hour angle
-        FAST_CHECK_EQ(r.delta, doctest::Approx(-0.31194));// earth declination angle
-        FAST_CHECK_EQ(r.local_time, doctest::Approx(10));// earth declination angle
+        FAST_CHECK_EQ(r.doy, doctest::Approx(1.0));// doy 1 January
+        //printf((r.local_time_str.c_str()), "%04d-%02d-%02dT%02d:%02d:%02d%s");
+        FAST_CHECK_EQ(r.local_time, doctest::Approx(10.50));// hour 1 January
         r.ra_radiation(lat, lon, t2, 1);
         FAST_CHECK_EQ(r.doy, doctest::Approx(152.0));// doy 1 June
-        FAST_CHECK_EQ(r.omega, doctest::Approx(15.59));// earth hour angle
-        FAST_CHECK_EQ(r.delta, doctest::Approx(0.070585));// earth declination angle
         r.ra_radiation(lat, lon, t3, 1);
         FAST_CHECK_EQ(r.doy, doctest::Approx(244.0));// doy 1 September
-        FAST_CHECK_EQ(r.omega, doctest::Approx(15.59));// earth hour angle
-        FAST_CHECK_EQ(r.delta, doctest::Approx(0.070585));// earth declination angle
+
+    }
+    TEST_CASE("check_hour_angle"){
+        /** compare to http://www.jgiesen.de/astro/suncalc/index.htm,  if withput EOT the hour angle is calculated as 15*(LT-12),
+         * so for 10.30 it is -22.5, see:https://en.wikipedia.org/wiki/Hour_angle*/
+        calculator r;
+        calendar utc_cal;
+        double lat = 56.0;
+        double lon = 66.31;
+        utctime t1, t2, t3;
+        t1 = utc_cal.time(1970, 1, 1, 10, 30, 0, 0);
+        t2 = utc_cal.time(1970, 6, 1, 12, 0, 0, 0);
+        t3 = utc_cal.time(1970, 9, 1, 23, 30, 0, 0);
+        r.ra_radiation(lat, lon, t1, 1);
+                FAST_CHECK_EQ(r.omega, doctest::Approx(-22.5));// earth hour angle
+        r.ra_radiation(lat, lon, t2, 1);
+                FAST_CHECK_EQ(r.omega, doctest::Approx(0.0));// earth hour angle
+        r.ra_radiation(lat, lon, t3, 1);
+                FAST_CHECK_EQ(r.omega, doctest::Approx(172.5));// earth hour angle
+
+    }
+    TEST_CASE("check_declination_angle"){
+        calculator r;
+        calendar utc_cal;
+        double lat = 56.0;
+        double lon = 66.31;
+        utctime t1, t2, t3;
+        t1 = utc_cal.time(1970, 1, 1, 10, 30, 0, 0);
+        t2 = utc_cal.time(1970, 6, 1, 12, 0, 0, 0);
+        t3 = utc_cal.time(1970, 9, 1, 23, 30, 0, 0);
+        r.ra_radiation(lat, lon, t1, 1);
+                FAST_CHECK_EQ(r.delta*180/shyft::core::pi, doctest::Approx(-23.06));// earth declination angle
+        r.ra_radiation(lat, lon, t2, 1);
+                FAST_CHECK_EQ(r.delta*180/shyft::core::pi, doctest::Approx(21.95));// earth declination angle
+        r.ra_radiation(lat, lon, t3, 1);
+                FAST_CHECK_EQ(r.delta*180/shyft::core::pi, doctest::Approx(8.4));// earth declination angle
 
     }
 
