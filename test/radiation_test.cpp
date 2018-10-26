@@ -42,52 +42,43 @@ namespace shyft::core {
 
             double latitude() const {return phi_;}// latitude, should be available from cell?/// TODO: add PROJ4 for conversion from cartesian to wgs84
 
-            double ra = 0.0; // extraterrestrial solar radiation for inclined surface[W/m2]
-            double rahor = 0.0; // extraterrestrial solar radiation for horizontal surfaces
-            double rso = 0.0; // clear sky solar radiation for inclined surface [W/m2]
+            double extrater_radiation() const {return ra_ ;} // extraterrestrial solar radiation for inclined surface[W/m2]
+            double extrater_radiation_hor() {return rahor_;} // extraterrestrial solar radiation for horizontal surfaces
+            double cs_radiation() const {return rso_ ;} // clear sky solar radiation for inclined surface [W/m2]
 
             double patm() const {return eatm_;}
             double ea() const {return ea_;}
 
 
-
-            /** \brief computes instantaneous extraterrestrial solar radiation
-             * \param latitude (phi)
-             * \param time
-             * \param surface normal
-             * \return ra [W/m2]*/
-
-            template <class V>
-            double ra_radiation(double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0 ){
-                compute_day_and_time(t);
-                // ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.574, eq.(D.5)
-                double G = 2*pi/365.0*(doy_-1);
-                delta_ = 0.006918 - 0.399912*cos(G)+0.070257*sin(G)- 0.006758*cos(2*G)+0.000907*sin(2*G) - 0.002697*cos(3*G)+0.00148*sin(3*G);
-                omega_ = hour_angle(lt_); // earth hour angle
-                costt_ = costt(omega_, delta_, latitude, slope_, aspect_);
-                costthor_ = costt(omega_, delta_, latitude);
-                ra = gsc*costt_*(1+0.0033*cos(doy_*2*pi/365)); // eq.(1)
-                rahor = gsc*costthor_*(1+0.0033*cos(doy_*2*pi/365)); // eq.(1) with cos(theta)hor
-
-                ///TODO: clean up
-                eatm_ = atm_pressure(elevation); // [kPa] atmospheric pressure as a function of elevation
-                ea_ = actual_vap_pressure(temperature, rhumidity); //[kPa] actual vapor pressure
-
-                return ra;
-            }
             /** \brief computes instantaneous clear-sky radiation  for inclined surfaces
              * \param temperature, [degC]
              * \param rhumidity, [percent]
              * \param time -- utctime
              * \param cell
              * \return rso, [W/m^2] -- clear sky radiation*/
-            template <class C>
-            double rso_cs_radiation(double temperature, double rhumidity, utctime t, const C& cell){
-                omega_ = hour_angle(utc.calendar_units(t).hour); // hour angle
+            template <class V>
+            double rso_cs_radiation(double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0 ){
+                doy_ = utc.day_of_year(t);
+                lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute/60.0;
+                delta_ = compute_earth_declination(doy_);
+                omega_ = hour_angle(lt_); // earth hour angle
+
+                arma::vec normal0{0.0,0.0,1.0}; // normal to horizontal plane
+                slope_ = acos(arma::norm_dot(surface_normal, normal0));
+                //slope_ = atan2(pow(pow(surface_normal(0),2)+pow(surface_normal(1),2),0.5),surface_normal(2));
+                aspect_ = pi - atan2(surface_normal(1),surface_normal(0));
+
+                costt_ = costt(omega_, delta_, latitude, slope_, aspect_); // eq.(14)
+                costthor_ = costt(omega_, delta_, latitude);
+
+                ra_ = compute_ra(costt_,doy_); // eq.(1)
+                rahor_ = compute_ra(costthor_,doy_); // eq.(1) with cos(theta)hor
+
                 double W; //equivalent depth of precipitable water in the atmosphere[mm]
-                eatm_ = atm_pressure(cell.midpoint().z); // [kPa] atmospheric pressure as a function of elevation
+                eatm_ = atm_pressure(elevation); // [kPa] atmospheric pressure as a function of elevation ///TODO: get elevation from cell.midpoint().z
                 ea_ = actual_vap_pressure(temperature, rhumidity); //[kPa] actual vapor pressure
                 W = 0.14*ea_*eatm_ + 2.1; // eq.(18)
+
                 double Kt = 1.0; // turbidity, 1.0 - clean, 0.5 -- dusty
                 double Kbo;
                 double sin_beta, sin_betahor;
@@ -107,10 +98,10 @@ namespace shyft::core {
 
                 double fi = 0.75 + 0.25*cos(slope_) - 0.5/pi*slope_;//eq.(32)
 
-                double fb = Kbo/Kbohor*ra/rahor;//eq.(34)
+                double fb = Kbo/Kbohor*ra_/rahor_;//eq.(34)
                 double fia = (1 - Kbohor)*(1+pow(Kbohor/(Kbohor+Kdohor),0.5)*pow(sin(slope_/2),3))*fi + fb*Kbohor; //eq.(33)
-                rso = Kbo*ra + (fia*Kdo + param.albedo*(1-fi)*(Kbo+Kdo))*rahor; // eq.(37)     direct beam + diffuse + reflected
-                return rso; // eq.(37)
+                rso_ = Kbo*ra_ + (fia*Kdo + param.albedo*(1-fi)*(Kbo+Kdo))*rahor_; // eq.(37)     direct beam + diffuse + reflected
+                return rso_; // eq.(37)
             }
         private:
             double delta_;
@@ -120,6 +111,10 @@ namespace shyft::core {
             double aspect_;
             double ea_;
             double eatm_;
+
+            double ra_ = 0.0; // extraterrestrial solar radiation for inclined surface[W/m2]
+            double rahor_ = 0.0; // extraterrestrial solar radiation for horizontal surfaces
+            double rso_ = 0.0; // clear sky solar radiation for inclined surface [W/m2]
 
             const double gsc = 1367; // W/m2 -- solar constant
             const double PatokPa = 0.001; // Pa to kPa
@@ -182,9 +177,14 @@ namespace shyft::core {
                 double LST = lt - TC/60; // local solar time
                 return 15*(lt-12); ///TODO: find right EOT and data for validation, so it should return: 15*(LST-12)
             }
-            void compute_day_and_time(utctime t){
-                doy_ = utc.day_of_year(t);
-                lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute/60.0;
+
+            double  compute_earth_declination(double doy){
+                // ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.574, eq.(D.5)
+                double G = 2*pi/365.0*(doy-1);
+                return  0.006918 - 0.399912*cos(G)+0.070257*sin(G)- 0.006758*cos(2*G)+0.000907*sin(2*G) - 0.002697*cos(3*G)+0.00148*sin(3*G);
+            }
+            double compute_ra(double cos_theta, double doy ){
+                return gsc*cos_theta*(1+0.0033*cos(doy*2*pi/365)); // eq.(1)
             }
         };
 
@@ -218,26 +218,7 @@ TEST_SUITE("radiation") {
     using std::vector;
     using shyft::core::utctime;
     // test basics: creation, etc
-    // /TODO: prepare set of tests: 1. check vapor pressure result, 2. check atm_pressure vs elevation
 
-   /* TEST_CASE("check_doy"){
-        parameter p;
-        calculator r(p);
-        calendar utc_cal;
-        double lat = 56.0;
-        utctime t1, t2, t3;
-        t1 = utc_cal.time(1970, 1, 1, 10, 30, 0, 0);
-        t2 = utc_cal.time(1970, 6, 1, 12, 0, 0, 0);
-        t3 = utc_cal.time(1970, 9, 1, 23, 30, 0, 0);
-        r.ra_radiation(lat, t1, 1);
-        FAST_CHECK_EQ(r.doy_, doctest::Approx(1.0));// doy 1 January
-        FAST_CHECK_EQ(r.lt_, doctest::Approx(10.50));// hour 1 January
-        r.ra_radiation(lat, t2, 1);
-        FAST_CHECK_EQ(r.doy_, doctest::Approx(152.0));// doy 1 June
-        r.ra_radiation(lat, t3, 1);
-        FAST_CHECK_EQ(r.doy_, doctest::Approx(244.0));// doy 1 September
-
-    }*/ // no need for checking doy anymore
     TEST_CASE("check_hour_angle"){
         /** \brief Check Earth Hour Angle
          * based on ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.574, no EOT correction provided*/
@@ -246,15 +227,16 @@ TEST_SUITE("radiation") {
         calendar utc_cal;
         double lat = 56.0;
         utctime t1, t2, t3;
+        arma::vec surface_normal({0.0,0.0,1.0});
         t1 = utc_cal.time(1970, 1, 1, 10, 30, 0, 0);
         t2 = utc_cal.time(1970, 6, 1, 12, 0, 0, 0);
         t3 = utc_cal.time(1970, 9, 1, 23, 30, 0, 0);
         // using simple formulae for checking, need to provide test for EOT
-        r.ra_radiation(lat, t1, 1);
+        r.rso_cs_radiation(lat, t1, surface_normal);
                 FAST_CHECK_EQ(r.hra(), doctest::Approx(-22.5));// earth hour angle
-        r.ra_radiation(lat, t2, 1);
+        r.rso_cs_radiation(lat, t2, surface_normal);
                 FAST_CHECK_EQ(r.hra(), doctest::Approx(0.0));// earth hour angle
-        r.ra_radiation(lat, t3, 1);
+        r.rso_cs_radiation(lat, t3, surface_normal);
                 FAST_CHECK_EQ(r.hra(), doctest::Approx(172.5));// earth hour angle
 
     }
@@ -266,33 +248,58 @@ TEST_SUITE("radiation") {
         calendar utc_cal;
         double lat = 56.0;
         utctime t1, t2, t3, t4;
+        arma::vec surface_normal({0.0,0.0,1.0});
         t1 = utc_cal.time(1970, 12, 21, 12, 30, 0, 0);
         t2 = utc_cal.time(1970, 6, 21, 12, 30, 0, 0);
         t3 = utc_cal.time(1970, 3, 21, 12, 30, 0, 0);
         t4 = utc_cal.time(1970, 9, 24, 12, 30, 0, 0);
-        r.ra_radiation(lat, t1, 1);
+        r.rso_cs_radiation(lat, t1, surface_normal);
                 FAST_CHECK_EQ(r.declination(), doctest::Approx(-23.5).epsilon(0.1));// earth declination angle 21/22 December (min)
-        r.ra_radiation(lat, t2, 1);
+        r.rso_cs_radiation(lat, t2, surface_normal);
                 FAST_CHECK_EQ(r.declination(), doctest::Approx(23.5).epsilon(0.1));// earth declination angle 21/22 June (max)
-        r.ra_radiation(lat, t3, 1);
+        r.rso_cs_radiation(lat, t3, surface_normal);
                 FAST_CHECK_EQ(r.declination(), doctest::Approx(0.0).epsilon(0.1));// earth declination angle 20/21 March 0
-        r.ra_radiation(lat, t4, 1);
+        r.rso_cs_radiation(lat, t4, surface_normal);
                 FAST_CHECK_EQ(r.declination(), doctest::Approx(0.0).epsilon(0.5));// earth declination angle 22/23 September 0 this gives a bit higher error
     }
-    TEST_CASE("check_pressures"){
+    TEST_CASE("check_atm_pressures"){
         parameter p;
         calculator r(p);
         calendar utc_cal;
         double lat = 56.0;
         utctime t;
+        arma::vec surface_normal({0.0,0.0,1.0});
         t = utc_cal.time(1970, 12, 21, 12, 30, 0, 0);
-        r.ra_radiation(lat, t, 1, 0.0, 0.0, 0.0);
+        r.rso_cs_radiation(lat, t, surface_normal, 0.0, 0.0, 0.0);
                 FAST_CHECK_EQ(r.patm(), doctest::Approx(101.325).epsilon(0.1));
-        r.ra_radiation(lat, t, 1, 0.0, 0.0, 1000.0);
-                FAST_CHECK_EQ(r.patm(), doctest::Approx(89.88).epsilon(0.1));
-        r.ra_radiation(lat, t, 1, 0.0, 0.0,  -1000.0);
+        r.rso_cs_radiation(lat, t, surface_normal, 0.0, 0.0, 1000.0);
+                FAST_CHECK_EQ(r.patm(), doctest::Approx(89.88).epsilon(0.1)); // https://onlinelibrary.wiley.com/doi/pdf/10.1002/9781118568101.app2
+        r.rso_cs_radiation(lat, t, surface_normal, 0.0, 0.0,  -1000.0);
                 FAST_CHECK_EQ(r.patm(), doctest::Approx(113.93).epsilon(0.1));
 
+    }
+    TEST_CASE("check_vap_pressure"){
+        /**\brief check saturation pressure (rhumidity=100)
+         * based ref.:  Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.113, fig.3.1*/
+        parameter p;
+        calculator r(p);
+        calendar utc_cal;
+        double lat = 56.0;
+        utctime t;
+        arma::vec surface_normal({0.0,0.0,1.0});
+        t = utc_cal.time(1970, 12, 21, 12, 30, 0, 0);
+        r.rso_cs_radiation(lat, t, surface_normal, 21.0, 100.0, 0.0);
+                FAST_CHECK_EQ(r.ea(), doctest::Approx(2.5).epsilon(0.01));
+        r.rso_cs_radiation(lat, t, surface_normal, 21.0, 50.0, 0.0);
+                FAST_CHECK_EQ(r.ea(), doctest::Approx(1.25).epsilon(0.01));
+        r.rso_cs_radiation(lat, t, surface_normal, 0.0, 100.0, 0.0);
+                FAST_CHECK_EQ(r.ea(), doctest::Approx(0.6).epsilon(0.01));
+        r.rso_cs_radiation(lat, t, surface_normal, 27.0, 100.0, 0.0);
+                FAST_CHECK_EQ(r.ea(), doctest::Approx(3.6).epsilon(0.01));
+        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 0.0);
+                FAST_CHECK_EQ(r.ea(), doctest::Approx(0.03).epsilon(0.01));
+                FAST_CHECK_EQ(r.slope(), doctest::Approx(0.0).epsilon(0.01));
+                FAST_CHECK_EQ(r.aspect(), doctest::Approx(3.14).epsilon(0.01));
     }
 
     TEST_CASE("surface_normal_from_cells") {
