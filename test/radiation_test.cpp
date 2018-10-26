@@ -34,13 +34,14 @@ namespace shyft::core {
             P param;
             explicit calculator(const P& p):param(p) {}
 
+            /// TODO: remove accessing functions after all tests
             double declination() const {return delta_*180/pi;}  // declination of the earth, [deg], positive for northern hemisphere summer
             double hra() const {return omega_;} // earth hour angle, [deg]
 
             double slope() const {return slope_;} // horizontal slope, should be calculated from normal vector
             double aspect() const {return aspect_;} // surface aspect angle, 0 -- due south, -pi/2 -- due east, pi/2 -- due west, +-pi -- due north
 
-            double latitude() const {return phi_;}// latitude, should be available from cell?/// TODO: add PROJ4 for conversion from cartesian to wgs84
+            double latitude() const {return phi_;}// latitude, [deg] should be available from cell?/// TODO: add PROJ4 for conversion from cartesian to wgs84
 
             double extrater_radiation() const {return ra_ ;} // extraterrestrial solar radiation for inclined surface[W/m2]
             double extrater_radiation_hor() {return rahor_;} // extraterrestrial solar radiation for horizontal surfaces
@@ -135,8 +136,10 @@ namespace shyft::core {
                 c = cos(delta)*sin(s)*sin(gamma);
                 return  -a + b*cos(omega) + c*sin(omega); // eq.14
             }
-            double sinomega(){
-                return 0.0;
+            double sun_rise_set(double delta, double phi){
+                if (delta+phi)>pi/2 {omega_s = pi;}; // for northern hemisphere
+                if (delta-phi)>pi/2 {omega_s = 0;};
+                return omega_s;
             }
             /** \brief computes standard atmospheric pressure
              * \param height, [m] -- elevation of the point
@@ -298,10 +301,20 @@ TEST_SUITE("radiation") {
                 FAST_CHECK_EQ(r.ea(), doctest::Approx(3.6).epsilon(0.01));
         r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 0.0);
                 FAST_CHECK_EQ(r.ea(), doctest::Approx(0.03).epsilon(0.01));
+    }
+    TEST_CASE("check_slope_aspect"){
+        /**\brief check slope and aspect*/
+        parameter p;
+        calculator r(p);
+        calendar utc_cal;
+        double lat = 56.0;
+        utctime t;
+        arma::vec surface_normal({0.0,0.0,1.0});
+        t = utc_cal.time(1970, 12, 21, 12, 30, 0, 0);
+        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 0.0);
                 FAST_CHECK_EQ(r.slope(), doctest::Approx(0.0).epsilon(0.01));
                 FAST_CHECK_EQ(r.aspect(), doctest::Approx(3.14).epsilon(0.01));
     }
-
     TEST_CASE("surface_normal_from_cells") {
         vector<cell> cells;
         auto r= surface_normal(cells);
