@@ -136,9 +136,50 @@ namespace shyft::core {
                 c = cos(delta)*sin(s)*sin(gamma);
                 return  -a + b*cos(omega) + c*sin(omega); // eq.14
             }
-            double sun_rise_set(double delta, double phi){
-                if (delta+phi)>pi/2 {omega_s = pi;}; // for northern hemisphere
-                if (delta-phi)>pi/2 {omega_s = 0;};
+            double sun_rise_set(double delta, double phi, double slope, double aspect,std::string hemisphere="N"){
+                ///TODO get info about hemisphere from data, don't see anything in geopoint, but it is inside netcdf file
+                double omega_s; // omega_s -- time of potential horizontal sunset, -omega_s --time of horizontal sunrize
+                if (hemisphere.compare("N")) {
+                    if ((delta + phi) > pi / 2) { omega_s = pi; } // for northern hemisphere
+                    if ((delta - phi) > pi / 2) { omega_s = 0; }
+                }
+                else {
+                    if ((delta + phi) < -pi / 2) { omega_s = pi; } // for southern hemisphere
+                    if ((delta - phi) < -pi / 2) { omega_s = 0; }
+                }
+                double omega1_24, omega2_24;
+                double costt_sunset = costt(omega_s, delta, phi, slope, aspect);
+                double costt_sunrise = costt(-omega_s, delta, phi, slope, aspect);
+                double bbcc = b*b + c*c > 0.0 ? b*b+c*c : b*b+c*c+0.0001;
+                double sqrt_bca = bbcc-a*a>0.0? bbcc-a*a : 0.0001;
+                double sin_omega1 = min(1.0, max(-1.0,(a*c - b*pow(sqrt_bca,0.5))/bbcc));//eq.(13a)
+                double omega1 = asin(sin_omega1);
+                double costt_omega1 = costt(omega1,delta,phi,slope,aspect);
+                bool omega1_valid = false;
+                if ((costt_sunrise <=costt_omega1) and (costt_omega1<0.001)){omega1_24=omega1;}
+                else {
+                    omega1 = -pi-omega1;
+                    if (costt(omega1,delta,phi,slope,aspect) > 0.001){omega1_24 = -omega_s;}
+                    else {
+                        if (omega1<=-omega_s){omega1_24 = -omega_s;}
+                        else {omega1_24 = omega1;}
+                    }
+                }
+                if (omega1_24<-omega_s){omega1_24 = -omega_s;}
+                double sin_omega2 = min(1.0,max(-1.0,(a*c + b*pow(sqrt_bca,0.5))/bbcc));//eq.(13b)
+                double omega2 = asin(sin_omega2);
+                double costt_omega2 = costt(omega2,delta,phi,slope,aspect);
+                if (costt_sunset<=costt_omega2 and costt_omega2<0.001){omega2_24 = omega2;}
+                else {
+                    omega2 = pi-omega2;
+                    if (costt(omega2,delta,phi,slope,aspect)>0.001){omega2_24 = omega_s;}
+                    else{
+                        if (omega2>=omega_s){omega2_24=omega_s;}
+                        else{omega2_24 = omega2;}
+                    }
+                }
+                if (omega2_24> omega_s){omega2_24 = omega_s;}
+                if (omega1_24<omega2_24) {omega1_24=omega2_24;}//slope is always shaded
                 return omega_s;
             }
             /** \brief computes standard atmospheric pressure
