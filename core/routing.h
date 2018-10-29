@@ -103,9 +103,9 @@ namespace shyft {
                 river&operator=(const river&)=default;
                 river&operator=(river&&)=default;
                 // python support
-                river(int id,shyft::core::routing_info downstream=shyft::core::routing_info(),uhg_parameter p=uhg_parameter()):
+                river(int64_t id,shyft::core::routing_info downstream=shyft::core::routing_info(),uhg_parameter p=uhg_parameter()):
                     id(id),downstream(downstream),parameter(p) {}
-                int id;///< self.id, >0 means valid id, <=0 means null
+                int64_t id;///< self.id, >0 means valid id, <=0 means null
                 shyft::core::routing_info downstream;///< downstream routing info, where to, and the static distance measure
                 uhg_parameter parameter;///< We assume each river do have distinct parameter, so no shared pointer
                 // here we could have a link to the observed time-series (can use the self.id to associate)
@@ -143,9 +143,9 @@ namespace shyft {
              * to enable external simplified description and association.
              */
             struct river_network {
-                std::map<int,river> rid_map;///< user operates on rivers based on river-id, we map this here
+                std::map<int64_t,river> rid_map;///< user operates on rivers based on river-id, we map this here
 
-                void check_rid(int rid, bool must_exist=true) const {
+                void check_rid(int64_t rid, bool must_exist=true) const {
                     if(!valid_routing_id(rid)) throw std::runtime_error("valid river|routing id must be >0");
                     if(must_exist)
                         if(rid_map.find(rid)==rid_map.end())
@@ -154,7 +154,7 @@ namespace shyft {
 
                 /** verify there is no directed cycles in the river-network */
                 bool network_contains_directed_cycle() const {
-                    std::map<int,bool> not_visited;
+                    std::map<int64_t,bool> not_visited;
                     for(auto it=rid_map.cbegin();it!=rid_map.cend();++it)
                         not_visited[it->first]=false;
                     for(auto it=rid_map.cbegin();it!=rid_map.cend();++it) {
@@ -191,7 +191,7 @@ namespace shyft {
                     return *this;
                 }
                 ///< .remove_by_id(river-id)
-                void remove_by_id(int rid) {
+                void remove_by_id(int64_t rid) {
                     check_rid(rid);
                     auto upstreams=upstreams_by_id(rid);
                     for(auto i:upstreams)
@@ -199,26 +199,26 @@ namespace shyft {
                     rid_map.erase(rid);
                 }
                 ///< .river(river-id).. --> the river-object itself, r/w
-                river& river_by_id(int rid) {
+                river& river_by_id(int64_t rid) {
                     check_rid(rid);
                     return rid_map[rid];
                 }
-                river river_by_id2(int rid) { check_rid(rid); return rid_map[rid];}
+                river river_by_id2(int64_t rid) { check_rid(rid); return rid_map[rid];}
                 const river& river_by_id(int rid) const {
                     check_rid(rid);
                     return rid_map.find(rid)->second;
                 }
 
-                std::vector<int> upstreams_by_id(int rid) const {
+                std::vector<int64_t> upstreams_by_id(int rid) const {
                     check_rid(rid);
-                    std::vector<int> rids;
+                    std::vector<int64_t> rids;
                     for(auto it=rid_map.cbegin();it!=rid_map.cend();++it) {
                         if(it->second.downstream.id==rid)
                             rids.push_back(it->first);
                     }
                     return rids;
                 }
-                std::vector<int> all_upstreams_by_id(int rid) const {
+                std::vector<int64_t> all_upstreams_by_id(int rid) const {
                     check_rid(rid);
                     auto rids=upstreams_by_id(rid);
                     auto n =rids.size();//since we are going to extend it in loop below
@@ -230,7 +230,7 @@ namespace shyft {
                     return rids;
                 }
 
-                int downstream_by_id(int rid) const {
+                int downstream_by_id(int64_t rid) const {
                     check_rid(rid);
                     return rid_map.find(rid)->second.downstream.id;
                 }
@@ -341,7 +341,7 @@ namespace shyft {
                 /** compute the local lateral inflow from connected shyft-cells into given river-id
                  *
                  */
-                rts_t local_inflow(int node_id) const {
+                rts_t local_inflow(int64_t node_id) const {
                     rts_t r(ta,0.0,time_series::POINT_AVERAGE_VALUE);// default null to null ts.
                     for (const auto& c : *cells) {
                         if (c.geo.routing.id == node_id) {
@@ -357,7 +357,7 @@ namespace shyft {
                  * Notice that this is a recursive function that will go upstream
                  * and collect *all* upstream flow
                  */
-                rts_t upstream_inflow(int node_id) const {
+                rts_t upstream_inflow(int64_t node_id) const {
                     rts_t r(ta, 0.0, time_series::POINT_AVERAGE_VALUE);
                     auto upstream_ids=rivers->upstreams_by_id(node_id);
                     for(auto upstream_id:upstream_ids) {
@@ -374,7 +374,7 @@ namespace shyft {
                  * This is a walk in the park, since we can just use
                  * already existing (possibly recursive) functions to do the work.
                  */
-                rts_t output_m3s(int node_id) const {
+                rts_t output_m3s(int64_t node_id) const {
                     utctimespan dt = ta.delta(); // for now need to pick up delta from the sources
                     std::vector<double> uhg_weights = rivers->river_by_id(node_id).uhg(dt);
                     auto sum_input_m3s = local_inflow(node_id)+ upstream_inflow(node_id);

@@ -195,14 +195,14 @@ namespace shyft {
 
 			/**throws runtime_error if catchment_indexes contains cid that's not part of cells */
 			template<typename cell>
-			static void verify_cids_exist(const vector<cell>& cells, const vector<int>& indexes,stat_scope it) {
+			static void verify_cids_exist(const vector<cell>& cells, const vector<int64_t>& indexes,stat_scope it) {
 				if (indexes.size() == 0) return;
                 if(it==stat_scope::cell_ix) {
                     for(auto cid:indexes)
                         if(cid <0 || cid >(int)cells.size())
                             throw runtime_error(string("Supplied cell index reference ")+ to_string(cid)+" is ouside valid range 0 .."+to_string(cells.size()));
                 } else {
-                    map<int, bool> all_cids;
+                    map<int64_t, bool> all_cids;
                     for (const auto&c : cells) all_cids[c.geo.catchment_id()] = true;
                     for(auto cid:indexes)
                         if (all_cids.count(cid) == 0)
@@ -211,8 +211,8 @@ namespace shyft {
 			}
 			/** returns true if cell matches index_type criteria  */
 			template<typename cell>
-			inline static bool is_match(const cell&c,stat_scope it,int cid,size_t i) {
-                return (it==stat_scope::cell_ix && cid==int(i)) || (it==stat_scope::catchment_ix && c.geo.catchment_id() == (size_t) cid);
+			inline static bool is_match(const cell&c,stat_scope it,int64_t cid,size_t i) {
+                return (it==stat_scope::cell_ix && cid==int64_t(i)) || (it==stat_scope::catchment_ix && c.geo.catchment_id() == (size_t) cid);
             }
 
             /** \brief average_catchment_feature returns the area-weighted average
@@ -226,7 +226,7 @@ namespace shyft {
              * \return area weighted feature sum, as a ts, a  shared_ptr<pts_ts>
              */
             template<typename cell, typename cell_feature_ts>
-            static shared_ptr<pts_t> average_catchment_feature(const vector<cell>& cells, const vector<int>& catchment_indexes,
+            static shared_ptr<pts_t> average_catchment_feature(const vector<cell>& cells, const vector<int64_t>& catchment_indexes,
                                                                cell_feature_ts&& cell_ts, stat_scope it=stat_scope::catchment_ix) {
                 if (cells.size() == 0)
                     throw runtime_error("no cells to make statistics on");
@@ -267,7 +267,7 @@ namespace shyft {
 			* \return area weighted feature sum, as a double value
 			*/
 			template<typename cell, typename cell_feature_ts>
-			static double average_catchment_feature_value(const vector<cell>& cells, const vector<int>& indexes,
+			static double average_catchment_feature_value(const vector<cell>& cells, const vector<int64_t>& indexes,
 				cell_feature_ts&& cell_ts,size_t j, stat_scope it=stat_scope::catchment_ix) {
 				if (cells.size() == 0)
 					throw runtime_error("no cells to make statistics on");
@@ -306,7 +306,7 @@ namespace shyft {
              * \return feature sum, as a ts, a  shared_ptr<pts_ts>
              */
 			template<typename cell, typename cell_feature_ts>
-            static shared_ptr<pts_t> sum_catchment_feature(const vector<cell>& cells, const vector<int>& indexes,
+            static shared_ptr<pts_t> sum_catchment_feature(const vector<cell>& cells, const vector<int64_t>& indexes,
                                                            cell_feature_ts && cell_ts,stat_scope it=stat_scope::catchment_ix) {
                 if (cells.size() == 0)
                     throw runtime_error("no cells to make statistics on");
@@ -343,7 +343,7 @@ namespace shyft {
 			* \return feature sum, as a ts, a  shared_ptr<pts_ts>
 			*/
 			template<typename cell, typename cell_feature_ts>
-			static double sum_catchment_feature_value(const vector<cell>& cells, const vector<int>& indexes,
+			static double sum_catchment_feature_value(const vector<cell>& cells, const vector<int64_t>& indexes,
 				cell_feature_ts && cell_ts, size_t j,stat_scope it=stat_scope::catchment_ix) {
 				if (cells.size() == 0)
 					throw runtime_error("no cells to make statistics on");
@@ -379,7 +379,7 @@ namespace shyft {
 			* \return vector filled with feature for the j'th time-step on timeaxis
 			*/
 			template<typename cell, typename cell_feature_ts>
-			static vector<double> catchment_feature(const vector<cell>& cells, const vector<int>& catchment_indexes,
+			static vector<double> catchment_feature(const vector<cell>& cells, const vector<int64_t>& catchment_indexes,
 				cell_feature_ts && cell_ts,size_t j, stat_scope it=stat_scope::catchment_ix) {
 				if (cells.size() == 0)
 					throw runtime_error("no cells to make extract from");

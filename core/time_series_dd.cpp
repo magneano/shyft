@@ -787,7 +787,7 @@ namespace shyft{
 			return true;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const intv_t& percentile_list) {
 			std::vector<apoint_ts> r; r.reserve(percentile_list.size());
 			auto tsvx = deflate_ts_vector<gts_t>(tsv1);
 			// check of all tsvx.time_axis is of same type
@@ -828,7 +828,7 @@ namespace shyft{
 			return r;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const intv_t& percentile_list) {
 			return percentiles(ts_list, time_axis::generic_dt(ta), percentile_list);
 		}
 

@@ -37,7 +37,7 @@ namespace expose {
                               "  radiation_slope_factor def 0.9\n"
                               "  routing_info def(0,0.0), i.e. not routed and hydrological distance=0.0m\n"
         )
-        .def(init<geo_point,double,int,py::optional<double,const land_type_fractions&,routing_info>>(
+        .def(init<geo_point,double,int64_t,py::optional<double,const land_type_fractions&,routing_info>>(
          (py::arg("self"),py::arg("mid_point"),py::arg("area"),py::arg("catchment_id"),py::arg("radiation_slope_factor"),py::arg("land_type_fractions"),py::arg("routing_info")),
          doc_intro("Constructs a GeoCellData with all parameters specified")
          doc_parameters()

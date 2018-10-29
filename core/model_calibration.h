@@ -293,7 +293,7 @@ namespace shyft {
                  * \param catchment_property_ determines if this target specification is for DISCHARGE|SNOW_COVERED_AREA|SNOW_WATER_EQUIVALENT
                  * \param uid a user supplied uid, string, to help user correlate this target to external data-sources
                  */
-                target_specification(const target_time_series_t& ts, const vector<int>& cids, double scale_factor,
+                target_specification(const target_time_series_t& ts, const vector<int64_t>& cids, double scale_factor,
                     target_spec_calc_type calc_mode = NASH_SUTCLIFFE, double s_r = 1.0,
                     double s_a = 1.0, double s_b = 1.0, target_property_type catchment_property_ = DISCHARGE, std::string uid = "")
                     : ts(ts), catchment_indexes(cids), scale_factor(scale_factor),
@@ -310,15 +310,15 @@ namespace shyft {
                 * \param s_b scale factor b in kling-gupta
                 * \param uid a user supplied uid, string, to help user correlate this target to external data-sources
                 */
-                target_specification(const target_time_series_t& ts, int river_id, double scale_factor,
+                target_specification(const target_time_series_t& ts, int64_t river_id, double scale_factor,
                     target_spec_calc_type calc_mode = NASH_SUTCLIFFE, double s_r = 1.0,
                     double s_a = 1.0, double s_b = 1.0, std::string uid = "")
                     : ts(ts), river_id(river_id), scale_factor(scale_factor),
                     calc_mode(calc_mode), catchment_property(ROUTED_DISCHARGE), s_r(s_r), s_a(s_a), s_b(s_b), uid(uid) {
                 }
                 target_time_series_t ts; ///< The target ts, - any type that is time-series compatible
-                std::vector<int> catchment_indexes; ///< the catchment_indexes that denotes the catchments in the model that together should match the target ts
-                int river_id=0;///< in case of catchment_property = ROUTED_DISCHARGE, this identifies the river id to get discharge for
+                std::vector<int64_t> catchment_indexes; ///< the catchment_indexes that denotes the catchments in the model that together should match the target ts
+                int64_t river_id=0;///< in case of catchment_property = ROUTED_DISCHARGE, this identifies the river id to get discharge for
                 double scale_factor; ///<< the scale factor to be used when considering multiple target_specifications.
                 target_spec_calc_type calc_mode;///< *NASH_SUTCLIFFE, KLING_GUPTA
                 target_property_type catchment_property;///<  *DISCHARGE,SNOW_COVERED_AREA, SNOW_WATER_EQUIVALENT, ROUTED_DISCHARGE
@@ -522,7 +522,7 @@ namespace shyft {
                     n_catchments = model.number_of_catchments();
                     // 3. figure out the catchment indexes to evaluate..
                     //    and if we need to turn on snow collection
-                    vector<int> catchment_indexes;
+                    vector<int64_t> catchment_indexes;
 
                     model.set_snow_sca_swe_collection(-1, false);//turn off all snow by default.
                     for (const auto&t : targets) {

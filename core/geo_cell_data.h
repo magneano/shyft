@@ -9,7 +9,9 @@ See file COPYING for more details **/
 
 namespace shyft {
     namespace core {
-
+        using cid_t=int64_t;
+        using cids_t=std::vector<cid_t>;
+    
         /** \brief LandTypeFractions are used to describe 'type of land'
          *   like glacier, lake, reservoir and forest.
          *
@@ -106,12 +108,12 @@ namespace shyft {
 			geo_cell_data() :catchment_ix(0),area_m2(default_area_m2),catchment_id_(-1),radiation_slope_factor_(default_radiation_slope_factor){}
 
 			geo_cell_data(const geo_point& mid_point,double area=default_area_m2,
-                int catchment_id = -1, double radiation_slope_factor=default_radiation_slope_factor,const land_type_fractions& land_type_fraction=land_type_fractions(),routing_info routing_inf=routing_info()):
+                int64_t catchment_id = -1, double radiation_slope_factor=default_radiation_slope_factor,const land_type_fractions& land_type_fraction=land_type_fractions(),routing_info routing_inf=routing_info()):
 				routing(routing_inf),mid_point_(mid_point), area_m2(area), catchment_id_(catchment_id),radiation_slope_factor_(radiation_slope_factor),fractions(land_type_fraction)
 			{}
 			const geo_point& mid_point() const { return mid_point_; }
-			size_t catchment_id() const { return catchment_id_; }
-			void set_catchment_id(size_t catchmentid) {catchment_id_=catchmentid;}
+			cid_t catchment_id() const { return catchment_id_; }
+			void set_catchment_id(cid_t catchmentid) {catchment_id_=catchmentid;}
 			double radiation_slope_factor() const { return radiation_slope_factor_; }
 			const land_type_fractions& land_type_fractions_info() const { return fractions; }
 			void set_land_type_fractions(const land_type_fractions& ltf) { fractions = ltf; }
@@ -126,7 +128,7 @@ namespace shyft {
 
 			geo_point mid_point_; // midpoint
 			double area_m2; //m2
-			size_t catchment_id_;
+			cid_t catchment_id_;
 			double radiation_slope_factor_;
 			land_type_fractions fractions;
 			// geo-type  parts, interesting for some/most response routines, sum fractions should be <=1.0

@@ -172,11 +172,11 @@ struct py_server : server<standard_dtss_dispatcher> {
             unique_lock<mutex> lck(mx);
             impl.reopen(timeout_ms);
         }
-        ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
+        ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
             scoped_gil_release gil;
             unique_lock<mutex> lck(mx);
-            std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
-            return impl.percentiles(tsv,p,ta,p_spec,use_ts_cached_read,update_ts_cache);
+            //std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
+            return impl.percentiles(tsv,p,ta,percentile_spec,use_ts_cached_read,update_ts_cache);
         }
         ts_vector_t evaluate(const ts_vector_t& tsv, core::utcperiod p,bool use_ts_cached_read,bool update_ts_cache) {
             scoped_gil_release gil;

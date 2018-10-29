@@ -6,7 +6,7 @@ namespace expose {
     namespace statistics {
         typedef shyft::time_series::dd::apoint_ts rts_;
         typedef std::vector<double> vd_;
-        typedef const std::vector<int>& cids_;
+        typedef const std::vector<int64_t>& cids_;
         typedef size_t ix_;
         using shyft::core::stat_scope;
         using namespace boost::python;
