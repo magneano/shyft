@@ -545,7 +545,7 @@ TEST_SUITE("radiation") {
                 FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
 
     }
-    TEST_CASE("check_solar_radiation_slope_45s"){
+    TEST_CASE("check_solar_radiation_slope_90s"){
         parameter p;
         p.albedo = 0.2;
         p.turbidity = 1.0;
