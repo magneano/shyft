@@ -20,7 +20,8 @@ namespace shyft::core {
 
         struct parameter {
             double albedo = 0.1; // average albedo of the surrounding ground surface:0.15-0.25 -- grass, 0.10-0.15 -- coniferous forest, 0.15 - 0.25 -- deciduous forest, 0.04-0.08 -- open water, 0.15-0.35 -- bare soil
-            parameter(double albedo = 0.1):albedo(albedo){}
+            double turbidity = 1.0; // 1.0 - clean, 0.5 -- dusty
+            parameter(double albedo = 0.1, double turbidity = 1.0):albedo(albedo),turbidity(turbidity){}
         };
 
         //struct state {}; // No state variables for this method
@@ -43,9 +44,10 @@ namespace shyft::core {
 
             double latitude() const {return phi_*rad2deg;}// latitude, [deg] should be available from cell?/// TODO: add PROJ4 for conversion from cartesian to wgs84
 
-            double extrater_radiation() const {return ra_ ;} // extraterrestrial solar radiation for inclined surface[W/m2]
-            double extrater_radiation_hor() {return rahor_;} // extraterrestrial solar radiation for horizontal surfaces
-            double cs_radiation() const {return rso_ ;} // clear sky solar radiation for inclined surface [W/m2]
+            double ra_radiation() const {return ra_ ;} // extraterrestrial solar radiation for inclined surface[W/m2]
+            double ra_radiation_hor() {return rahor_;} // extraterrestrial solar radiation for horizontal surfaces
+            double rs_radiation()const {return rs_;}
+            double rso_radiation() const {return rso_ ;} // clear sky solar radiation for inclined surface [W/m2]
 
             double patm() const {return eatm_;}
             double ea() const {return ea_;}
@@ -55,6 +57,7 @@ namespace shyft::core {
 
 
             /** \brief computes instantaneous clear-sky radiation  for inclined surfaces
+             * \param latitude, [deg]
              * \param temperature, [degC]
              * \param rhumidity, [percent]
              * \param time -- utctime
@@ -71,28 +74,27 @@ namespace shyft::core {
                 slope_ = acos(arma::norm_dot(surface_normal, normal0));
                 //slope_ = atan2(pow(pow(surface_normal(0),2)+pow(surface_normal(1),2),0.5),surface_normal(2));
                 aspect_ = pi - atan2(surface_normal(1),surface_normal(0));
-
-                compute_abc(delta_,latitude,slope_,aspect_);
+                phi_ = latitude*pi/180;
+                compute_abc(delta_,phi_,slope_,aspect_);
                 costt_ = costt(omega_); // eq.(14)
-                compute_abc(delta_,latitude);
+                compute_abc(delta_,phi_);
                 costthor_ = costt(omega_);
 
-                ra_ = compute_ra(costt_,doy_); // eq.(1)
-                rahor_ = compute_ra(costthor_,doy_); // eq.(1) with cos(theta)hor
+                ra_ = max(0.0,compute_ra(costt_,doy_)); // eq.(1)
+                rahor_ = max(0.0,compute_ra(costthor_,doy_)); // eq.(1) with cos(theta)hor
 
                 double W; //equivalent depth of precipitable water in the atmosphere[mm]
                 eatm_ = atm_pressure(elevation); // [kPa] atmospheric pressure as a function of elevation ///TODO: get elevation from cell.midpoint().z
                 ea_ = actual_vap_pressure(temperature, rhumidity); //[kPa] actual vapor pressure
                 W = 0.14*ea_*eatm_ + 2.1; // eq.(18)
 
-                double Kt = 1.0; // turbidity, 1.0 - clean, 0.5 -- dusty
                 double Kbo;
                 double sin_beta, sin_betahor;
-                sin_betahor = costthor_; // eq.(20) equal to (4), cos_tthor = sin_betahor /// TODO: check if cos_tt = sin_beta is true for inclined surface
+                sin_betahor = costthor_ ; // eq.(20) equal to (4), cos_tthor = sin_betahor /// TODO: check if cos_tt = sin_beta is true for inclined surface
                 sin_beta = costt_;
                 // clearness index for direct beam radiation
-                Kbo = 0.98 * exp(-0.00146*eatm_/Kt/sin_beta - 0.075*pow(W/sin_beta,0.4)); // eq.(17)
-                double Kbohor = 0.98 * exp(-0.00146*eatm_/Kt/sin_betahor - 0.075*pow(W/sin_betahor,0.4)); // eq.(17)
+                Kbo = 0.98 * exp(-0.00146*eatm_/param.turbidity/sin_beta - 0.075*pow((W/sin_beta),0.4)); // eq.(17)
+                double Kbohor = 0.98 * exp(-0.00146*eatm_/param.turbidity/sin_betahor - 0.075*pow((W/sin_betahor),0.4)); // eq.(17)
                 double Kdo; // transmissivity of diffuse radiation, eq.(19)a,b,c
                 if (Kbo >= 0.15){Kdo = 0.35 - 0.36*Kbo;}
                 else if (Kbo < 0.15 and Kbo > 0.065){Kdo = 0.18 + 0.82*Kbo;}
@@ -102,14 +104,29 @@ namespace shyft::core {
                 else if (Kbohor < 0.15 and Kbohor > 0.065){Kdohor = 0.18 + 0.82*Kbohor;}
                 else {Kdohor = 0.10 + 2.08 * Kbohor;}
 
-                double fi = 0.75 + 0.25*cos(slope_) - 0.5/pi*slope_;//eq.(32)
+                double fi_ = fi();//eq.(32)
 
-                double fb = Kbo/Kbohor*ra_/rahor_;//eq.(34)
-                double fia = (1 - Kbohor)*(1+pow(Kbohor/(Kbohor+Kdohor),0.5)*pow(sin(slope_/2),3))*fi + fb*Kbohor; //eq.(33)
-                rso_ = Kbo*ra_ + (fia*Kdo + param.albedo*(1-fi)*(Kbo+Kdo))*rahor_; // eq.(37)     direct beam + diffuse + reflected
-                compute_sun_rise_set(delta_,latitude,slope_,aspect_);
-                if (omega_ < omega1_24_ or omega_>omega2_24_){rso_=0.0;}
+                fb_ = Kbo/Kbohor*ra_/rahor_;//eq.(34)
+                double fia_ = fia(Kbohor,Kdohor); //eq.(33)
+                rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
+                compute_sun_rise_set(delta_,phi_,slope_,aspect_);
+                if (omega1_24_ > omega2_24_) {omega1_24_ = omega2_24_; rso_ = 0.0;}//slope is always shaded
                 return rso_; // eq.(37)
+            }
+
+            /**\brief translates measured solar radiation from horizontal surfaces to slopes
+             * \param rsm,[W/m^2] -- measured solar radiation
+             * \return equivalent solar radiation on a sloping surface */
+            double rs_radiation(double rsm){
+                double tauswhor = rsm/rahor_; //? not sure if we use a theoretical rahor here
+                double KBhor;
+                if (tauswhor>=0.42){KBhor = 1.56*tauswhor-0.55;}
+                else if (tauswhor>0.175 and tauswhor <0.42){KBhor = 0.022 - 0.280*tauswhor+0.828*tauswhor*tauswhor+0.765*pow(tauswhor,3);}
+                else {KBhor = 0.016*tauswhor;}
+                double KDhor = tauswhor - KBhor;
+
+                rs_ = rsm * (fb_*KBhor/tauswhor+fia(KBhor,KDhor)*KDhor/tauswhor+param.alpha*(1-fi())); /// TODO check if all theoretical things calculated before calling this function
+                return rs_;
             }
         private:
             double delta_;
@@ -123,6 +140,7 @@ namespace shyft::core {
             double ra_ = 0.0; // extraterrestrial solar radiation for inclined surface[W/m2]
             double rahor_ = 0.0; // extraterrestrial solar radiation for horizontal surfaces
             double rso_ = 0.0; // clear sky solar radiation for inclined surface [W/m2]
+            double rs_ = 0.0; // equivalent solar radiation on a sloping surface based on measured horizontal radiation
 
             const double gsc = 1367; // W/m2 -- solar constant
             const double Pa2kPa = 0.001; // Pa to kPa
@@ -134,6 +152,7 @@ namespace shyft::core {
             double costt_, costthor_;
             double a_,b_,c_;
             double omega1_24_,omega2_24_,omega1_24b_,omega2_24b_; //integration limits, actual periods of sun
+            double fb_;
 
             /** \brief computes necessary geometric parameters
              * \param omega, [rad] -- hour angle
@@ -159,7 +178,7 @@ namespace shyft::core {
              * \param hemisphere_str -- "N" or "S"
              * calculates  local variables omega1_24_, omega2_24_, omega1_24b_, omega2_24b_*/
             void compute_sun_rise_set(double delta, double phi, double slope, double aspect,std::string hemisphere="N"){
-                ///TODO get info about hemisphere from data, don't see anything in geopoint, but it is inside netcdf file
+                ///TODO get info about hemisphere from data, don't see anything in geopoint, but it is inside netcdf file -- add geopoint_with_crs to interface
                 double omega_s; // omega_s -- time of potential horizontal sunset, -omega_s --time of horizontal sunrize
                 if (hemisphere.compare("N")) {
                     if ((delta + phi) > pi / 2) { omega_s = pi; } // for northern hemisphere
@@ -181,32 +200,32 @@ namespace shyft::core {
                 double sin_omega1 = min(1.0, max(-1.0,(a_*c_ - b_*pow(sqrt_bca,0.5))/bbcc));//eq.(13a)
                 double omega1 = asin(sin_omega1);
                 omega1_24_=omega1;
-//                double costt_omega1 = costt(omega1);
-//                if ((costt_sunrise <= costt_omega1) and (costt_omega1<0.001)){omega1_24_=omega1;}
-//                else {
-//                    omega1 = -pi-omega1;
-//                    if (costt(omega1) > 0.001){omega1_24_ = -omega_s;}
-//                    else {
-//                        if (omega1<=-omega_s){omega1_24_ = -omega_s;}
-//                        else {omega1_24_ = -omega1;}
-//                    }
-//                }
-//                if (omega1_24_<-omega_s){omega1_24_ = -omega_s;}
+                double costt_omega1 = costt(omega1);
+                if ((costt_sunrise <= costt_omega1) and (costt_omega1<0.001)){omega1_24_=omega1;}
+                else {
+                    omega1 = -pi-omega1;
+                    if (costt(omega1) > 0.001){omega1_24_ = -omega_s;}
+                    else {
+                        if (omega1<=-omega_s){omega1_24_ = -omega_s;}
+                        else {omega1_24_ = -omega1;}
+                    }
+                }
+                if (omega1_24_<-omega_s){omega1_24_ = -omega_s;}
                 double sin_omega2 = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));//eq.(13b)
                 double omega2 = asin(sin_omega2);
                 omega2_24_=omega2;
-//                double costt_omega2 = costt(omega2);
-//                if (costt_sunset<=costt_omega2 and costt_omega2<0.001){omega2_24_ = omega2;}
-//                else {
-//                    omega2 = pi-omega2;
-//                    if (costt(omega2)>0.001){omega2_24_ = omega_s;}
-//                    else{
-//                        if (omega2>=omega_s){omega2_24_ = omega_s;}
-//                        else{omega2_24_ = omega2;}
-//                    }
-//                }
-//                if (omega2_24_ > omega_s){omega2_24_ = omega_s;}
-//                if (omega1_24_ < omega2_24_) {omega1_24_ = omega2_24_;}//slope is always shaded
+                double costt_omega2 = costt(omega2);
+                if (costt_sunset<=costt_omega2 and costt_omega2<0.001){omega2_24_ = omega2;}
+                else {
+                    omega2 = pi-omega2;
+                    if (costt(omega2)>0.001){omega2_24_ = omega_s;}
+                    else{
+                        if (omega2>=omega_s){omega2_24_ = omega_s;}
+                        else{omega2_24_ = omega2;}
+                    }
+                }
+                if (omega2_24_ > omega_s){omega2_24_ = omega_s;}
+
 //
 //                // two periods of direct beam radiation (eq.7)
 //                if (sin(slope)>sin(phi)*cos(delta)+cos(phi)*sin(delta)){
@@ -274,11 +293,14 @@ namespace shyft::core {
             }
             /**\brief computes extraterrestrial solar radiation
              * \param cos(theta)
-             * ]param doy -- day of the year
+             * \param doy -- day of the year
              * return ra, [W/m^2]*/
             double compute_ra(double cos_theta, double doy ){
                 return gsc*cos_theta*(1+0.0033*cos(doy*2*pi/365)); // eq.(1)
             }
+            double fi(){return 0.75 + 0.25*cos(slope_) - 0.5/pi*slope_;/*eq.(32)*/}
+            double fia(double kb,double kd){
+                return (1 - kb)*(1+pow(kb/(kb+kd),0.5)*pow(sin(slope_/2),3))*fi() + fb_*kb; /*eq.(33)*/}
         };
 
 /** \tparam C is a cell, like shyft-cell, */
@@ -406,7 +428,7 @@ TEST_SUITE("radiation") {
                 FAST_CHECK_EQ(r.aspect(), doctest::Approx(180.0).epsilon(0.01));
     }
 
-    TEST_CASE("check_sun_rise_and_set"){
+    /*TEST_CASE("check_sun_rise_and_set"){
 
         parameter p;
         p.albedo=0.2;
@@ -437,33 +459,37 @@ TEST_SUITE("radiation") {
                 FAST_CHECK_EQ(r.sun_set(), doctest::Approx(23.0).epsilon(0.01));
 
 
-    }
+    }*/
     TEST_CASE("check_solar_radiation"){
         parameter p;
-        p.albedo=0.2;
+        p.albedo = 0.2;
+        p.turbidity = 1.0;
         calculator r(p);
         calendar utc_cal;
         double lat = 44.0;
         utctime t;
         arma::vec surface_normal({0.5,0.5,1.0});
-        t = utc_cal.time(1970, 06, 21, 12, 30, 0, 0); // June 12.30
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.cs_radiation(), doctest::Approx(500.0).epsilon(0.01));
-        t = utc_cal.time(1970, 06, 21, 23, 30, 0, 0); // June 23.30 -- no radiation
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.cs_radiation(), doctest::Approx(0.0).epsilon(0.01));
-        t = utc_cal.time(1970, 06, 21, 10, 30, 0, 0); // June 10.30
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.cs_radiation(), doctest::Approx(300.0).epsilon(0.01));
-        t = utc_cal.time(1970, 11, 21, 12, 30, 0, 0); // December 12.30
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.cs_radiation(), doctest::Approx(150.0).epsilon(0.01));
-        t = utc_cal.time(1970, 11, 21, 23, 30, 0, 0); // December 23.30
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.cs_radiation(), doctest::Approx(0.0).epsilon(0.01));
-        t = utc_cal.time(1970, 11, 21, 10, 30, 0, 0); // December 10.30
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.cs_radiation(), doctest::Approx(50.0).epsilon(0.01));
+        double ra_sum = 0.0;
+        double rso_sum = 0.0;
+        // checking for horizontal surface Eugene, OR, p.64, fig.1b
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
+            r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+            FAST_CHECK_EQ(ra_sum/24, doctest::Approx(490.0).epsilon(1.0));
+            FAST_CHECK_EQ(rso_sum/24, doctest::Approx(350.0).epsilon(1.0));
+        ra_sum = 0.0;
+        rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 01, 1, hour, 30, 0, 0); // January
+            r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(120.0).epsilon(1.0));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(1.0));
 
     }
     TEST_CASE("surface_normal_from_cells") {
