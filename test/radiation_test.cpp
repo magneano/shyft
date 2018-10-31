@@ -460,7 +460,7 @@ TEST_SUITE("radiation") {
 
 
     }*/
-    TEST_CASE("check_solar_radiation"){
+    TEST_CASE("check_solar_radiation_horizontal"){
         parameter p;
         p.albedo = 0.2;
         p.turbidity = 1.0;
@@ -468,28 +468,124 @@ TEST_SUITE("radiation") {
         calendar utc_cal;
         double lat = 44.0;
         utctime t;
-        arma::vec surface_normal({0.5,0.5,1.0});
+        // checking for horizontal surface Eugene, OR, p.64, fig.1b
+        arma::vec surface_normal({0.0,0.0,1.0});
         double ra_sum = 0.0;
         double rso_sum = 0.0;
-        // checking for horizontal surface Eugene, OR, p.64, fig.1b
         for (int hour = 0;hour<24;++hour){
             t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
-            r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
+            r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-            FAST_CHECK_EQ(ra_sum/24, doctest::Approx(490.0).epsilon(1.0));
-            FAST_CHECK_EQ(rso_sum/24, doctest::Approx(350.0).epsilon(1.0));
+            FAST_CHECK_EQ(ra_sum/24, doctest::Approx(490.0).epsilon(0.1));
+            FAST_CHECK_EQ(rso_sum/24, doctest::Approx(350.0).epsilon(0.1));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
             t = utc_cal.time(1970, 01, 1, hour, 30, 0, 0); // January
-            r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
+            r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(120.0).epsilon(1.0));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(1.0));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(120.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(0.1));
+        ra_sum = 0.0;
+        rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 01, 12, hour, 30, 0, 0); // December
+            r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(130.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(0.1));
+
+    }
+    TEST_CASE("check_solar_radiation_slope_45s"){
+        parameter p;
+        p.albedo = 0.2;
+        p.turbidity = 1.0;
+        calculator r(p);
+        calendar utc_cal;
+        double lat = 44.0;
+        utctime t;
+        // checking for horizontal surface Eugene, OR, p.64, fig.1b
+        double slope = 135*shyft::core::pi/180; // 45 S
+        arma::vec surface_normal({cos(slope),sin(slope),1.0});
+        double ra_sum = 0.0;
+        double rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
+            r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(400.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(300.0).epsilon(0.1));
+        ra_sum = 0.0;
+        rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 01, 1, hour, 30, 0, 0); // January
+            r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(350.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+        ra_sum = 0.0;
+        rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 01, 12, hour, 30, 0, 0); // December
+            r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(350.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+
+    }
+    TEST_CASE("check_solar_radiation_slope_45s"){
+        parameter p;
+        p.albedo = 0.2;
+        p.turbidity = 1.0;
+        calculator r(p);
+        calendar utc_cal;
+        double lat = 44.0;
+        utctime t;
+        // checking for horizontal surface Eugene, OR, p.64, fig.1b
+        double slope = 270*shyft::core::pi/180; // 90 S
+        arma::vec surface_normal({cos(slope),sin(slope),1.0});
+        double ra_sum = 0.0;
+        double rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
+            r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(400.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(300.0).epsilon(0.1));
+        ra_sum = 0.0;
+        rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 01, 1, hour, 30, 0, 0); // January
+            r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(350.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+        ra_sum = 0.0;
+        rso_sum = 0.0;
+        for (int hour = 0;hour<24;++hour){
+            t = utc_cal.time(1970, 01, 12, hour, 30, 0, 0); // December
+            r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
+            ra_sum += r.ra_radiation();
+            rso_sum += r.rso_radiation();
+        }
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(350.0).epsilon(0.1));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
 
     }
     TEST_CASE("surface_normal_from_cells") {
