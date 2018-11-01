@@ -303,6 +303,8 @@ namespace shyft {
             apoint_ts inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const;
             apoint_ts decode(int start_bit,int n_bits) const;
 
+            apoint_ts slice(int i0, int n) const;
+
             apoint_ts merge_points(const apoint_ts& o);
             //-- in case the underlying ipoint_ts is a gpoint_ts (concrete points)
             //   we would like these to be working (exception if it's not possible,i.e. an expression)
@@ -384,6 +386,7 @@ namespace shyft {
             void set(size_t i, double x) {rep.set(i,x);}
             void fill(double x) {rep.fill(x);}
             void scale_by(double x) {rep.scale_by(x);}
+            gpoint_ts slice(int i0, int n) const { return rep.slice(i0, n); };
             virtual bool needs_bind() const { return false;}
             virtual void do_bind()  {}
             gts_t & core_ts() {return rep;}
