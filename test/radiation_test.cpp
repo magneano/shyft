@@ -54,8 +54,8 @@ namespace shyft::core {
 
             double sun_rise() const {return omega1_24_*rad2deg;}
             double sun_set() const {return omega2_24_*rad2deg;}
-            double ra24_ = 0.0;
 
+            double ra24_=0.0;
 
             /** \brief computes instantaneous clear-sky radiation  for inclined surfaces
              * \param latitude, [deg]
@@ -82,8 +82,9 @@ namespace shyft::core {
                 compute_abc(delta_,phi_);
                 costthor_ = costt(omega_);
 
-                ra_ = max(0.0,compute_ra(costt_,doy_)); // eq.(1)
                 rahor_ = max(0.0,compute_ra(costthor_,doy_)); // eq.(1) with cos(theta)hor
+                //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
+                ra_ = max(0.0,compute_ra(costt_,doy_)); // eq.(1)
 
                 double W; //equivalent depth of precipitable water in the atmosphere[mm]
                 eatm_ = atm_pressure(elevation); // [kPa] atmospheric pressure as a function of elevation ///TODO: get elevation from cell.midpoint().z
@@ -110,16 +111,15 @@ namespace shyft::core {
 
                 fb_ = Kbo/Kbohor*ra_/(rahor_>0.0?rahor_:0.00001);//eq.(34)
                 double fia_ = fia(Kbohor,Kdohor); //eq.(33)
+                compute_sun_rise_set(delta_,phi_,slope_,aspect_);
+                if (omega1_24_ > omega2_24_) {omega1_24_ = omega2_24_; ra_= 0.0;}//slope is always shaded
                 rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
 
-                compute_sun_rise_set(delta_,phi_,slope_,aspect_);
-                if (omega1_24_ > omega2_24_) {omega1_24_ = omega2_24_; rso_ = 0.0;}//slope is always shaded
-                compute_abc(delta_,phi_);
+                compute_abc(delta_,phi_,slope_,aspect_);
                 double costt24_ = costt24(omega1_24_,omega2_24_);
-                //std::cout<<"costt24  "<<costt24_<<std::endl;
-                //std::cout<<"costt  "<<costt_<<std::endl;
-                ra24_ = compute_ra24(costt24_,doy_);
-
+                ra24_ = compute_ra(costt24_,doy_);
+                //std::cout<<"ra24: "<< ra24_ << std::endl;
+                
                 return rso_; // eq.(37)
             }
 
@@ -134,7 +134,7 @@ namespace shyft::core {
                 else {KBhor = 0.016*tauswhor;}
                 double KDhor = tauswhor - KBhor;
 
-                rs_ = rsm * (fb_*KBhor/tauswhor+fia(KBhor,KDhor)*KDhor/tauswhor+param.alpha*(1-fi())); /// TODO check if all theoretical things calculated before calling this function
+                rs_ = rsm * (fb_*KBhor/tauswhor+fia(KBhor,KDhor)*KDhor/tauswhor+param.albedo*(1-fi())); /// TODO check if all theoretical things calculated before calling this function
                 return rs_;
             }
         private:
@@ -184,83 +184,6 @@ namespace shyft::core {
              * \param phi,[rad] -- latitude
              * \param slope,[rad]
              * \param aspect,[rad]
-             * \param hemisphere_str -- "N" or "S"
-             * calculates  local variables omega1_24_, omega2_24_, omega1_24b_, omega2_24b_*/
-           /* void compute_sun_rise_set(double delta, double phi, double slope, double aspect,std::string hemisphere="N"){
-                ///TODO get info about hemisphere from data, don't see anything in geopoint, but it is inside netcdf file -- add geopoint_with_crs to interface
-                double omega_s; // omega_s -- time of potential horizontal sunset, -omega_s --time of horizontal sunrize
-                // this solar noon and sunrise taken from ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.575
-                if (abs(phi - delta) >= pi / 2) { omega_s = pi; }
-                if (abs(phi - delta) < pi / 2 and (abs(phi+delta) >= pi/2)) { omega_s = 0; }
-
-                if (hemisphere.compare("N")) {
-                    if ((delta + phi) > pi / 2) { omega_s = pi; } // for northern hemisphere
-                    if ((delta - phi) > pi / 2) { omega_s = 0; }
-                }
-                else {
-                    if ((delta + phi) < -pi / 2) { omega_s = pi; } // for southern hemisphere
-                    if ((delta - phi) < -pi / 2) { omega_s = 0; }
-                }
-                compute_abc(delta,phi,slope,aspect);
-                double costt_sunset = costt(omega_s);
-                double costt_sunrise = costt(-omega_s);
-
-                /// TODO: verify this weird sun rise and sunset procedure
-
-                double bbcc = b_*b_ + c_*c_ > 0.0 ? b_*b_+c_*c_ : b_*b_+c_*c_+0.0001;
-                double sqrt_bca = bbcc-a_*a_>0.0 ? bbcc-a_*a_ : 0.0; // the authors suggest here 0.0001???
-                double sin_omega1 = min(1.0, max(-1.0,(a_*c_ - b_*pow(sqrt_bca,0.5))/bbcc));//eq.(13a)
-                double omega1 = asin(sin_omega1);
-                omega1_24_=omega1;
-                double costt_omega1 = costt(omega1);
-                if ((costt_sunrise <= costt_omega1) and (costt_omega1<0.001)){omega1_24_=omega1;}
-                else {
-                    omega1 = -pi-omega1;
-                    if (costt(omega1) > 0.001){omega1_24_ = -omega_s;}
-                    else {
-                        if (omega1<=-omega_s){omega1_24_ = -omega_s;}
-                        else {omega1_24_ = -omega1;}
-                    }
-                }
-                if (omega1_24_<-omega_s){omega1_24_ = -omega_s;}
-                double sin_omega2 = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));//eq.(13b)
-                double omega2 = asin(sin_omega2);
-                omega2_24_=omega2;
-                double costt_omega2 = costt(omega2);
-                if (costt_sunset<=costt_omega2 and costt_omega2<0.001){omega2_24_ = omega2;}
-                else {
-                    omega2 = pi-omega2;
-                    if (costt(omega2)>0.001){omega2_24_ = omega_s;}
-                    else{
-                        if (omega2>=omega_s){omega2_24_ = omega_s;}
-                        else{omega2_24_ = omega2;}
-                    }
-                }
-                if (omega2_24_ > omega_s){omega2_24_ = omega_s;}
-
-//
-//                // two periods of direct beam radiation (eq.7)
-//                if (sin(slope)>sin(phi)*cos(delta)+cos(phi)*sin(delta)){
-//                    double sinA = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));
-//                    double A = asin(sinA);
-//                    double sinB = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));
-//                    double B = asin(sinB);
-//                    omega2_24b_ = min(A,B);
-//                    omega1_24b_ = max(A,B);
-//                    double costt_omega2_24b = costt(omega2_24b_);
-//                    if (costt_omega2_24b<-0.001 or costt_omega2_24b>0.001){omega2_24b_ = -pi-omega2_24b_;}
-//                    double costt_omega1_24b=costt(omega1_24b_);
-//                    if ((costt_omega1_24b<-0.001 or costt_omega1_24b>0.001)){omega1_24b_ = pi-omega1_24b_;}
-//                    if ((omega2_24b_<omega1_24_) or (omega1_24b_<omega2_24_)){
-//                        omega2_24b_ = omega1_24_;
-//                        omega1_24b_ = omega1_24_;} // single period of sun
-//                }
-            }*/
-            /**\brief compute sun rise and sun set values
-             * \param delta,[rad] - earrh declination angle
-             * \param phi,[rad] -- latitude
-             * \param slope,[rad]
-             * \param aspect,[rad]
              * calculates  local variables omega1_24_, omega2_24_, omega1_24b_, omega2_24b_*/
             void compute_sun_rise_set(double delta, double phi, double slope, double aspect){
                 ///TODO get info about hemisphere from data, don't see anything in geopoint, but it is inside netcdf file -- add geopoint_with_crs to interface
@@ -268,7 +191,7 @@ namespace shyft::core {
                 // this solar noon and sunrise taken from ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.575
                 if (abs(phi - delta) >= pi / 2) { omega_s = pi; }
                 if (abs(phi - delta) < pi / 2 and (abs(phi+delta) >= pi/2)) { omega_s = 0; }
-                if (abs(phi - delta) < pi/2 and (abs(phi+delta) < pi/2)){omega_s = acos(-tan(delta)*tan(phi));}
+                if (abs(phi - delta) < pi/2 and (abs(phi+delta) < pi/2)){omega_s = acos(-tan(delta)*tan(phi));} // for horizontal surface
 
                 compute_abc(delta,phi,slope,aspect);
                 double costt_sunset = costt(omega_s);
@@ -383,12 +306,10 @@ namespace shyft::core {
             double fia(double kb,double kd){
                 return (1 - kb)*(1+pow(kb/(kb+kd),0.5)*pow(sin(slope_/2),3))*fi() + fb_*kb; /*eq.(33)*/
             }
-            /**\brief functions for 24h analytical computation*/
+            /**\brief compute 24h parameter*/
             double costt24(double omega1, double omega2){
-                return -a_*(omega2-omega1)+b_*(sin(omega2)-sin(omega1))+c_*(cos(omega2)-cos(omega1));
-            }
-            double compute_ra24(double cos_theta24,double doy){
-                return gsc*cos_theta24*(1+0.0033*cos(doy*2*pi/365)); // eq.(6)
+                //return -a_*(omega2-omega1) + b_ * (sin(omega2)-sin(omega1))+c_*(cos(omega2)-cos(omega1));
+                return 2*(-a_*(omega2) + b_ * (sin(omega2))+c_*(cos(omega2) - 1));
             }
         };
 
@@ -517,38 +438,6 @@ TEST_SUITE("radiation") {
                 FAST_CHECK_EQ(r.aspect(), doctest::Approx(0.0).epsilon(0.01));
     }
 
-    /*TEST_CASE("check_sun_rise_and_set"){
-
-        parameter p;
-        p.albedo=0.2;
-        calculator r(p);
-        calendar utc_cal;
-        double lat = 44.0;
-        utctime t;
-        arma::vec surface_normal({0.5,0.5,1.0});
-        // January
-        t = utc_cal.time(1970, 01, 1, 12, 30, 0, 0);
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.sun_rise(), doctest::Approx(10.0).epsilon(0.01));
-                FAST_CHECK_EQ(r.sun_set(), doctest::Approx(23.0).epsilon(0.01));
-        // March
-        t = utc_cal.time(1970, 03, 1, 12, 30, 0, 0);
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.sun_rise(), doctest::Approx(10.0).epsilon(0.01));
-                FAST_CHECK_EQ(r.sun_set(), doctest::Approx(23.0).epsilon(0.01));
-        // July
-        t = utc_cal.time(1970, 07, 16, 12, 30, 0, 0);
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.sun_rise(), doctest::Approx(10.0).epsilon(0.01));
-                FAST_CHECK_EQ(r.sun_set(), doctest::Approx(23.0).epsilon(0.01));
-                // December
-        t = utc_cal.time(1970, 11, 21, 12, 30, 0, 0);
-        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 150.0);
-                FAST_CHECK_EQ(r.sun_rise(), doctest::Approx(10.0).epsilon(0.01));
-                FAST_CHECK_EQ(r.sun_set(), doctest::Approx(23.0).epsilon(0.01));
-
-
-    }*/
     TEST_CASE("check_solar_radiation_horizontal"){
         parameter p;
         p.albedo = 0.2;
@@ -561,16 +450,24 @@ TEST_SUITE("radiation") {
         arma::vec surface_normal({0.0,0.0,1.0});
         double ra_sum = 0.0;
         double rso_sum = 0.0;
+        double rs_sum = 0.0;
+//        unsigned long doy_fig1[8] = {1,   50, 100, 150, 200, 250, 300, 350};
+//        double ra_fig1[8] = {140, 250, 390, 490, 480, 370, 200, 120};
+//        double rso_fi1[8] = {90,  140, 280, 350, 340, 250, 150, 90};
+//        shyft::core::YMDhms ymdhms = utc_cal.from_day_number(doy_fig1[1]);
         for (int hour = 0;hour<24;++hour){
             t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
             r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
+            rs_sum += r.rs_radiation(260.0);
+            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;  
+            std::cout<<"======================"<<std::endl;
         }
-            FAST_CHECK_EQ(ra_sum/24, doctest::Approx(490.0).epsilon(0.1));
-            FAST_CHECK_EQ(r.ra24_, doctest::Approx(490.0).epsilon(0.1));
-            FAST_CHECK_EQ(r.ra24_, doctest::Approx(ra_sum/24).epsilon(0.1));
-            FAST_CHECK_EQ(rso_sum/24, doctest::Approx(350.0).epsilon(0.1));
+            std::cout<<"rs: "<<rs_sum/24<<std::endl;
+            FAST_CHECK_EQ(ra_sum/24, doctest::Approx(490.0).epsilon(0.05));
+            FAST_CHECK_EQ(rso_sum/24, doctest::Approx(350.0).epsilon(0.05));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
@@ -578,11 +475,12 @@ TEST_SUITE("radiation") {
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
+            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;
+            std::cout<<"======================"<<std::endl;
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(120.0).epsilon(0.1));
-                FAST_CHECK_EQ(r.ra24_, doctest::Approx(120.0).epsilon(0.1));
-                FAST_CHECK_EQ(r.ra24_, doctest::Approx(ra_sum/24).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(130.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(85.0).epsilon(0.05));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
@@ -590,11 +488,12 @@ TEST_SUITE("radiation") {
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
+            std::cout<<"ra24: "<<r.ra24_<<std::endl;                                    
+            std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl; 
+            std::cout<<"======================"<<std::endl;                             
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(130.0).epsilon(0.1));
-                FAST_CHECK_EQ(r.ra24_, doctest::Approx(130.0).epsilon(0.1));
-                FAST_CHECK_EQ(r.ra24_, doctest::Approx(ra_sum/24).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(130.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(85.0).epsilon(0.05));
 
     }
     TEST_CASE("check_solar_radiation_slope_45s"){
@@ -606,6 +505,7 @@ TEST_SUITE("radiation") {
         double lat = 44.0;
         utctime t;
         // checking for horizontal surface Eugene, OR, p.64, fig.1d
+        // 24h  average radiation
         double slope = 45*shyft::core::pi/180; // 45 S
         double proj = sin(slope);
         //double aspect = 45*shyft::core::pi/180;// facing south
@@ -614,32 +514,18 @@ TEST_SUITE("radiation") {
         double ra_sum = 0.0;
         double rahor_sum = 0.0;
         double rso_sum = 0.0;
-        double area = 0.0;
-        double f_a = 0.0;
-        double f = 0.0;
-        double t_a = 0.0;
-        t = utc_cal.time(1970, 06, 21, 0, 30, 0, 0); // June
-        r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
-        f_a = r.ra_radiation();
-        for (int hour = 0;hour<24;++hour){
+        for (int hour = 0;hour<23;++hour){
             t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
             r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rahor_sum += r.ra_radiation_hor();
             rso_sum += r.rso_radiation();
-            f_a = r.ra_radiation();
-            area += 0.5*(f_a + f)*(hour - t_a);
-            f = f_a;
-            t_a = hour;
-
+            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;  
+            std::cout<<"======================"<<std::endl;
         }
-        double result = area/(t_a);
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(360.0).epsilon(0.1));
-                FAST_CHECK_EQ(result, doctest::Approx(360.0).epsilon(0.1));
-                //FAST_CHECK_EQ(rahor_sum/24, doctest::Approx(360.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(290.0).epsilon(0.1));
-                FAST_CHECK_EQ(r.ra24_, doctest::Approx(490.0).epsilon(0.1));
-                FAST_CHECK_EQ(r.ra24_, doctest::Approx(ra_sum/24).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(375.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(290.0).epsilon(0.05));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
@@ -648,21 +534,21 @@ TEST_SUITE("radiation") {
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(360.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(390.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.05));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
-            t = utc_cal.time(1970, 12, 12, hour, 30, 0, 0); // December
+            t = utc_cal.time(1970, 12, 21, hour, 30, 0, 0); // December
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(360.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(390.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.05));
 
     }
-    /*TEST_CASE("check_solar_radiation_slope_90S"){
+    TEST_CASE("check_solar_radiation_slope_90S"){
         parameter p;
         p.albedo = 0.05;
         p.turbidity = 1.0;
@@ -683,8 +569,8 @@ TEST_SUITE("radiation") {
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(120.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(120.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(100.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(90.0).epsilon(0.05));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
@@ -693,18 +579,18 @@ TEST_SUITE("radiation") {
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(410.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(410.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.05));
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
-            t = utc_cal.time(1970, 12, 12, hour, 30, 0, 0); // December
+            t = utc_cal.time(1970, 12, 21, hour, 30, 0, 0); // December
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(410.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(410.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(200.0).epsilon(0.05));
 
     }
     TEST_CASE("check_solar_radiation_slope_90N"){
@@ -722,36 +608,50 @@ TEST_SUITE("radiation") {
         arma::vec surface_normal({proj*cos(aspect),proj*sin(aspect),cos(slope)});
         double ra_sum = 0.0;
         double rso_sum = 0.0;
+        double rahor_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
             t = utc_cal.time(1970, 06, 21, hour, 30, 0, 0); // June
             r.rso_cs_radiation(lat, t, surface_normal, 20.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
+            std::cout<<"ra: "<<r.ra_radiation()<<std::endl;
             rso_sum += r.rso_radiation();
+            std::cout<<"rso: "<<r.rso_radiation()<<std::endl;
+            rahor_sum += r.ra_radiation_hor();
+            std::cout<<"rahor: "<<r.ra_radiation_hor()<<std::endl;
+            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;
+            std::cout<<"======================"<<std::endl;
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(100.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(50.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(100.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(50.0).epsilon(0.05));
+
         ra_sum = 0.0;
         rso_sum = 0.0;
+        rahor_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
             t = utc_cal.time(1970, 01, 1, hour, 30, 0, 0); // January
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
+            rahor_sum += r.ra_radiation_hor();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(0.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(10.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(0.0).epsilon(0.05));
+                FAST_CHECK_EQ(rahor_sum/24, doctest::Approx(50.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(10.0).epsilon(0.05));
+                FAST_CHECK_EQ(r.sun_rise(), doctest::Approx(10.0).epsilon(0.01));
+                FAST_CHECK_EQ(r.sun_set(), doctest::Approx(23.0).epsilon(0.01)); 
         ra_sum = 0.0;
         rso_sum = 0.0;
         for (int hour = 0;hour<24;++hour){
-            t = utc_cal.time(1970, 01, 12, hour, 30, 0, 0); // December
+            t = utc_cal.time(1970, 12, 21, hour, 30, 0, 0); // December
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
         }
-                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(0.0).epsilon(0.1));
-                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(10.0).epsilon(0.1));
+                FAST_CHECK_EQ(ra_sum/24, doctest::Approx(0.0).epsilon(0.05));
+                FAST_CHECK_EQ(rso_sum/24, doctest::Approx(10.0).epsilon(0.05));
 
-    }   */
+    }   
     TEST_CASE("surface_normal_from_cells") {
         vector<cell> cells;
         auto r= surface_normal(cells);
