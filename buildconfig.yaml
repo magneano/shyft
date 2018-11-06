@@ -8,9 +8,10 @@ phases:
       - apt-get update -y
       - apt-get install -y build-essential liblapack-dev libblas-dev libpng-dev
       - apt-get install -y g++-8 gcc-8 gfortran
-      - wget -O ../cmake.install.sh https://cmake.org/files/v3.12/cmake-3.12.1-Linux-x86_64.sh
+      - wget -O ../cmake.install.sh https://cmake.org/files/v3.12/cmake-3.12.4-Linux-x86_64.sh
       - bash ../cmake.install.sh --skip-license --prefix=/usr
       - echo pwd is `pwd`,$HOME
+      - mkdir -p `pwd`/../shyft_dependencies
       - export CXX="g++-8" CC="gcc-8"
       - bash build_support/build_dependencies.sh
 

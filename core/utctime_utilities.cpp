@@ -250,7 +250,7 @@ utctime calendar::trim(utctime t, utctimespan deltaT) const {
         return t;
     if(deltaT==YEAR) {
         auto c = calendar_units(t);
-        c.month = c.day = 1; c.hour = c.minute = c.second = 0;
+        c.month = c.day = 1; c.hour = c.minute = c.second =c.micro_second= 0;
         return time(c);
     }
     if (deltaT== QUARTER) {
@@ -259,12 +259,12 @@ utctime calendar::trim(utctime t, utctimespan deltaT) const {
     }
     if(deltaT==MONTH) {
         auto c = calendar_units(t);
-        c.day = 1; c.hour = c.minute = c.second = 0;
+        c.day = 1; c.hour = c.minute = c.second = c.micro_second=0;
         return time(c);
     }
     if(deltaT==DAY) {
         auto c = calendar_units(t);
-        c.hour = c.minute = c.second = 0;
+        c.hour = c.minute = c.second = c.micro_second=0;
         return time(c);
     }
     auto tz_offset=tz_info->utc_offset(t);
