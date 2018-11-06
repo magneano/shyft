@@ -50,53 +50,62 @@ namespace shyft::core {
 		struct response {
 			double rcs_radiation = 0.0;
 			double slope_factor = 1.0;
+			double db_radiation = 0.0;
+			double dif_radiation = 0.0;
+			double bs_radiation = 0.0;
 		};
 
-		template <class P>
+		template <class P, class R>
 		struct calculator {
 			P param;
+			R response;
 			double rcs_radiation_ = 0.0;
 			double slope_factor_ = 0.0;
-			explicit calculator(const P& p):param(p) {}
-			void compute_ra_radiation(double latitude, double rhumidity, double temperature, utctime t,  double slope = 0.0, double aspect = 0.0, double elevation = 0.0){
+			explicit calculator(const P& p, R& r):param(p),response(r) {}
+			void compute_ra_radiation(R& response, double latitude, double rhumidity, double temperature, utctime t,  double slope = 0.0, double aspect = 0.0, double elevation = 0.0){
 				doy_ = utc.day_of_year(t);
-				std::cout << "doy: " << doy_ << std::endl;
+				// std::cout << "doy: " << doy_ << std::endl;
 				//lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute/60.0;
 				delta_ = compute_earth_declination(doy_);
-				std::cout << "declination: " << delta_*180/pi << std::endl;
+				//std::cout << "declination: " << delta_*180/pi << std::endl;
 				phi_ = latitude*pi/180;
+
 				Ts_ = compute_rise_set(phi_,delta_);
-				std::cout << "time_sunset: " << Ts_ << std::endl;
+				//std::cout << "time_sunset: " << Ts_ << std::endl;
 				double KET = compute_total_extraterrestrial_radiation(phi_,delta_,Ts_,doy_);
-				std::cout << "ket: " << KET << std::endl;
+//				std::cout << "ket: " << KET << std::endl;
 
 				double phi_eq = equivalent_latitude(phi_,slope,aspect);
-				std::cout << "phi_eq: " << phi_eq*180/pi << std::endl;
+//				std::cout << "phi_eq: " << phi_eq*180/pi << std::endl;
 				double diff = long_difference(phi_eq,slope,aspect);
-				std::cout << "diff: " << diff*180/pi << std::endl;
+//				std::cout << "diff: " << diff*180/pi << std::endl;
 				double ts_sloped = compute_rise_set(phi_eq,delta_, diff);
-				std::cout << "time_sunset_slope: " << ts_sloped << std::endl;
+//				std::cout << "time_sunset_slope: " << ts_sloped << std::endl;
 
 				double KETs = compute_total_extraterrestrial_radiation(phi_eq,delta_,ts_sloped,doy_);
-				std::cout << "kets: " << KETs << std::endl;
+//				std::cout << "kets: " << KETs << std::endl;
 
 				compute_transmissivities(rhumidity, temperature,Ts_, phi_, delta_, elevation);
 				double Kdirh = direct_beam_radiation(phi_,delta_,Ts_,doy_);
-				std::cout << "kdirh: " << Kdirh << std::endl;
+//				std::cout << "kdirh: " << Kdirh << std::endl;
 
 				double Kdirhs = direct_beam_radiation(phi_eq,delta_,ts_sloped,doy_);
-				std::cout << "kdirhs: " << Kdirhs << std::endl;
+//				std::cout << "kdirhs: " << Kdirhs << std::endl;
 
 				double Kdif = diffuse_radiation(phi_,delta_, Ts_,doy_);
-				std::cout << "kdif: " << Kdif << std::endl;
+//				std::cout << "kdif: " << Kdif << std::endl;
 
 				double Kbs = backscattered_radiation(phi_,delta_, Ts_, doy_);
-				std::cout << "kbs: " << Kbs << std::endl;
+//				std::cout << "kbs: " << Kbs << std::endl;
+//                std::cout << "===============================" << std::endl;
 
 				double rcs_horizontal = Kdirh+Kdif+Kbs;
 				double rcs_slope = Kdirhs+Kdif+Kbs;
-				rcs_radiation_ = rcs_slope;
-				slope_factor_ = rcs_slope/rcs_horizontal;
+				response.rcs_radiation = rcs_slope;
+				response.slope_factor = rcs_slope/rcs_horizontal;
+				response.db_radiation = Kdirhs;
+				response.dif_radiation = Kdif;
+				response.bs_radiation = Kbs;
 				return;
 
 			}
@@ -115,22 +124,14 @@ namespace shyft::core {
 			const double gsc = 117.8; // MJ/m2*day -- solar constant
 			//const double gsc = 4.910; // MJ/m2*hr -- solar constant
 			const double omega = 0.2618;// angular velocity of the earth [rad/hr]
-			const double Pa2kPa = 0.001; // Pa to kPa
 			const double deg2rad=pi/180; // degrees to radians
 			const double rad2deg=180/pi; // rad to deg
 			calendar utc;
 			double doy_; // day of the yearI
 			double Ts_;// time sunset
 
-			double hour_angle(double lt, double longitude=0.0, double tz=0.0){
-				double LSTM = 15*tz; // local standard time meridian
-//                double B = 360/365*(doy)*(-81);
-//                double EoT = 9.87*sin(2*B) - 7.3*cos(B) - 1.5*sin(B);// equation of time
-				double M = 2*pi/365.2596358*doy_*pi/180;
-				double EoT = -7.659*sin(M)+9.863*sin(2*M+3.5932);//https://en.wikipedia.org/wiki/Equation_of_time*/
-				double TC = 4*(longitude - LSTM) + EoT; //time correction factor including EoT correction for Earth eccentricity
-				double LST = lt - TC/60; // local solar time
-				return 15*(lt-12)*deg2rad; ///TODO: find right EOT and data for validation, so it should return: 15*(LST-12)
+			double hour_angle(double lt){
+				return 15*(lt-12)*deg2rad;
 			}
 			/**\brief computes earth declination angle
              * // ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.574, eq.(D.5)
@@ -214,15 +215,15 @@ namespace shyft::core {
 				double M = optical_air_mass(time_sunset,latitude,declination,elevation);
 				std::cout << "M: " << M << std::endl;
 				double W = 0.00493*(rhumidity/temperature)*exp(26.23-5416/temperature);
-				std::cout << "W: " << W << std::endl;
+//				std::cout << "W: " << W << std::endl;
 				tau_wa_  = 1 - 0.077 *pow(M*W,0.3);
-				std::cout << "tau_wa: " << tau_wa_ << std::endl;
+//				std::cout << "tau_wa: " << tau_wa_ << std::endl;
 				tau_da_ = pow(0.965,M);
-				std::cout << "tau_da_: " << tau_da_ << std::endl;
+//				std::cout << "tau_da_: " << tau_da_ << std::endl;
 				tau_ws_ = 1 - 0.0225*M*W;
-				std::cout << "tau_ws_: " << tau_ws_ << std::endl;
+//				std::cout << "tau_ws_: " << tau_ws_ << std::endl;
 				tau_rs_ = 0.972 - 0.08262*M+0.00933*M*M - 0.00095*M*M*M + 0.0000437*pow(M,4);
-				std::cout << "tau_rs: " << tau_rs_ << std::endl;
+//				std::cout << "tau_rs: " << tau_rs_ << std::endl;
 				tau_ds_ = pow(0.965,M);
 				total_tau_direct_ = tau_wa_*tau_da_*tau_ws_*tau_rs_*tau_ds_;
 				total_tau_diffuse_ = 0.5*tau_wa_*tau_da_*(1-tau_ws_*tau_rs_*tau_ds_);

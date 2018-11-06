@@ -56,9 +56,7 @@ namespace shyft::core {
 			P param;
 			explicit calculator(const P& p):param(p) {}
 
-			/// TODO: remove accessing functions after all tests
-			double declination() const {return delta_*rad2deg;}  // declination of the earth, [deg], positive for northern hemisphere summer
-			double hra() const {return omega_*rad2deg;} // earth hour angle, [deg]
+
 
 			double slope() const {return slope_*rad2deg;} // horizontal slope, [deg], should be calculated from normal vector
 			double aspect() const {return aspect_*rad2deg;} // surface aspect angle, [deg], 0 -- due south, -pi/2 -- due east, pi/2 -- due west, +-pi -- due north
@@ -70,8 +68,6 @@ namespace shyft::core {
 			double rs_radiation()const {return rs_;}
 			double rso_radiation() const {return rso_ ;} // clear sky solar radiation for inclined surface [W/m2]
 
-			double patm() const {return eatm_;}
-			double ea() const {return ea_;}
 
 			double sun_rise() const {return omega1_24_*rad2deg;}
 			double sun_set() const {return omega2_24_*rad2deg;}
