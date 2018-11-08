@@ -60,9 +60,9 @@ using shyft::core::calendar;
 using shyft::core::deltahours;
 using shyft::core::to_seconds64;
 using shyft::core::seconds;
-
-
+using shyft::time_series::ts_point_fx;
 using gta_t = shyft::time_axis::generic_dt;
+using ta_generic_type=shyft::time_axis::generic_dt::generic_type;
 using gts_t = shyft::time_series::point_ts<gta_t>;
 
 
@@ -472,13 +472,17 @@ private:
     }
 
     template<class T>
-    ts_db_header mk_header(const gts_t& ts) const {
-        auto p{ts.total_period() };
+    ts_db_header mk_header(ts_point_fx pfx, ta_generic_type gt, size_t n, utcperiod p) const {
          if(T::version()=='1') {
              p.start /= utctime::period::den;
              p.end  /= utctime::period::den;
         }
-         return ts_db_header{ ts.point_interpretation(),ts.time_axis().gt,uint32_t(ts.size()),p,T::version()};
+         return ts_db_header{ pfx,gt,uint32_t(n),p,T::version()};
+    }
+    
+    template<class T>
+    ts_db_header mk_header(const gts_t& ts)  const  {
+        return mk_header<T>(ts.point_interpretation(),ts.time_axis().gt,ts.size(),ts.total_period());
     }
 
     // ----------
@@ -581,10 +585,12 @@ private:
             }
 
             // write header
-            ts_db_header new_header{
-                new_ts.fx_policy, old_header.ta_type,
-                static_cast<uint32_t>((tn - t0) / new_ts.ta.f.dt), utcperiod{ t0, tn },T::version()
-            };
+            auto new_header=mk_header<T>(
+                new_ts.fx_policy,
+                old_header.ta_type, 
+                static_cast<uint32_t>((tn - t0) / new_ts.ta.f.dt), 
+                utcperiod{ t0, tn }
+            );
             // -----
             fseek(fh, 0, SEEK_SET);  // seek to begining
             write(fh, static_cast<const void*>(&new_header), sizeof(ts_db_header));
@@ -663,12 +669,11 @@ private:
             }
 
             // write header
-            ts_db_header new_header{
+            auto  new_header= mk_header<T>(
                 new_ts.fx_policy, old_header.ta_type,
                 static_cast<uint32_t>(new_ts.ta.c.cal->diff_units(t0, tn, new_ts.ta.c.dt)),
-                utcperiod{ t0, tn },
-                T::version()
-            };
+                utcperiod{ t0, tn }
+            );
             // -----
             fseek(fh, 0, SEEK_SET);  // seek to begining
             write(fh, static_cast<const void*>(&new_header), sizeof(ts_db_header));
@@ -767,12 +772,11 @@ private:
             }
 
             // write header
-            ts_db_header new_header{
+            auto new_header=mk_header<T>(
                 new_ts.fx_policy, old_header.ta_type,
                 static_cast<uint32_t>(merged_t.size() - 1),
-                utcperiod{ merged_t.at(0), merged_t.at(merged_t.size() - 1) },
-                T::version()
-            };
+                utcperiod{ merged_t.at(0), merged_t.at(merged_t.size() - 1) }
+            );
             // -----
             fseek(fh, 0, SEEK_SET);  // seek to begining
             write(fh, static_cast<const void *>(&new_header), sizeof(ts_db_header));

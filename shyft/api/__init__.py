@@ -51,6 +51,7 @@ DoubleVector_FromNdArray = lambda x: DoubleVector.from_numpy(x)
 def VectorString(v):
     return str(v.to_numpy())
 
+Int64Vector=IntVector
 
 DoubleVector.__str__ = lambda self: VectorString(self)
 

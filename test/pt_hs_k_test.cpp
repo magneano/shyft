@@ -1,6 +1,8 @@
 
 #include "test_pch.h"
 #include "core/pt_hs_k.h"
+#include "core/cell_model.h"
+#include "core/pt_hs_k_cell_model.h"
 #include "mocks.h"
 #include "core/time_series.h"
 #include "core/utctime_utilities.h"
@@ -87,5 +89,58 @@ TEST_CASE("test_call_stack") {
     auto snow_swe = response_collector.snow_swe();
     for (size_t i = 0; i < snow_swe.size(); ++i)
         TS_ASSERT(std::isfinite(snow_swe.get(i).v) && snow_swe.get(i).v >= 0);
+}
+TEST_CASE("pt_hs_k_lake_reservoir_response") {
+    calendar cal;
+    utctime t0 = cal.time(2014, 8, 1, 0, 0, 0);
+    utctimespan dt=deltahours(1);
+    const int n=50;// need to run some steps to observe kirchner response
+    ta::fixed_dt tax(t0,dt,n);
+	ta::fixed_dt tax_state(t0, dt, n + 1);
+    pt::parameter pt_param;
+    hs::parameter gs_param;
+    ae::parameter ae_param;
+    kr::parameter k_param;
+    pc::parameter p_corr_param;
+    parameter parameter{pt_param, gs_param, ae_param, k_param, p_corr_param};
+
+    pts_t temp(tax,-15.0,POINT_AVERAGE_VALUE);// freezing cold
+    pts_t prec(tax,3.0,POINT_AVERAGE_VALUE);prec.set(0,0.0);// rain except 1.step we use to get initial kirchner response
+    pts_t rel_hum(tax,0.8,POINT_AVERAGE_VALUE);
+    pts_t wind_speed(tax,2.0,POINT_AVERAGE_VALUE);
+    pts_t radiation(tax,300.0,POINT_AVERAGE_VALUE);
+
+    kr::state kirchner_state{1};// 1 mm 
+    hs::state gs_state;
+    //gs_state.lwc=100.0;
+    //gs_state.acc_melt=100.0; 
+    
+    state s0{gs_state, kirchner_state};// need a equal state for the second run
+    state s1{gs_state, kirchner_state};
+    
+    pt_hs_k::state_collector sc;
+    pt_hs_k::all_response_collector rc;
+    const double cell_area=1000*1000;
+    sc.collect_state=true;
+    sc.initialize(tax_state,0,0,cell_area);
+    rc.initialize(tax,0,0,cell_area);
+    geo_cell_data gcd(geo_point(1000,1000,100));
+    land_type_fractions ltf(0.0,0.2,0.3,0.0,0.5);// 0.2 lake, 0.3 reservoir , 0.5 unspec
+    gcd.set_land_type_fractions(ltf);
+    
+    parameter.msp.reservoir_direct_response_fraction=0.0;// all rsv goes to kirchner
+    pt_hs_k::run<direct_accessor,pt_hs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,s0,sc,rc);
+    FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266).epsilon(0.01)); // first with 0 precip, nothing should happen
+    FAST_CHECK_EQ(rc.avg_discharge.value(n-1), doctest::Approx( 0.5*mmh_to_m3s(prec.value(1),cell_area)).epsilon(0.01));
+    
+    parameter.msp.reservoir_direct_response_fraction=1.0;// all rsv goes directly to output, lake goes to kirchner
+    sc.initialize(tax_state,0,0,cell_area);
+    rc.initialize(tax,0,0,cell_area);
+    pt_hs_k::run<direct_accessor,pt_hs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,s1,sc,rc);
+    FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266*0.7).epsilon(0.01)); // first with 0 precip, nothing should happen
+    auto expected_1 = 0.266+0.3*0.5*mmh_to_m3s(prec.value(1),cell_area);
+    FAST_CHECK_EQ(rc.avg_discharge.value(1), doctest::Approx(expected_1).epsilon(0.05)); // precip on rsv direct effect
+    auto expected_2 = 0.2*mmh_to_m3s(prec.value(1),cell_area)*(1.0-0.3)+0.3*mmh_to_m3s(prec.value(1),cell_area);
+    FAST_CHECK_EQ(rc.avg_discharge.value(n-1), doctest::Approx(expected_2 ).epsilon(0.01));
 }
 }

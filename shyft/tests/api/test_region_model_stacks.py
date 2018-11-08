@@ -219,17 +219,17 @@ class RegionModel(unittest.TestCase):
         sum_discharge_value = model.statistics.discharge_value(cids, 0)  # at the first timestep
         sum_charge = model.statistics.charge(cids)
         sum_charge_value = model.statistics.charge_value(cids, 0)
-        self.assertAlmostEqual(sum_charge_value, -111.75,places=2)
+        self.assertAlmostEqual(sum_charge_value, -110.6998, places=2)
         cell_charge=model.statistics.charge_value(api.IntVector([0,1,3]), 0,ix_type=api.stat_scope.cell)
-        self.assertAlmostEqual(cell_charge, -16.86330,places=2)
+        self.assertAlmostEqual(cell_charge, -16.7138,places=2)
         charge_sum_1_2_6 = model.statistics.charge(api.IntVector([1,2, 6]), ix_type=api.stat_scope.cell).values.to_numpy().sum()
-        self.assertAlmostEqual(charge_sum_1_2_6,-39.0524,places=2)
+        self.assertAlmostEqual(charge_sum_1_2_6,107.3981,places=2)
         ae_output = model.actual_evaptranspiration_response.output(cids)
         ae_pot_ratio = model.actual_evaptranspiration_response.pot_ratio(cids)
         self.assertIsNotNone(ae_output)
         self.assertAlmostEqual(ae_output.values.to_numpy().max(), 0.189214067680088)
         self.assertIsNotNone(ae_pot_ratio)
-        self.assertAlmostEqual(ae_pot_ratio.values.to_numpy().min(), 0.9999330003895371)
+        self.assertAlmostEqual(ae_pot_ratio.values.to_numpy().min(), 0.9995599424191931)
         self.assertAlmostEqual(ae_pot_ratio.values.to_numpy().max(), 1.0)
         opt_model.run_cells()  # starting out with the same state, same interpolated values, and region-parameters, we should get same results
         sum_discharge_opt_value = opt_model.statistics.discharge_value(cids, 0)
@@ -299,7 +299,7 @@ class RegionModel(unittest.TestCase):
         river_upstream_inflow_m3s = model.river_upstream_inflow_m3s(
             1)  # should be 0.0 in this case, since we do not have a routing network
         self.assertIsNotNone(river_out_m3s)
-        self.assertAlmostEqual(river_out_m3s.value(8), 31.57297, 0)
+        self.assertAlmostEqual(river_out_m3s.value(8), 28.061248025828114, 0)
         self.assertIsNotNone(river_local_m3s)
         self.assertIsNotNone(river_upstream_inflow_m3s)
         model.connect_catchment_to_river(1, 0)

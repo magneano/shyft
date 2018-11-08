@@ -59,6 +59,7 @@ namespace shyft {
         using gta_t=time_axis::generic_dt;
         using gts_t=point_ts<gta_t>;
         using rts_t=point_ts<time_axis::fixed_dt>;
+        using intv_t=vector<int64_t>; ///< vector<int64_t> to ensure expose to python works same linux and win
 
 
         /** \brief A virtual abstract interface (thus the prefix i) base for point_ts
@@ -302,6 +303,8 @@ namespace shyft {
             apoint_ts inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const;
             apoint_ts decode(int start_bit,int n_bits) const;
 
+            apoint_ts slice(int i0, int n) const;
+
             apoint_ts merge_points(const apoint_ts& o);
             //-- in case the underlying ipoint_ts is a gpoint_ts (concrete points)
             //   we would like these to be working (exception if it's not possible,i.e. an expression)
@@ -383,6 +386,7 @@ namespace shyft {
             void set(size_t i, double x) {rep.set(i,x);}
             void fill(double x) {rep.fill(x);}
             void scale_by(double x) {rep.scale_by(x);}
+            gpoint_ts slice(int i0, int n) const { return rep.slice(i0, n); };
             virtual bool needs_bind() const { return false;}
             virtual void do_bind()  {}
             gts_t & core_ts() {return rep;}
@@ -588,7 +592,7 @@ namespace shyft {
             virtual void set_point_interpretation(ts_point_fx /* point_interpretation*/) { ; }
             virtual const gta_t& time_axis() const { return ts->time_axis(); }
             virtual utcperiod total_period() const { return ts?time_axis().total_period():utcperiod{}; }
-            virtual size_t index_of(utctime t) const { return ts?string::npos:ts->index_of(t); }
+            virtual size_t index_of(utctime t) const { return ts?ts->index_of(t):string::npos; }
             virtual size_t size() const { return ts?ts->size():0; }
             virtual utctime time(size_t i) const { return ts->time(i); };
             virtual double value(size_t i) const;
@@ -1871,8 +1875,8 @@ namespace shyft {
         apoint_ts pow(double           lhs,const apoint_ts& rhs) ;
 
         ///< percentiles, need to include several forms of time_axis for python
-        std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list,const gta_t & ta,const vector<int>& percentiles);
-        std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list,const time_axis::fixed_dt & ta,const vector<int>& percentiles);
+        std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list,const gta_t & ta,const intv_t& percentiles);
+        std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list,const time_axis::fixed_dt & ta,const intv_t& percentiles);
 
         ///< time_shift i.e. same ts values, but time-axis is time-axis + dt
         apoint_ts time_shift(const apoint_ts &ts, utctimespan dt);
@@ -1909,7 +1913,6 @@ namespace shyft {
             for (auto &f : calcs) f.get();
             return tsv2;
         }
-
         /** \brief ats_vector represents a list of time-series, support math-operations.
          *
          * Supports handling and math operations for vectors of time-series.
@@ -1956,16 +1959,16 @@ namespace shyft {
 			vector<double> values_at_time_i(int64_t t) const {
 				return values_at_time(seconds(t));
 			}
-            ats_vector percentiles(gta_t const &ta,vector<int> const& percentile_list) const {
+            ats_vector percentiles(gta_t const &ta,intv_t const& percentile_list) const {
                 ats_vector r;r.reserve(percentile_list.size());
                 auto rp= shyft::time_series::calculate_percentiles(ta,deflate_ts_vector<gts_t>(*this),percentile_list);
                 for(auto&ts:rp) r.emplace_back(ta,std::move(ts.v),POINT_AVERAGE_VALUE);
                 return r;
             }
-            ats_vector percentiles_f(time_axis::fixed_dt const&ta,vector<int> const& percentile_list) const {
+            ats_vector percentiles_f(time_axis::fixed_dt const&ta,intv_t const& percentile_list) const {
                 return percentiles(gta_t(ta),percentile_list);
             }
-            ats_vector slice(vector<int>const& slice_spec) const {
+            ats_vector slice(intv_t const& slice_spec) const {
                 if(slice_spec.size()==0) {
                     return ats_vector(*this);// just a clone of this
                 } else {

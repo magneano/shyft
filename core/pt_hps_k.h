@@ -235,9 +235,14 @@ namespace shyft {
             state.hps.distribute(parameter.hps,false);// fixup state to match parameter dimensions for snow-bins, but only if they are empty
 
             R response;
-            const double total_lake_fraction = geo_cell_data.land_type_fractions_info().lake() + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
-            const double kirchner_fraction = 1 - glacier_fraction;
+            const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
+            const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
+            const double no_snow_storage_fraction = geo_cell_data.land_type_fractions_info().reservoir() + geo_cell_data.land_type_fractions_info().lake();
+            const double kirchner_routed_prec =  geo_cell_data.land_type_fractions_info().reservoir()*(1.0-parameter.msp.reservoir_direct_response_fraction) + geo_cell_data.land_type_fractions_info().lake();
+            const double snow_storage_fraction = 1.0 - no_snow_storage_fraction;// on this part, snow builds up, and melts.-> season time-response
+            const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
+            const double kirchner_fraction = 1 - direct_response_fraction;
             const double cell_area_m2 = geo_cell_data.area();
             const double glacier_area_m2 = geo_cell_data.area()*glacier_fraction;
 
@@ -260,13 +265,13 @@ namespace shyft {
                 response.ae.ae = actual_evapotranspiration::calculate_step(state.kirchner.q, response.pt.pot_evapotranspiration,
                                     parameter.ae.ae_scale_factor,std::max(state.hps.sca,glacier_fraction),  // a evap only on non-snow/non-glac area
                                     period.timespan());
+                double gm_mmh= shyft::m3s_to_mmh(response.gm_melt_m3s, cell_area_m2);
+                kirchner.step(period.start, period.end, state.kirchner.q, response.kirchner.q_avg, response.hps.outflow*snow_storage_fraction+prec*kirchner_routed_prec + gm_routed*gm_mmh, response.ae.ae); //all units mm/h over 'same' area
 
-                kirchner.step(period.start, period.end, state.kirchner.q, response.kirchner.q_avg, response.hps.outflow, response.ae.ae); //all units mm/h over 'same' area
-                double bare_lake_fraction = total_lake_fraction*(1.0 - state.hps.sca);// only direct response on bare (no snow-cover) lakes
                 response.total_discharge =
-                      std::max(0.0, prec - response.ae.ae)*bare_lake_fraction // when it rains, remove ae. from direct response
-                    + m3s_to_mmh(response.gm_melt_m3s, cell_area_m2)
-                    + response.kirchner.q_avg * (kirchner_fraction-bare_lake_fraction);
+                      std::max(0.0, prec - response.ae.ae)*direct_response_fraction // when it rains, remove ae. from direct response
+                    + gm_direct*gm_mmh  // glacier melt direct response                    
+                    + response.kirchner.q_avg*kirchner_fraction;
                 response.charge_m3s =
                     + shyft::mmh_to_m3s(prec, cell_area_m2)
                     - shyft::mmh_to_m3s(response.ae.ae, cell_area_m2)

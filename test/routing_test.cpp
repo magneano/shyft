@@ -50,10 +50,10 @@ TEST_CASE("test_build_valid_river_network") {
 
     using namespace std;
     using namespace shyft::core;
-    int a_id = 1;
-    int b_id = 2;
-    int c_id = 3;
-    int d_id = 4;
+    int64_t a_id = 1;
+    int64_t b_id = 2;
+    int64_t c_id = 3;
+    int64_t d_id = 4;
     routing::river a{ a_id,routing_info(b_id, 2*3600.0),routing::uhg_parameter(1.0) };// two hour delay from
     routing::river b{ b_id,routing_info(d_id, 0),routing::uhg_parameter(1.0) }; // give zero delay
     routing::river c{ c_id,routing_info(d_id, 3600.0),routing::uhg_parameter(1.0) };// give one hour delay

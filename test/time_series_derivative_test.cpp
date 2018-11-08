@@ -164,4 +164,34 @@ TEST_SUITE("time_series") {
     TEST_CASE("ts_linear_one_segment") {
         tc_ts_linear_one_segment(derivative_method::default_diff);
     }
+    TEST_CASE("derivative_ts_index_of") {
+        using shyft::nan;
+        apoint_ts a(ta1,1.0,ts_point_fx::POINT_AVERAGE_VALUE);
+        auto b = a.derivative();
+        for(size_t i=0;i<ta1.size();++i) {
+            FAST_CHECK_EQ(b.index_of(ta1.time(i)),a.index_of(ta1.time(i)));
+            FAST_CHECK_EQ(b.time(i),b.time(i));
+        }
+    }
+    TEST_CASE("derivative_inside_issue") {
+        /* https://github.com/statkraft/shyft/issues/352
+         * The following code reproduces the issue. 
+         * As seen from the last statement, 
+         * orig+orig_derivative_inside_inf contains values [2. 2. 2. 2.], 
+         * but 
+         * (orig+orig_derivative_inside_inf).inside evaluates all values as NaN. 
+         * Why?
+         * Ans: There was a bug in derivative.index_of, which is now fixed, and covered with the above test.
+         *      The original test-code, in c++ is shown below, with correct wanted behaviour
+         */
+        using shyft::nan;
+        apoint_ts orig(ta1,1.0,ts_point_fx::POINT_AVERAGE_VALUE);
+        auto a = orig.derivative().inside(nan,nan,nan,1.0,0.0);
+        auto b = (orig + orig.derivative().inside(nan,nan,nan,1.0,0.0)).inside(nan,nan,nan,1.0,0.0);
+        auto a_v = a.values();
+        auto b_v = b.values();
+        FAST_CHECK_EQ(a_v.size(),ta1.size());
+        for(auto&v:b_v)
+            FAST_CHECK_EQ(v,doctest::Approx(1.0));
+    }
 }

@@ -723,6 +723,12 @@ namespace shyft{
 		apoint_ts apoint_ts::convolve_w(const std::vector<double> &w, shyft::time_series::convolve_policy conv_policy) const {
 			return apoint_ts(std::make_shared<convolve_w_ts>(*this, w, conv_policy));
 		}
+        apoint_ts apoint_ts::slice(int i0, int n) const {
+            gpoint_ts *gpts = dynamic_cast<gpoint_ts*>(ts.get());
+            if (!gpts)
+                throw std::runtime_error("apoint_ts::slice() only allowed for ts of non-expression types");
+            return apoint_ts(make_shared<gpoint_ts>(gpts->slice(i0, n)));
+        }
 
         apoint_ts apoint_ts::rating_curve(const rating_curve_parameters & rc_param) const {
             return apoint_ts(std::make_shared<rating_curve_ts>(*this, rc_param));
@@ -787,7 +793,7 @@ namespace shyft{
 			return true;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const intv_t& percentile_list) {
 			std::vector<apoint_ts> r; r.reserve(percentile_list.size());
 			auto tsvx = deflate_ts_vector<gts_t>(tsv1);
 			// check of all tsvx.time_axis is of same type
@@ -828,7 +834,7 @@ namespace shyft{
 			return r;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const intv_t& percentile_list) {
 			return percentiles(ts_list, time_axis::generic_dt(ta), percentile_list);
 		}
 

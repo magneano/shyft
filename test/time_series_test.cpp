@@ -698,6 +698,60 @@ TEST_SUITE("time_series") {
         }
     }
 
+    TEST_CASE("test_time_series_slice") {
+
+        // Test data
+        vector<double> values = { 1.0, 2.0, 3.0, 4.0 };
+        const int n = std::size(values);
+        const int dt = 3600;
+        vector<utctime> times;
+        for(int i = 0; i < n+1; ++i) times.push_back(_t(dt * i));
+
+        // Create timeseries of three different types with the same data
+        typedef time_axis::generic_dt ta_t;
+        typedef point_ts<ta_t> ts_t;
+        std::array tss = { ts_t(ta_t(0, dt, n), values, POINT_AVERAGE_VALUE),
+                           ts_t(ta_t(make_shared<calendar>(), 0, dt, n), values, POINT_AVERAGE_VALUE),
+                           ts_t(ta_t(times), values, POINT_AVERAGE_VALUE)
+                         };
+
+        for (int tsi = 0; tsi < size(tss); ++tsi) {
+            ts_t &ts = tss[tsi];
+
+            /* First create all possible valid subsets of the timeseries, and verify correct result */
+            for (int start_ix = 0; start_ix < n; ++start_ix) {
+                for (int n_slice = 1; n_slice < (n - start_ix); ++n_slice) {
+                    ts_t sliced = ts.slice(start_ix, n_slice);
+
+                    // We should have a sliced time series with n_slice values, and identical point interpretation
+                    TS_ASSERT_EQUALS(sliced.size(), n_slice);
+                    TS_ASSERT_EQUALS(sliced.time_axis().size(), n_slice);
+                    TS_ASSERT_EQUALS(sliced.point_interpretation(), ts.point_interpretation());
+
+                    // Verify n_slice identical values and time points
+                    for (int i = 0; i < n_slice; ++i) {
+                        TS_ASSERT_EQUALS(sliced.get(0 + i).v, ts.get(start_ix + i).v);
+                        TS_ASSERT_EQUALS(sliced.time_axis().time(0 + i), ts.time_axis().time(start_ix + i));
+                    }
+
+                    // Verify last time point
+                    int last_ix = start_ix + n_slice;
+                    utctime end = ts.total_period().end;
+                    if (last_ix < ts.size()) end = ts.time_axis().time(last_ix);
+                    TS_ASSERT_EQUALS(sliced.time_axis().total_period().end, end);
+                }
+
+            }
+
+            /* Then verify that invalid subsets fail */
+            TS_ASSERT_THROWS(ts.slice(-10, 1), std::runtime_error); // Start before beginning
+            TS_ASSERT_THROWS(ts.slice(10, 1), std::runtime_error); // Start after end
+            TS_ASSERT_THROWS(ts.slice(0, 10), std::runtime_error); // Request too many items
+            TS_ASSERT_THROWS(ts.slice(0, -10), std::runtime_error); // Request too few items
+            TS_ASSERT_THROWS(ts.slice(0, 0), std::runtime_error); // Request no items
+        }
+    }
+
     TEST_CASE("test_ts_weighted_average") {
         using pts_t=point_ts<time_axis::fixed_dt>;
         calendar utc;
