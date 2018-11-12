@@ -65,7 +65,7 @@ TEST_SUITE("radiation_dingman") {
             ra.compute_ra_radiation(r,lat,rh,temp,t1);
             r_cur = r.db_radiation;
             std::cout<<"Kdb: " << r_cur<<std::endl;
-            TS_ASSERT(r_prev < r_cur);
+            TS_ASSERT(r_prev < r_cur);//the radiation should increase closer to equator
             r_prev = r_cur;
         }
     }

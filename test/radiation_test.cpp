@@ -62,7 +62,7 @@ TEST_SUITE("radiation") {
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
             rs_sum += r.rs_radiation(260.0);
-            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            //std::cout<<"ra24: "<<r.ra24_<<std::endl;
             std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;  
             std::cout<<"======================"<<std::endl;
         }
@@ -76,7 +76,7 @@ TEST_SUITE("radiation") {
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
-            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            //std::cout<<"ra24: "<<r.ra24_<<std::endl;
             std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;
             std::cout<<"======================"<<std::endl;
         }
@@ -89,7 +89,7 @@ TEST_SUITE("radiation") {
             r.rso_cs_radiation(lat, t, surface_normal, -21.0, 50.0, 150.0);
             ra_sum += r.ra_radiation();
             rso_sum += r.rso_radiation();
-            std::cout<<"ra24: "<<r.ra24_<<std::endl;                                    
+            //std::cout<<"ra24: "<<r.ra24_<<std::endl;
             std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl; 
             std::cout<<"======================"<<std::endl;                             
         }
@@ -121,7 +121,7 @@ TEST_SUITE("radiation") {
             ra_sum += r.ra_radiation();
             rahor_sum += r.ra_radiation_hor();
             rso_sum += r.rso_radiation();
-            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            //std::cout<<"ra24: "<<r.ra24_<<std::endl;
             std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;  
             std::cout<<"======================"<<std::endl;
         }
@@ -219,7 +219,7 @@ TEST_SUITE("radiation") {
             std::cout<<"rso: "<<r.rso_radiation()<<std::endl;
             rahor_sum += r.ra_radiation_hor();
             std::cout<<"rahor: "<<r.ra_radiation_hor()<<std::endl;
-            std::cout<<"ra24: "<<r.ra24_<<std::endl;
+            //std::cout<<"ra24: "<<r.ra24_<<std::endl;
             std::cout<<"sunset and rise: "<<r.sun_rise()<<"  "<<r.sun_set()<<std::endl;
             std::cout<<"======================"<<std::endl;
         }

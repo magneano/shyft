@@ -48,7 +48,11 @@ namespace shyft::core {
 		//struct state {}; // No state variables for this method
 
 		struct response {
-			double rcs_radiation = 0.0;
+			double dir_radiation = 0.0;
+			double dif_radiation = 0.0;
+			double ref_radiation = 0.0;
+			double tsw_radiation = 0.0;
+			double lw_radiation = 0.0;
 		};
 
 		template <class P>
@@ -72,9 +76,9 @@ namespace shyft::core {
 			double sun_rise() const {return omega1_24_*rad2deg;}
 			double sun_set() const {return omega2_24_*rad2deg;}
 
-			double ra24_=0.0;
+			//double ra24_=0.0;
 
-			/** \brief computes instantaneous clear-sky radiation  for inclined surfaces
+			/** \brief computes instantaneous short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
              * \param latitude, [deg]
              * \param temperature, [degC]
              * \param rhumidity, [percent]
@@ -132,9 +136,9 @@ namespace shyft::core {
 				if (omega1_24_ > omega2_24_) {omega1_24_ = omega2_24_; ra_= 0.0;}//slope is always shaded
 				rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
 
-				compute_abc(delta_,phi_,slope_,aspect_);
-				double costt24_ = costt24(omega1_24_,omega2_24_);
-				ra24_ = compute_ra(costt24_,doy_);
+				//compute_abc(delta_,phi_,slope_,aspect_);
+				//double costt24_ = costt24(omega1_24_,omega2_24_);
+				//ra24_ = compute_ra(costt24_,doy_);
 				//std::cout<<"ra24: "<< ra24_ << std::endl;
 
 				return rso_; // eq.(37)
