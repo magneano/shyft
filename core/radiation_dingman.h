@@ -71,33 +71,16 @@ namespace shyft::core {
 				phi_ = latitude*pi/180;
 
 				Ts_ = compute_rise_set(phi_,delta_);
-				//std::cout << "time_sunset: " << Ts_ << std::endl;
 				double KET = compute_total_extraterrestrial_radiation(phi_,delta_,Ts_,doy_);
-//				std::cout << "ket: " << KET << std::endl;
-
 				double phi_eq = equivalent_latitude(phi_,slope,aspect);
-//				std::cout << "phi_eq: " << phi_eq*180/pi << std::endl;
 				double diff = long_difference(phi_eq,slope,aspect);
-//				std::cout << "diff: " << diff*180/pi << std::endl;
 				double ts_sloped = compute_rise_set(phi_eq,delta_, diff);
-//				std::cout << "time_sunset_slope: " << ts_sloped << std::endl;
-
 				double KETs = compute_total_extraterrestrial_radiation(phi_eq,delta_,ts_sloped,doy_);
-//				std::cout << "kets: " << KETs << std::endl;
-
 				compute_transmissivities(rhumidity, temperature,Ts_, phi_, delta_, elevation);
 				double Kdirh = direct_beam_radiation(phi_,delta_,Ts_,doy_);
-//				std::cout << "kdirh: " << Kdirh << std::endl;
-
 				double Kdirhs = direct_beam_radiation(phi_eq,delta_,ts_sloped,doy_);
-//				std::cout << "kdirhs: " << Kdirhs << std::endl;
-
 				double Kdif = diffuse_radiation(phi_,delta_, Ts_,doy_);
-//				std::cout << "kdif: " << Kdif << std::endl;
-
 				double Kbs = backscattered_radiation(phi_,delta_, Ts_, doy_);
-//				std::cout << "kbs: " << Kbs << std::endl;
-//                std::cout << "===============================" << std::endl;
 
 				double rcs_horizontal = Kdirh+Kdif+Kbs;
 				double rcs_slope = Kdirhs+Kdif+Kbs;
@@ -213,17 +196,11 @@ namespace shyft::core {
              * \param elevation, [m] */
 			void compute_transmissivities(double rhumidity, double temperature, double time_sunset, double latitude, double declination, double elevation = 0.0){
 				double M = optical_air_mass(time_sunset,latitude,declination,elevation);
-				std::cout << "M: " << M << std::endl;
 				double W = 0.00493*(rhumidity/temperature)*exp(26.23-5416/temperature);
-//				std::cout << "W: " << W << std::endl;
 				tau_wa_  = 1 - 0.077 *pow(M*W,0.3);
-//				std::cout << "tau_wa: " << tau_wa_ << std::endl;
 				tau_da_ = pow(0.965,M);
-//				std::cout << "tau_da_: " << tau_da_ << std::endl;
 				tau_ws_ = 1 - 0.0225*M*W;
-//				std::cout << "tau_ws_: " << tau_ws_ << std::endl;
 				tau_rs_ = 0.972 - 0.08262*M+0.00933*M*M - 0.00095*M*M*M + 0.0000437*pow(M,4);
-//				std::cout << "tau_rs: " << tau_rs_ << std::endl;
 				tau_ds_ = pow(0.965,M);
 				total_tau_direct_ = tau_wa_*tau_da_*tau_ws_*tau_rs_*tau_ds_;
 				total_tau_diffuse_ = 0.5*tau_wa_*tau_da_*(1-tau_ws_*tau_rs_*tau_ds_);

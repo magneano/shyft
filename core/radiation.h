@@ -55,12 +55,10 @@ namespace shyft::core {
 			double lw_radiation = 0.0;
 		};
 
-		template <class P>
+		template <class P, class R>
 		struct calculator {
 			P param;
 			explicit calculator(const P& p):param(p) {}
-
-
 
 			double slope() const {return slope_*rad2deg;} // horizontal slope, [deg], should be calculated from normal vector
 			double aspect() const {return aspect_*rad2deg;} // surface aspect angle, [deg], 0 -- due south, -pi/2 -- due east, pi/2 -- due west, +-pi -- due north
@@ -76,17 +74,17 @@ namespace shyft::core {
 			double sun_rise() const {return omega1_24_*rad2deg;}
 			double sun_set() const {return omega2_24_*rad2deg;}
 
-			//double ra24_=0.0;
-
 			/** \brief computes instantaneous short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
              * \param latitude, [deg]
+             * \param utctime,
+             * \param surface_normal
              * \param temperature, [degC]
              * \param rhumidity, [percent]
-             * \param time -- utctime
-             * \param cell
+             * \param elevation
+             * \param rsm -- measured radiation, [W/m^2]
              * \return rso, [W/m^2] -- clear sky radiation*/
 			template <class V>
-			void rso_cs_radiation(double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0, double rsm = 0.0){
+			void rso_cs_radiation(R& response, double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0, double rsm = 0.0){
 				doy_ = utc.day_of_year(t);
 				lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute/60.0;
 				delta_ = compute_earth_declination(doy_);
@@ -107,6 +105,10 @@ namespace shyft::core {
 				costthor_ = costt(omega_);
 
                 compute_sun_rise_set(delta_,phi_,slope_,aspect_);
+//                std::cout<<"omega1_24: "<<omega1_24_<<std::endl;
+//                std::cout<<"omega1_24b: "<<omega1_24b_<<std::endl;
+//                std::cout<<"omega2_24: "<<omega2_24_<<std::endl;
+//                std::cout<<"omega2_24b: "<<omega2_24b_<<std::endl;
                 if (omega_>omega1_24_ and omega_<omega2_24_){
                     rahor_ = max(0.0, compute_ra(costthor_, doy_)); // eq.(1) with cos(theta)hor
                     //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
@@ -128,9 +130,6 @@ namespace shyft::core {
 				// clearness index for direct beam radiation
 
 				Kbo = min(1.0,max(-0.4,0.98 * exp(-0.00146*eatm_/param.turbidity/sin_beta - 0.075*pow((W/sin_beta),0.4)))); // eq.(17)
-//                std::cout<<"main eatm_: "<< eatm_ << std::endl;
-//                std::cout<<"main W: "<< W << std::endl;
-//                std::cout<<"main sin_beta: "<< sin_beta << std::endl;
 				double Kbohor = min(1.0,max(-0.4,0.98 * exp(-0.00146*eatm_/param.turbidity/sin_betahor - 0.075*pow((W/sin_betahor),0.4)))); // eq.(17)
 
 				double Kdo; // transmissivity of diffuse radiation, eq.(19)a,b,c
@@ -145,35 +144,16 @@ namespace shyft::core {
 
 				double fi_ = fi();//eq.(32)
 
-				fb_ = min(5.0,Kbo/Kbohor*ra_/(rahor_>0.0?rahor_:max(0.00001,ra_)));//eq.(34)
+				// fb_ = min(5.0,Kbo/Kbohor*ra_/(rahor_>0.0?rahor_:max(0.00001,ra_)));//eq.(34)
                 fb_ = ra_/(rahor_>0.0?rahor_:max(0.00001,ra_));//eq.(34)
 
-//				double phi1 = asin(sin(phi_)*cos(slope_)-cos(phi_)*sin(slope_)*cos(aspect_));
-//                double g = asin(sin(slope_)*sin(aspect_/cos(phi1)));
-//                double omegas = acos(-tan(phi1)*tan(delta_));
-//				double h0 = max(omegas,g-omegas);
-//				double h1 = min(omegas,g+omegas);
-//				double d = 0.5*(h1-h0);
-//				double e = d;
-//				fb_  = (sin(phi1)/sin(phi_)*(d - sin(d)*cos(e)*cos(g)/cos(omegas)))/(omegas-tan(omegas)); // ref.: Tian 2001
-//                std::cout<<"main Kbo: "<< Kbo << std::endl;
-//                std::cout<<"main Kbohor: "<< Kbohor << std::endl;
-//                std::cout<<"main ra_: "<< ra_ << std::endl;
-//                std::cout<<"main rahor_: "<< rahor_ << std::endl;
-//                std::cout<<"main fb_: "<< fb_ << std::endl;
-//                std::cout<<"main kb/kbhor_: "<< Kbo/Kbohor << std::endl;
 				double fia_ = fia(Kbohor,Kdohor); //eq.(33)
 
 				if (omega1_24_ > omega2_24_) {omega1_24_ = omega2_24_; ra_= 0.0;}//slope is always shaded
+				//if ((omega_ > omega2_24b_) and (omega_<omega1_24b_) and (omega1_24_<omega2_24b_) and (omega1_24b_<omega2_24_)){ra_ = 0.0;}
 				rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
-
-				//compute_abc(delta_,phi_,slope_,aspect_);
-				//double costt24_ = costt24(omega1_24_,omega2_24_);
-				//ra24_ = compute_ra(costt24_,doy_);   // a 24h analytical calculation (not required for our purpuse)
-				//std::cout<<"ra24: "<< ra24_ << std::endl;
-
-				//return rso_; // eq.(37)
 				rs_ = rs_radiation(rsm);
+				response.tsw_radiation = rso_;
 			}
 
 			/**\brief translates measured solar radiation from horizontal surfaces to slopes
@@ -186,13 +166,6 @@ namespace shyft::core {
 				else if (tauswhor>0.175 and tauswhor <0.42){KBhor = 0.022 - 0.280*tauswhor+0.828*tauswhor*tauswhor+0.765*pow(tauswhor,3);}
 				else {KBhor = 0.016*tauswhor;}
 				double KDhor = tauswhor - KBhor;
-//                std::cout<<"rsm: "<< rsm << std::endl;
-//                std::cout<<"fb_: "<< fb_ << std::endl;
-//                std::cout<<"KBhor: "<< KBhor << std::endl;
-//                std::cout<<"tauswhor: "<< tauswhor << std::endl;
-//                std::cout<<"KDhor: "<< KDhor << std::endl;
-//                std::cout<<"fia: "<< fia(KBhor,KDhor) << std::endl;
-//                std::cout<<"fi: "<< fi() << std::endl;
 				rs_ = rsm * (fb_*KBhor/tauswhor+fia(KBhor,KDhor)*KDhor/tauswhor+param.albedo*(1-fi())); /// TODO check if all theoretical things calculated before calling this function
 				return rs_;
 			}
@@ -290,22 +263,23 @@ namespace shyft::core {
 				if (omega2_24_ > omega_s){omega2_24_ = omega_s;}
 
 //
-//                // two periods of direct beam radiation (eq.7)
-//                if (sin(slope)>sin(phi)*cos(delta)+cos(phi)*sin(delta)){
-//                    double sinA = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));
-//                    double A = asin(sinA);
-//                    double sinB = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));
-//                    double B = asin(sinB);
-//                    omega2_24b_ = min(A,B);
-//                    omega1_24b_ = max(A,B);
-//                    double costt_omega2_24b = costt(omega2_24b_);
-//                    if (costt_omega2_24b<-0.001 or costt_omega2_24b>0.001){omega2_24b_ = -pi-omega2_24b_;}
-//                    double costt_omega1_24b=costt(omega1_24b_);
-//                    if ((costt_omega1_24b<-0.001 or costt_omega1_24b>0.001)){omega1_24b_ = pi-omega1_24b_;}
-//                    if ((omega2_24b_<omega1_24_) or (omega1_24b_<omega2_24_)){
-//                        omega2_24b_ = omega1_24_;
-//                        omega1_24b_ = omega1_24_;} // single period of sun
-//                }
+                // two periods of direct beam radiation (eq.7)
+                if (sin(slope)>sin(phi)*cos(delta)+cos(phi)*sin(delta)){
+                    double sinA = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));
+                    double A = asin(sinA);
+                    double sinB = min(1.0,max(-1.0,(a_*c_ + b_*pow(sqrt_bca,0.5))/bbcc));
+                    double B = asin(sinB);
+                    omega2_24b_ = min(A,B);
+                    omega1_24b_ = max(A,B);
+                    compute_abc(delta_,phi_,slope_,aspect_);
+                    double costt_omega2_24b = costt(omega2_24b_);
+                    if (costt_omega2_24b<-0.001 or costt_omega2_24b>0.001){omega2_24b_ = -pi-omega2_24b_;}
+                    double costt_omega1_24b=costt(omega1_24b_);
+                    if ((costt_omega1_24b<-0.001 or costt_omega1_24b>0.001)){omega1_24b_ = pi-omega1_24b_;}
+                    if ((omega2_24b_>omega1_24_) or (omega1_24b_<omega2_24_)){
+                        omega2_24b_ = omega1_24_;
+                        omega1_24b_ = omega1_24_;} // single period of sun
+                }
 			}
 			/** \brief computes standard atmospheric pressure
              * \param height, [m] -- elevation of the point
