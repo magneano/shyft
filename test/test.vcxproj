@@ -156,7 +156,6 @@
     <ClCompile Include="qm_test.cpp" />
     <ClCompile Include="routing_test.cpp" />
     <ClCompile Include="sceua_test.cpp" />
-    <ClCompile Include="radiation_test.cpp" />
     <ClCompile Include="test_ice_packing.cpp" />
     <ClCompile Include="test_pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
