@@ -73,6 +73,7 @@ namespace shyft::core {
 			double sun_set() const {return omega2_24_*rad2deg;}
 
 			/** \brief computes instantaneous predicted short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
+			 * ref.: Allen, R. G.; Trezza, R. & Tasumi, M. Analytical integrated functions for daily solar radiation on slopes Agricultural and Forest Meteorology, 2006, 139, 55-73
              * \param latitude, [deg]
              * \param utctime,
              * \param surface_normal
@@ -154,6 +155,7 @@ namespace shyft::core {
 			}
 
 			/**\brief translates measured solar radiation from horizontal surfaces to slopes
+			 * ref.: Allen, R. G.; Trezza, R. & Tasumi, M. Analytical integrated functions for daily solar radiation on slopes Agricultural and Forest Meteorology, 2006, 139, 55-73
 			 * \param latitude, [deg]
              * \param utctime,
              * \param surface_normal

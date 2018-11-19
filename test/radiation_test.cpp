@@ -9,18 +9,18 @@
 #include <cmath>
 #include <random>
 
-namespace shyft::core::radiation{
-    /** \tparam C is a cell, like shyft-cell, */
-    template <class C>
-    vector<arma::vec> surface_normal( const vector<C>& cells){
-        vector<arma::vec> r;
-        for(const auto&c:cells) {
-            double x=c.geo.mid_point().x;
-            r.push_back(arma::vec({1.0,1.0,1.0}));
-        }
-        return r;
-    }
-}
+//namespace shyft::core::radiation{
+//    /** \tparam C is a cell, like shyft-cell, */
+//    template <class C>
+//    vector<arma::vec> surface_normal( const vector<C>& cells){
+//        vector<arma::vec> r;
+//        for(const auto&c:cells) {
+//            double x=c.geo.mid_point().x;
+//            r.push_back(arma::vec({1.0,1.0,1.0}));
+//        }
+//        return r;
+//    }
+//}
 
 namespace shyft::test {
     using shyft::core::geo_cell_data;
@@ -65,10 +65,9 @@ TEST_SUITE("radiation") {
     using shyft::core::radiation::parameter;
     using shyft::core::radiation::response;
     using shyft::core::radiation::calculator;
-    using shyft::core::radiation::surface_normal;
+//    using shyft::core::radiation::surface_normal;
     using shyft::core::calendar;
     using shyft::test::cell;
-    using std::vector;
     using shyft::core::utctime;
     using shyft::test::trapezoidal_average;
     // test basics: creation, etc
@@ -572,8 +571,8 @@ TEST_SUITE("radiation") {
         }
 
     }*/
-    TEST_CASE("surface_normal_from_cells") {
-        vector<cell> cells;
-        auto r= surface_normal(cells);
-    }
+//    TEST_CASE("surface_normal_from_cells") {
+//        vector<cell> cells;
+//        auto r= surface_normal(cells);
+//    }
 }
