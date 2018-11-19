@@ -47,3 +47,11 @@ namespace expose {
             ;
     }
 }
+
+BOOST_PYTHON_MODULE(_radiation)
+{
+
+    boost::python::scope().attr("__doc__")="Shyft python api for the radiation model";
+    boost::python::docstring_options doc_options(true, true, false);// all except c++ signatures
+    expose::radiation();
+}
