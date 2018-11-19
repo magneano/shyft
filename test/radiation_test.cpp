@@ -9,7 +9,18 @@
 #include <cmath>
 #include <random>
 
-
+namespace shyft::core::radiation{
+    /** \tparam C is a cell, like shyft-cell, */
+    template <class C>
+    vector<arma::vec> surface_normal( const vector<C>& cells){
+        vector<arma::vec> r;
+        for(const auto&c:cells) {
+            double x=c.geo.mid_point().x;
+            r.push_back(arma::vec({1.0,1.0,1.0}));
+        }
+        return r;
+    }
+}
 
 namespace shyft::test {
     using shyft::core::geo_cell_data;
@@ -72,7 +83,7 @@ TEST_SUITE("radiation") {
 //        utctime t;
 //        arma::vec surface_normal({0.0,0.0,1.0});
 //        t = utc_cal.time(1970, 12, 21, 12, 30, 0, 0);
-//        r.rso_cs_radiation(lat, t, surface_normal, -31.0, 100.0, 0.0);
+//        r.psw_radiation(lat, t, surface_normal, -31.0, 100.0, 0.0);
 //                FAST_CHECK_EQ(r.slope(), doctest::Approx(0.0).epsilon(0.01));
 //                FAST_CHECK_EQ(r.aspect(), doctest::Approx(0.0).epsilon(0.01));
 //    }
@@ -99,18 +110,20 @@ TEST_SUITE("radiation") {
         SUBCASE("June") {
             std::cout << "========= June ========" << std::endl;
             ta = utc_cal.time(1970, 06, 21, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            //rad.psw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0);
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 06, 21, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                //rad.psw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0);
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
 
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -124,18 +137,18 @@ TEST_SUITE("radiation") {
         SUBCASE("January") {
             std::cout << "========= January =======" << std::endl;
             ta = utc_cal.time(1970, 01, 1, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0);
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0);
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 01, 1, h, 00, 0, 0); // January
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0);
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0);
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
 
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -148,18 +161,18 @@ TEST_SUITE("radiation") {
         SUBCASE("December") {
             std::cout << "========= December =======" << std::endl;
             ta = utc_cal.time(1970, 12, 21, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0);
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0);
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.tsw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 12, 21, h, 00, 0, 0); // January
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0);
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0);
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
 
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -197,18 +210,18 @@ TEST_SUITE("radiation") {
         SUBCASE("June") {
             std::cout << "========= June ========" << std::endl;
             ta = utc_cal.time(1970, 06, 21, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 06, 21, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
 
             std::cout << "rahor: " << av_rahor.result() << std::endl;
@@ -223,18 +236,18 @@ TEST_SUITE("radiation") {
         SUBCASE("January") {
             std::cout << "========= January ========" << std::endl;
             ta = utc_cal.time(1970, 01, 1, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 01, 1, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -248,18 +261,18 @@ TEST_SUITE("radiation") {
         SUBCASE("December") {
             std::cout << "========= December ========" << std::endl;
             ta = utc_cal.time(1970, 12, 12, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 12, 12, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -296,18 +309,18 @@ TEST_SUITE("radiation") {
         SUBCASE("June") {
             std::cout << "========= June ========" << std::endl;
             ta = utc_cal.time(1970, 06, 21, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 06, 21, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -319,18 +332,18 @@ TEST_SUITE("radiation") {
         SUBCASE("January") {
             std::cout << "========= January ========" << std::endl;
             ta = utc_cal.time(1970, 01, 1, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 01, 1, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -342,18 +355,18 @@ TEST_SUITE("radiation") {
         SUBCASE("December") {
             std::cout << "========= December ========" << std::endl;
             ta = utc_cal.time(1970, 12, 12, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 12, 12, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -392,18 +405,18 @@ TEST_SUITE("radiation") {
         SUBCASE("June") {
             std::cout << "========= June ========" << std::endl;
             ta = utc_cal.time(1970, 06, 21, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 06, 21, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -415,18 +428,18 @@ TEST_SUITE("radiation") {
         SUBCASE("January") {
             std::cout << "========= January ========" << std::endl;
             ta = utc_cal.time(1970, 01, 1, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 01, 1, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -438,18 +451,18 @@ TEST_SUITE("radiation") {
         SUBCASE("December") {
             std::cout << "========= December ========" << std::endl;
             ta = utc_cal.time(1970, 12, 12, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+            rad.tsw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.psw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 12, 12, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
+                rad.tsw_radiation(r, lat, t, surface_normal, 20.0, 50.0, 150.0, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.psw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -491,18 +504,18 @@ TEST_SUITE("radiation") {
                 SUBCASE("June") {
             std::cout << "========= June ========" << std::endl;
             ta = utc_cal.time(1970, 06, 21, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, elevation, ur(gen));
+            rad.psw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, elevation, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.tsw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 06, 21, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, elevation, ur(gen));
+                rad.psw_radiation(r, lat, t, surface_normal, 20.0, 50.0, elevation, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.tsw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -514,18 +527,18 @@ TEST_SUITE("radiation") {
                 SUBCASE("January") {
             std::cout << "========= January ========" << std::endl;
             ta = utc_cal.time(1970, 01, 1, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, elevation, ur(gen));
+            rad.psw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, elevation, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.tsw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 01, 1, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, elevation, ur(gen));
+                rad.psw_radiation(r, lat, t, surface_normal, 20.0, 50.0, elevation, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.tsw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;
@@ -537,18 +550,18 @@ TEST_SUITE("radiation") {
                 SUBCASE("December") {
             std::cout << "========= December ========" << std::endl;
             ta = utc_cal.time(1970, 12, 12, 00, 00, 0, 0);
-            rad.rso_cs_radiation(r, lat, ta, surface_normal, 20.0, 50.0, elevation, ur(gen));
+            rad.psw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, elevation, ur(gen));
             av_rahor.initialize(rad.ra_radiation_hor(), 0.0);
             av_ra.initialize(rad.ra_radiation(), 0.0);
-            av_rso.initialize(rad.rso_radiation(), 0.0);
-            av_rs.initialize(rad.rs_radiation(ur(gen)), 0.0);
+            av_rso.initialize(r.tsw_radiation, 0.0);
+            av_rs.initialize(r.tsw_radiation, 0.0);
             for (int h = 1; h < 24; ++h) {
                 t = utc_cal.time(1970, 12, 12, h, 00, 0, 0); // June
-                rad.rso_cs_radiation(r, lat, t, surface_normal, 20.0, 50.0, elevation, ur(gen));
+                rad.psw_radiation(r, lat, t, surface_normal, 20.0, 50.0, elevation, ur(gen));
                 av_rahor.add(rad.ra_radiation_hor(), h);
                 av_ra.add(rad.ra_radiation(), h);
-                av_rso.add(rad.rso_radiation(), h);
-                av_rs.add(rad.rs_radiation(ur(gen)), h);
+                av_rso.add(r.tsw_radiation, h);
+                av_rs.add(r.tsw_radiation, h);
             }
             std::cout << "rahor: " << av_rahor.result() << std::endl;
             std::cout << "ra: " << av_ra.result() << std::endl;

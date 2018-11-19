@@ -48,10 +48,11 @@ namespace shyft::core {
 		//struct state {}; // No state variables for this method
 
 		struct response {
-			double dir_radiation = 0.0;
-			double dif_radiation = 0.0;
-			double ref_radiation = 0.0;
-			double tsw_radiation = 0.0;
+			double dir_radiation = 0.0; // direct beam
+			double dif_radiation = 0.0; // diffuse
+			double ref_radiation = 0.0; // reflected
+			double psw_radiation = 0.0; // predicted clear sky solar radiation for inclined surface [W/m2]
+			double tsw_radiation = 0.0; // translated  solar radiation on a sloping surface based on measured horizontal radiation [W/m^2]
 			double lw_radiation = 0.0;
 		};
 
@@ -67,24 +68,20 @@ namespace shyft::core {
 
 			double ra_radiation() const {return ra_ ;} // extraterrestrial solar radiation for inclined surface[W/m2]
 			double ra_radiation_hor() {return rahor_;} // extraterrestrial solar radiation for horizontal surfaces
-			double rs_radiation()const {return rs_;}
-			double rso_radiation() const {return rso_ ;} // clear sky solar radiation for inclined surface [W/m2]
-
 
 			double sun_rise() const {return omega1_24_*rad2deg;}
 			double sun_set() const {return omega2_24_*rad2deg;}
 
-			/** \brief computes instantaneous short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
+			/** \brief computes instantaneous predicted short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
              * \param latitude, [deg]
              * \param utctime,
              * \param surface_normal
              * \param temperature, [degC]
              * \param rhumidity, [percent]
              * \param elevation
-             * \param rsm -- measured radiation, [W/m^2]
-             * \return rso, [W/m^2] -- clear sky radiation*/
+             * \return */
 			template <class V>
-			void rso_cs_radiation(R& response, double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0, double rsm = 0.0){
+			void psw_radiation(R& response, double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0){
 				doy_ = utc.day_of_year(t);
 				lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute/60.0;
 				delta_ = compute_earth_declination(doy_);
@@ -105,10 +102,6 @@ namespace shyft::core {
 				costthor_ = costt(omega_);
 
                 compute_sun_rise_set(delta_,phi_,slope_,aspect_);
-//                std::cout<<"omega1_24: "<<omega1_24_<<std::endl;
-//                std::cout<<"omega1_24b: "<<omega1_24b_<<std::endl;
-//                std::cout<<"omega2_24: "<<omega2_24_<<std::endl;
-//                std::cout<<"omega2_24b: "<<omega2_24b_<<std::endl;
                 if (omega_>omega1_24_ and omega_<omega2_24_){
                     rahor_ = max(0.0, compute_ra(costthor_, doy_)); // eq.(1) with cos(theta)hor
                     //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
@@ -151,23 +144,36 @@ namespace shyft::core {
 
 				if (omega1_24_ > omega2_24_) {omega1_24_ = omega2_24_; ra_= 0.0;}//slope is always shaded
 				//if ((omega_ > omega2_24b_) and (omega_<omega1_24b_) and (omega1_24_<omega2_24b_) and (omega1_24b_<omega2_24_)){ra_ = 0.0;}
-				rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
-				rs_ = rs_radiation(rsm);
-				response.tsw_radiation = rso_;
+				// rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
+				response.dir_radiation = Kbo*ra_;
+				response.dif_radiation = fia_*Kdo*rahor_;
+				response.ref_radiation = param.albedo*(1-fi_)*(Kbo+Kdo)*rahor_;
+				response.psw_radiation = response.dir_radiation + response.dif_radiation + response.ref_radiation; // clear sky solar radiation for inclined surface [W/m2]
+				response.tsw_radiation = response.psw_radiation; // if no measurements -- than we use predicted value
+				return;
 			}
 
 			/**\brief translates measured solar radiation from horizontal surfaces to slopes
+			 * \param latitude, [deg]
+             * \param utctime,
+             * \param surface_normal
+             * \param temperature, [degC]
+             * \param rhumidity, [percent]
+             * \param elevation, [m]
              * \param rsm,[W/m^2] -- measured solar radiation
-             * \return equivalent solar radiation on a sloping surface */
-			double rs_radiation(double rsm){
+             * \return */
+            template <class V>
+			void tsw_radiation(R& response, double latitude, utctime t, const V & surface_normal, double temperature=0.0, double rhumidity=40.0, double elevation = 0.0, double rsm = 0.0){
+			    // first calculate all predicted values
+                psw_radiation(response, latitude, t, surface_normal, temperature, rhumidity, elevation);
 				double tauswhor = rsm>0.0?rsm/(rahor_>0.0?rahor_:rsm):1.0; //? not sure if we use a theoretical rahor here
 				double KBhor;
 				if (tauswhor>=0.42){KBhor = 1.56*tauswhor-0.55;}
 				else if (tauswhor>0.175 and tauswhor <0.42){KBhor = 0.022 - 0.280*tauswhor+0.828*tauswhor*tauswhor+0.765*pow(tauswhor,3);}
 				else {KBhor = 0.016*tauswhor;}
 				double KDhor = tauswhor - KBhor;
-				rs_ = rsm * (fb_*KBhor/tauswhor+fia(KBhor,KDhor)*KDhor/tauswhor+param.albedo*(1-fi())); /// TODO check if all theoretical things calculated before calling this function
-				return rs_;
+				response.tsw_radiation = rsm * (fb_*KBhor/tauswhor+fia(KBhor,KDhor)*KDhor/tauswhor+param.albedo*(1-fi()));
+				return;
 			}
 		private:
 			double delta_;
@@ -180,8 +186,6 @@ namespace shyft::core {
 
 			double ra_ = 0.0; // extraterrestrial solar radiation for inclined surface[W/m2]
 			double rahor_ = 0.0; // extraterrestrial solar radiation for horizontal surfaces
-			double rso_ = 0.0; // clear sky solar radiation for inclined surface [W/m2]
-			double rs_ = 0.0; // equivalent solar radiation on a sloping surface based on measured horizontal radiation
 
 			const double gsc = 1367; // W/m2 -- solar constant
 			const double Pa2kPa = 0.001; // Pa to kPa
@@ -346,16 +350,7 @@ namespace shyft::core {
 			}
 		};
 
-/** \tparam C is a cell, like shyft-cell, */
-		template <class C>
-		vector<arma::vec> surface_normal( const vector<C>& cells){
-			vector<arma::vec> r;
-			for(const auto&c:cells) {
-				double x=c.geo.mid_point().x;
-				r.push_back(arma::vec({1.0,1.0,1.0}));
-			}
-			return r;
-		}
+
 	}
 
 }
