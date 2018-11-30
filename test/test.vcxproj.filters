@@ -132,6 +132,9 @@
     <ClCompile Include="time_series_decode_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
+    <ClCompile Include="time_series_qac_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
     <ClCompile Include="time_series_fixup_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>

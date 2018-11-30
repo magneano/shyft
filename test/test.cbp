@@ -227,6 +227,9 @@
 		<Unit filename="utctime_utilities_test.cpp">
 			<Option virtualFolder="time_and_calendar/" />
 		</Unit>
+		<Unit filename="time_series_qac_test.cpp">
+		     <Option virtualFolder="time_series" />
+		</Unit>
 		<Extensions>
 			<DoxyBlocks>
 				<comment_style block="0" line="0" />
