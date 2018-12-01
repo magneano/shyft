@@ -1,6 +1,5 @@
 #include "test_pch.h"
 #include "core/utctime_utilities.h"
-#include "core/geo_cell_data.h"
 #include <armadillo>
 #include <vector>
 #include <chrono>
@@ -23,10 +22,6 @@
 //}
 
 namespace shyft::test {
-    using shyft::core::geo_cell_data;
-    struct cell {
-        geo_cell_data geo;
-    };
 
     class trapezoidal_average {
     private:
@@ -67,7 +62,6 @@ TEST_SUITE("radiation") {
     using shyft::core::radiation::calculator;
 //    using shyft::core::radiation::surface_normal;
     using shyft::core::calendar;
-    using shyft::test::cell;
     using shyft::core::utctime;
     using shyft::test::trapezoidal_average;
     // test basics: creation, etc
@@ -194,9 +188,9 @@ TEST_SUITE("radiation") {
         utctime t;
         // checking for horizontal surface Eugene, OR, p.64, fig.1d
         // 24h  average radiation
-        double slope = 45*shyft::core::pi/180; // 45 S
+        double slope = 45*shyft::core::radiation::pi/180; // 45 S
         double proj = sin(slope);
-        double aspect = 0.0*shyft::core::pi/180;// facing south
+        double aspect = 0.0*shyft::core::radiation::pi/180;// facing south
         arma::vec surface_normal({proj*cos(aspect),proj*sin(aspect),cos(slope)});
         utctime ta;
         trapezoidal_average av_rahor;
@@ -292,7 +286,7 @@ TEST_SUITE("radiation") {
         double lat = 44.0;
         utctime t;
         // checking for horizontal surface Eugene, OR, p.64, fig.1e
-        double slope = 90*shyft::core::pi/180; // 90 S
+        double slope = 90*shyft::core::radiation::pi/180; // 90 S
         double proj = sin(slope);
         double aspect = 0.0;// facing south
         arma::vec surface_normal({proj*cos(aspect),proj*sin(aspect),cos(slope)});
@@ -386,9 +380,9 @@ TEST_SUITE("radiation") {
         double lat = 44.0;
         utctime t;
         // checking for horizontal surface Eugene, OR, p.64, fig.1f
-        double slope = 90*shyft::core::pi/180; // 90 N
+        double slope = 90*shyft::core::radiation::pi/180; // 90 N
         double proj = sin(slope);
-        double aspect = 180*shyft::core::pi/180;// facing north
+        double aspect = 180*shyft::core::radiation::pi/180;// facing north
         arma::vec surface_normal({proj*cos(aspect),proj*sin(aspect),cos(slope)});
         double ra_sum = 0.0;
         double rso_sum = 0.0;
@@ -485,9 +479,9 @@ TEST_SUITE("radiation") {
         double rhumidity = 50.0;
         utctime t;
         // checking for horizontal surface Eugene, OR, p.64, fig.1f
-        double slope = 90*shyft::core::pi/180; // 90 N
+        double slope = 90*shyft::core::radiation::pi/180; // 90 N
         double proj = sin(slope);
-        double aspect = 180*shyft::core::pi/180;// facing north
+        double aspect = 180*shyft::core::radiation::pi/180;// facing north
         arma::vec surface_normal({proj*cos(aspect),proj*sin(aspect),cos(slope)});
         double ra_sum = 0.0;
         double rso_sum = 0.0;

@@ -29,15 +29,16 @@ See file COPYING for more details **/
 //#include <proj.h>
 
 namespace shyft::core {
-	using std::vector;
-	using std::cos;
-	using std::sin;
-	using std::pow;
-	using std::exp;
-	using namespace std;
-	const double pi = boost::math::constants::pi<double>();
+
 
 	namespace radiation {
+        using std::vector;
+        using std::cos;
+        using std::sin;
+        using std::pow;
+        using std::exp;
+        using namespace std;
+        const double pi = boost::math::constants::pi<double>();
 
 		struct parameter {
 			double albedo = 0.1; // average albedo of the surrounding ground surface:0.15-0.25 -- grass, 0.10-0.15 -- coniferous forest, 0.15 - 0.25 -- deciduous forest, 0.04-0.08 -- open water, 0.15-0.35 -- bare soil
