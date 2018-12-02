@@ -12,11 +12,10 @@ namespace shyft {
         using cid_t=int64_t;
         using cids_t=std::vector<cid_t>;
     
-        /** \brief LandTypeFractions are used to describe 'type of land'
+        /** \brief land_type_fractions are used to describe 'type of land'
          *   like glacier, lake, reservoir and forest.
          *
-         *   It is designed as a part of GeoCellData (could be nested, but
-         *   we take python/swig into consideration). It's of course
+         *   It is designed as a part of geo_cell_data. It's of course
          *   questionable, since we could have individual models for each type
          *   of land, - but current approach is to use a cell-area, and then
          *   describe fractional properties.
@@ -56,6 +55,7 @@ namespace shyft {
 			double reservoir()const{ return reservoir_; } // regulated, assume zero time-delay to discharge
 			double forest() const { return forest_; }
 			double unspecified() const { return 1.0 - glacier_ - lake_ - reservoir_ - forest_; }
+			double snow_storage() const {return 1.0 - lake_ - reservoir_;}///<the fraction that allow snow storage
             void set_fractions(double glacier, double lake, double reservoir, double forest) {
                 const double tol = 1.0e-3; // Allow small round off errors
                 const double sum = glacier + lake + reservoir + forest;
@@ -72,6 +72,7 @@ namespace shyft {
             bool operator==(const land_type_fractions&o) const {
                 return std::abs(glacier_ - o.glacier_) + std::abs(lake_ - o.glacier_) + std::abs(reservoir_ - o.reservoir_) + std::abs(forest_-o.forest_)< 0.001;
             }
+            bool operator!=(const land_type_fractions&o) const {return !operator==(o);}
           private:
 			double glacier_;
 			double lake_;   // not regulated, assume time-delay until discharge
@@ -123,6 +124,7 @@ namespace shyft {
                 return o.catchment_id_ == catchment_id_ && mid_point_ == o.mid_point_ && std::abs(area_m2-o.area_m2)<0.1 && fractions==o.fractions
                 && std::abs(o.routing.distance-routing.distance)<0.1 && o.routing.id == routing.id;
             }
+            bool operator!=(const geo_cell_data& o) const {return !operator==(o);}
             routing_info routing;///< keeps the geo-static routing info, where it routes to, and routing distance.
         private:
 

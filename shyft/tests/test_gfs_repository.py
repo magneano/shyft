@@ -15,7 +15,7 @@ class GFSDataRepositoryTestCase(unittest.TestCase):
         today = utc.trim(api.utctime_now(), api.Calendar.DAY)
         return today - api.Calendar.DAY*2  # yesterday
 
-    @unittest.skipIf("SHYFT_SKIP_OPENDAP_TEST" in environ, "gfs repository is not available from everywhere")
+    @unittest.skipIf("SHYFT_OPENDAP_TEST" not in environ, "gfs repository is not available from everywhere")
     def test_open_dap_app(self):
         self._get_timeseries()
         self._get_forecast()

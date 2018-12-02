@@ -162,6 +162,11 @@ namespace shyft {
             * to a specified observed/wanted average
             */
             void adjust_q(double scale_factor) {kirchner.adjust_q(scale_factor);}
+            state scale_snow(const double& snow_storage_area_fraction) const {
+                state c{*this};
+                c.snow.swe *= snow_storage_area_fraction;
+                return c;
+            }
 
             x_serialize_decl();
         };
@@ -179,6 +184,14 @@ namespace shyft {
             // Stack response
             double total_discharge;
             double charge_m3s;
+                        // scale snow parts relative snow_storage_area 
+            response scale_snow(const double& snow_storage_area_fraction) const {
+                response c{*this};
+                c.snow.snow_state.swe *= snow_storage_area_fraction;
+                c.snow.outflow *=snow_storage_area_fraction;
+                // are there others that we should also scale, sca, is a still meaningful, unscaled ?
+                return c;
+            }
         };
 
 
@@ -220,10 +233,9 @@ namespace shyft {
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
             const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
             const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
-            const double no_snow_storage_fraction = geo_cell_data.land_type_fractions_info().reservoir() + geo_cell_data.land_type_fractions_info().lake();
+            const double snow_storage_fraction = geo_cell_data.land_type_fractions_info().snow_storage();// on this part, snow builds up, and melts.-> season time-response
             const double kirchner_routed_prec =  geo_cell_data.land_type_fractions_info().reservoir()*(1.0-parameter.msp.reservoir_direct_response_fraction) + geo_cell_data.land_type_fractions_info().lake();
 
-            const double snow_storage_fraction = 1.0 - no_snow_storage_fraction;// on this part, snow builds up, and melts.-> season time-response
             const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
             const double kirchner_fraction = 1 - direct_response_fraction;
             const double cell_area_m2 = geo_cell_data.area();
@@ -237,7 +249,7 @@ namespace shyft {
                 double rad = rad_accessor.value(i);
                 double rel_hum = rel_hum_accessor.value(i);
                 double prec = p_corr.calc(prec_accessor.value(i));
-                state_collector.collect(i, state);///< \note collect the state at the beginning of each period (the end state is saved anyway)
+                state_collector.collect(i, state.scale_snow(snow_storage_fraction));///< \note collect the state at the beginning of each period (the end state is saved anyway)
 
                 hbv_snow.step(state.snow, response.snow, period.start, period.end, prec, temp); // outputs mm/h, interpreted as over the entire area
 
@@ -262,9 +274,9 @@ namespace shyft {
                 response.snow.snow_state=state.snow;//< note/sih: we need snow in the response due to calibration
 
                 // Possibly save the calculated values using the collector callbacks.
-                response_collector.collect(i, response);
+                response_collector.collect(i, response.scale_snow(snow_storage_fraction));
                 if(i+1==i_end)
-                    state_collector.collect(i+1, state);///< \note last iteration,collect the  final state as well.
+                    state_collector.collect(i+1, state.scale_snow(snow_storage_fraction));///< \note last iteration,collect the  final state as well.
 
             }
             response_collector.set_end_response(response);

@@ -82,6 +82,9 @@
 		<Unit filename="api_test.cpp">
 			<Option virtualFolder="api/" />
 		</Unit>
+		<Unit filename="geo_test.cpp">
+			<Option virtualFolder="api/" />
+		</Unit>
 		<Unit filename="bayesian_kriging_test.cpp">
 			<Option virtualFolder="interpolation/" />
 		</Unit>

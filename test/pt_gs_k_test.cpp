@@ -343,6 +343,10 @@ TEST_CASE("ptgsk_lake_reservoir_response") {
     rc.initialize(tax,0,0,cell_area);
     pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,s1,sc,rc);
     FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266*0.7).epsilon(0.01)); // first with 0 precip, nothing should happen
+    //-- verify that buildup is only on non lake + reservoir area
+    FAST_CHECK_EQ(rc.snow_swe.value(0), doctest::Approx(0.0).epsilon(0.001));// first step is 0.0 on the average, there is no precip
+    FAST_CHECK_EQ(rc.snow_swe.value(1), doctest::Approx(1.548).epsilon(0.01));// average second step is 1.5 mm + initial bareground mm, since it only build on non-lake,rsv area
+    FAST_CHECK_EQ(rc.snow_swe.value(2), doctest::Approx(3.048).epsilon(0.01));// average third step is 1.5 +1.5 mm + initial bareground mm, etc..
     auto expected_1 = 0.266+0.3*0.5*mmh_to_m3s(prec.value(1),cell_area);
     FAST_CHECK_EQ(rc.avg_discharge.value(1), doctest::Approx(expected_1).epsilon(0.05)); // precip on rsv direct effect
     auto expected_2 = 0.2*mmh_to_m3s(prec.value(1),cell_area)*(1.0-0.3)+0.3*mmh_to_m3s(prec.value(1),cell_area);
