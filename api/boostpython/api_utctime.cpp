@@ -2,7 +2,7 @@
 See file COPYING for more details **/
 #include "boostpython_pch.h"
 #include "core/utctime_utilities.h"
-
+#include <functional>
 /*
  * This section provides a  functional-convertible mechanism that was lacking in boost python.
  * The idea is that there is a function Fx that takes a type Source and construct inplace a type Target.
@@ -192,6 +192,9 @@ namespace expose {
 		static utctime abs_timespan(utctime x) {
 			return x>=x.zero() ? x:-x;
 		}
+		static int64_t _hash_(utctime x) {
+            return std::hash<int64_t>{}(int64_t(x.count()));
+        }
 		static double _float_(utctime x) {
 			return to_seconds(x);
 		}
@@ -374,6 +377,8 @@ namespace expose {
 			.def("sqrt",raw_function(utctime_ext::_sqrt_,1))
 			//.def(self % self)
 			.def(-self)
+            // hash is needed!
+            .def("__hash__",&utctime_ext::_hash_,(py::arg("self")))
 			;
 			def("utctime_now",utctime_now,"returns time now as seconds since 1970s");
             def("deltahours",deltahours,args("n"),"returns time equal to specified n hours");

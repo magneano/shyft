@@ -40,7 +40,7 @@ class Calendar(unittest.TestCase):
         self.assertEqual(7, osl.diff_units(t0, t1, api.Calendar.DAY))
         self.assertEqual(1, osl.diff_units(t0, t1, api.Calendar.WEEK))
         self.assertEqual(0, osl.diff_units(t0, t1, api.Calendar.MONTH))
-        self.assertEqual(7 * 24, osl.diff_units(t0, t1, api.deltahours(1)))
+        self.assertEqual(7*24, osl.diff_units(t0, t1, api.deltahours(1)))
 
     def test_calendar_add_during_dst(self):
         osl = api.Calendar("Europe/Oslo")
@@ -164,7 +164,7 @@ class Calendar(unittest.TestCase):
         p_0_1 = api.UtcPeriod(t0, t1)
         p_0_3 = api.UtcPeriod(t0, t3)
         assert api.UtcPeriod(t0, t1).trim(utc, utc.MONTH, api.trim_policy.TRIM_IN) == p_0_1
-        assert api.UtcPeriod(t0, t1).trim(utc, 3600 * 24 * 30, api.trim_policy.TRIM_IN) == p_0_1
+        assert api.UtcPeriod(t0, t1).trim(utc, 3600*24*30, api.trim_policy.TRIM_IN) == p_0_1
         assert api.UtcPeriod(t0, t1 + 1).trim(utc, utc.MONTH) == p_0_1
         assert api.UtcPeriod(t1 - 1, t2 + 1).trim(utc, utc.MONTH, api.trim_policy.TRIM_OUT) == p_0_3
 
@@ -234,18 +234,18 @@ class Calendar(unittest.TestCase):
     def test_time_math(self):
         t = api.time
         self.assertAlmostEqual(t(2) + t(2), 4)
-        self.assertAlmostEqual(t(2) + 2,  4)
-        self.assertAlmostEqual(t(2) + 2.2,  4.2)
+        self.assertAlmostEqual(t(2) + 2, 4)
+        self.assertAlmostEqual(t(2) + 2.2, 4.2)
 
         self.assertAlmostEqual(t(2) - t(2), 0.0)
-        self.assertAlmostEqual(t(2) - 2,  0)
-        self.assertAlmostEqual(t(2) - 2.2,  -0.2)
+        self.assertAlmostEqual(t(2) - 2, 0)
+        self.assertAlmostEqual(t(2) - 2.2, -0.2)
 
         self.assertAlmostEqual(t(2)*t(3), 6.0)
-        self.assertAlmostEqual(t(2)*0.1,  0.2)
+        self.assertAlmostEqual(t(2)*0.1, 0.2)
 
         self.assertAlmostEqual(t(2)/t(3), 0.666667)
-        self.assertAlmostEqual(t(2)/0.1,  20.0)
+        self.assertAlmostEqual(t(2)/0.1, 20.0)
 
         self.assertAlmostEqual(t(2)//t(3), 0)
         self.assertAlmostEqual(t(10)//3, 3)
@@ -253,7 +253,7 @@ class Calendar(unittest.TestCase):
         self.assertAlmostEqual(abs(t(-3)), 3)
         self.assertAlmostEqual(abs(t(3.2)), 3.2)
 
-        self.assertAlmostEqual( t(10)%3, 1.0)
+        self.assertAlmostEqual(t(10)%3, 1.0)
 
     def test_time_floor(self):
         self.assertAlmostEqual(math.floor(api.time(3.2)), 3.0)
@@ -273,9 +273,20 @@ class Calendar(unittest.TestCase):
         self.assertIsNotNone(a)
         b = api.time(a)/1000.0
         self.assertIsNotNone(b)
-        sb=str(b)
-        self.assertTrue(len(sb)>0)
+        sb = str(b)
+        self.assertTrue(len(sb) > 0)
         pass
+
+    def test_time_hash(self):
+        t0 = api.time('2018-01-01T01:02:03Z')
+        t1 = api.time('2018-01-01T01:02:03Z')
+        h0 = hash(t0)
+        h1 = hash(t1)
+        self.assertEqual(h0, h1)
+        d = {t0: 'A'}
+        self.assertTrue(t0 in d)
+        self.assertTrue(t1 in d)
+
 
 if __name__ == "__main__":
     unittest.main()
