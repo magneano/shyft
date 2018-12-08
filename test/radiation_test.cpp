@@ -7,6 +7,7 @@
 #include "core/radiation.h"
 #include <cmath>
 #include <random>
+#include <tuple>
 
 //namespace shyft::core::radiation{
 //    /** \tparam C is a cell, like shyft-cell, */
@@ -56,6 +57,7 @@ namespace shyft::test {
 
 }
 
+
 TEST_SUITE("radiation") {
     using shyft::core::radiation::parameter;
     using shyft::core::radiation::response;
@@ -64,6 +66,7 @@ TEST_SUITE("radiation") {
     using shyft::core::calendar;
     using shyft::core::utctime;
     using shyft::test::trapezoidal_average;
+    using shyft::utility::geometry::triangle;
     // test basics: creation, etc
 
 
@@ -80,6 +83,15 @@ TEST_SUITE("radiation") {
 //                FAST_CHECK_EQ(r.slope(), doctest::Approx(0.0).epsilon(0.01));
 //                FAST_CHECK_EQ(r.aspect(), doctest::Approx(0.0).epsilon(0.01));
 //    }
+TEST_CASE("geometry"){
+    //arma::vec vertex({1.0,1.0,1.0});
+    //triangle tr_arma(vertex, vertex,vertex);
+    std::tuple<double,double,double> point1, point2,point3;
+
+    triangle tr_tuple(point1, point2,point3);
+
+
+}
 
     TEST_CASE("check_solar_radiation_horizontal"){
         parameter p;
