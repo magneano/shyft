@@ -83,6 +83,8 @@ TEST_SUITE("radiation") {
         FAST_CHECK_EQ(tr.aspect, doctest::Approx(0.0).epsilon(0.01));
         //std::cout<<std::get<0>(tr.normal)<<" "<<std::get<1>(tr.normal)<<" "<<std::get<2>(tr.normal)<<std::endl;
 
+
+
     }
     TEST_CASE("check_slope_aspect"){
         /**\brief check slope and aspect*/

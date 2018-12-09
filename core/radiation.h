@@ -38,11 +38,11 @@ namespace shyft {
                     make_triangle();
                 }
 
-                Point normal;
-                Point mid_point;
-                double slope;
-                double aspect;
-                double elevation;
+                Point normal = std::make_tuple(0.0,0.0,0.0);
+                Point mid_point = std::make_tuple(0.0,0.0,0.0);
+                double slope{0.0};
+                double aspect{0.0};
+                double elevation{0.0};
 
             private:
                 void make_triangle(){
@@ -59,7 +59,7 @@ namespace shyft {
                     double x = (x1+x2+x3)/3.0;
                     double y = (y1+y2+y3)/3.0;
                     double z = (z1+z2+z3)/3.0;
-
+                    mid_point = std::make_tuple(x,y,z);
 
                     //find normal vector
                     Point p1p2 = std::make_tuple(x2-x1,y2-y1,z2-z1);
@@ -67,14 +67,13 @@ namespace shyft {
                     double normal_x = std::get<1>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<1>(p1p3);
                     double normal_y = -std::get<0>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<0>(p1p3);
                     double normal_z = std::get<0>(p1p2)*std::get<1>(p1p3) - std::get<1>(p1p2)*std::get<0>(p1p3);
-
                     normal = std::make_tuple(normal_x,normal_y,normal_z);
-                    mid_point = std::make_tuple(x,y,z);
+
+                    // slope, aspect, elevation
                     slope = atan2(pow(pow(normal_x,2)+pow(normal_y,2),0.5),normal_z);
                     aspect = atan2(normal_y, normal_x);
                     elevation = std::get<2>(mid_point);
                 }
-
 
 
             };
