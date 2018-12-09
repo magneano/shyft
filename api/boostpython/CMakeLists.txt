@@ -45,7 +45,7 @@
         api_hbv_soil.cpp                                  api_time_series.cpp
         api_hbv_tank.cpp                                api_utctime.cpp
         api_interpolation.cpp                           api_vectors.cpp
-            #api_radiation.cpp
+            api_radiation.cpp
      )
 
     add_library(${core_api} SHARED ${core_api_sources} )

@@ -14,7 +14,7 @@ namespace expose {
         typedef arma::vec surface_normal;
 
         class_<parameter>("RadiationParameter")
-            .def(init<optional<double,double>>(args("albedo","turbidity"),"a new object with specified parameters"))
+            .def(init<double,double>(args("albedo","turbidity"),"a new object with specified parameters"))
             .def_readwrite("albedo",&parameter::albedo,"typical value 0.2")
             .def_readwrite("turbidity", &parameter::turbidity,"typical value 1.0")
             ;
