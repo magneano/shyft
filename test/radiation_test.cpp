@@ -81,7 +81,7 @@ TEST_SUITE("radiation") {
         triangle tr(point1, point2,point3);
         FAST_CHECK_EQ(tr.slope, doctest::Approx(0.0).epsilon(0.01));
         FAST_CHECK_EQ(tr.aspect, doctest::Approx(0.0).epsilon(0.01));
-        //std::cout<<std::get<0>(tr.normal)<<" "<<std::get<1>(tr.normal)<<" "<<std::get<2>(tr.normal)<<std::endl;
+
 
 
 

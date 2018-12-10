@@ -16,6 +16,7 @@
 #include "mocks.h"
 #include "core/time_series.h"
 #include "core/utctime_utilities.h"
+#include "core/cell_model.h"
 
 
 
@@ -36,7 +37,11 @@ namespace shyft::core::radiation_model{
     using namespace std;
 
 
+
     struct radiation_ts  {
+
+
+
         struct parameter{
             typedef radiation::parameter rad_parameter_t;
 
@@ -97,12 +102,13 @@ namespace shyft::core::radiation_model{
         };
 
         template<template <typename, typename> class A, class R, class T_TS, class RH_TS, class T,
-                 class GCD, class P>
+                 class GCD, class P,class RC>
                         void run_radiation_model(const GCD& geo_cell_data,
                                 const P& parameter,
                                                  const T& time_axis, int start_step, int  n_steps,
                                                  const T_TS& temp,
-                                                 const RH_TS& rel_hum) {
+                                                 const RH_TS& rel_hum,
+                                                 RC& response_collector) {
             // Access time series input data through accessors of template A (typically a direct accessor).
             using temp_accessor_t = A<T_TS, T>;
             using rel_hum_accessor_t = A<RH_TS, T>;
@@ -123,14 +129,49 @@ namespace shyft::core::radiation_model{
 
                 sw_radiation.psw_radiation(response.rad, geo_cell_data.mid_point().x, t, surface_normal, temp, rel_hum, geo_cell_data.mid_point().z);//
 
-                std::cout<<response.rad.psw_radiation<<"  ===== "<<std::endl;
+                //std::cout<<response.rad.psw_radiation<<"  ===== "<<std::endl;
 
 
-                //response_collector.collect(i, response);///< \note collect the response valid for the i'th period (current state is now at the end of period)
+                response_collector.collect(i, response);///< \note collect the response valid for the i'th period (current state is now at the end of period)
 
             }
-            //response_collector.set_end_response(response);
+            response_collector.set_end_response(response);
         }
+
+        typedef parameter parameter_t;
+        typedef response response_t;
+        typedef shared_ptr<parameter_t> parameter_t_;
+        typedef shared_ptr<response_t>  response_t_;
+        struct all_response_collector {
+            double destination_area;///< in [m^2]
+            // these are the one that we collects from the response, to better understand the model::
+            pts_t rad_output;///< potential evap mm/h
+
+            response_t end_reponse;///<< end_response, at the end of collected
+
+            explicit all_response_collector() {}
+            all_response_collector(const timeaxis_t& time_axis)
+                    : rad_output(time_axis, 0.0) {}
+
+            /**\brief called before run to allocate space for results */
+            void initialize(const timeaxis_t& time_axis,int start_step,int n_steps) {
+                ts_init(rad_output, time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+            }
+
+            /**\brief Call for each time step, to collect needed information from R
+            *
+            * The R in this case is the Response type defined for the pt_g_s_k stack
+            * and in principle, we can pick out all needed information from this.
+            * The values are put into the plain point time-series at the i'th position
+            * corresponding to the i'th simulation step, .. on the time-axis.. that
+            * again gives us the concrete period in time that this value applies to.
+            *
+            */
+            void collect(size_t idx, const response_t& response) {
+                rad_output.set(idx, response.rad.psw_radiation);
+            }
+            void set_end_response(const response_t& r) { end_reponse = r; }
+        };
 
     };
 
@@ -246,11 +287,16 @@ TEST_SUITE("radiation_ts_model") {
         geo_cell_data geo_cell_data;
         radiation_ts::parameter parameter(rad_param);
         radiation_ts rm;
-        rm.run_radiation_model<direct_accessor, radiation_ts::response>(geo_cell_data, parameter, time_axis,0,0, temp,rel_hum);
+        radiation_ts::all_response_collector response_collector(time_axis);
 
-        //auto snow_swe = response_collector.snow_swe;
-        //for (size_t i = 0; i < snow_swe.size(); ++i)
-        //TS_ASSERT(std::isfinite(snow_swe.get(i).v) && snow_swe.get(i).v >= 0);
+        rm.run_radiation_model<direct_accessor, radiation_ts::response>(geo_cell_data, parameter, time_axis,0,0, temp,rel_hum,response_collector);
+
+//        std::cout<<response.rad.psw_radiation<<"  ===== "<<std::endl;
+        auto swrad = response_collector.rad_output;
+        for (size_t i = 0; i < swrad.size(); ++i) {
+            TS_ASSERT(std::isfinite(swrad.get(i).v) && swrad.get(i).v >= 0);
+            std::cout<<swrad.get(i).v<<std::endl;
+        }
     }
 
 
