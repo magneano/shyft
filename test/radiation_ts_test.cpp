@@ -206,40 +206,6 @@ namespace shyfttest {
     };
 }; // End namespace shyfttest
 
-namespace shyft::test {
-
-    class trapezoidal_average {
-    private:
-        double area = 0.0;
-        double f_a = 0.0;; // Left hand side of next integration subinterval
-        double t_start = 0.0; // Start of integration period
-        double t_a = 0.0; // Left hand side time of next integration subinterval
-    public:
-        explicit trapezoidal_average() {}
-
-        /** \brief initialize must be called to reset states before being used during ode integration.
-         */
-        void initialize(double f0, double t_start) {
-            this->f_a = f0;
-            this->t_start = t_start;
-            t_a = t_start;
-            area = 0.0;
-        }
-
-        /** \brief Add contribution to average using a simple trapezoidal rule
-         *
-         * See: http://en.wikipedia.org/wiki/Numerical_integration
-         */
-        void add(double f, double t) {
-            area += 0.5*(f_a + f)*(t - t_a);
-            f_a = f;
-            t_a = t;
-        }
-
-        double result() const { return area/(t_a - t_start); }
-    };
-
-}
 
 TEST_SUITE("radiation_ts_model") {
     //using shyft::core::radiation::parameter;
@@ -248,7 +214,6 @@ TEST_SUITE("radiation_ts_model") {
     //    using shyft::core::radiation::surface_normal;
     using shyft::core::calendar;
     using shyft::core::utctime;
-    using shyft::test::trapezoidal_average;
     using shyft::core::radiation_model::radiation_ts;
     // test basics: creation, etc
 

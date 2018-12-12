@@ -84,11 +84,6 @@ namespace shyft {
 
 
         namespace radiation {
-            using std::vector;
-            using std::cos;
-            using std::sin;
-            using std::pow;
-            using std::exp;
             using namespace std;
             const double pi = boost::math::constants::pi<double>();
 
