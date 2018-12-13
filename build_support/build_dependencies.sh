@@ -2,8 +2,8 @@
 export SHYFT_WORKSPACE=${SHYFT_WORKSPACE:=$(readlink --canonicalize --no-newline `dirname ${0}`/../..)}
 # to align the cmake support:
 SHYFT_DEPENDENCIES_DIR=${SHYFT_DEPENDENCIES_DIR:=${SHYFT_WORKSPACE}/shyft_dependencies}
-armadillo_name=armadillo-9.100.5
-dlib_name=dlib-19.15
+armadillo_name=armadillo-9.200.4
+dlib_name=dlib-19.16
 boost_ver=1_68_0
 pybind11_ver=v2.2.3
 miniconda_ver=4.5.4

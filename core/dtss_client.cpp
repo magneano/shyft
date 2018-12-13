@@ -158,7 +158,7 @@ void client::close(int timeout_ms) {
 }
 
 vector<apoint_ts>
-client::percentiles(ts_vector_t const& tsv, utcperiod p, gta_t const&ta, const vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
+client::percentiles(ts_vector_t const& tsv, utcperiod p, gta_t const&ta, const std::vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
     if (tsv.size() == 0)
         throw runtime_error("percentiles requires a source ts-vector with more than 0 time-series");
     if (percentile_spec.size() == 0)
@@ -198,7 +198,7 @@ client::percentiles(ts_vector_t const& tsv, utcperiod p, gta_t const&ta, const v
 		);
 		return r;
     } else {
-        vector<int> p_spec;
+        vector<int64_t> p_spec;
         bool can_do_server_side_average=true; // in case we are searching for min-max extreme, we can not do server-side average
         for(size_t i=0;i<percentile_spec.size();++i) {
             p_spec.push_back(int(percentile_spec[i]));

@@ -917,6 +917,59 @@ class TimeSeries(unittest.TestCase):
         self.assertAlmostEqual(ba.value(0), 2.0)
         self.assertAlmostEqual(ab.value(7), 1.0)
 
+    def test_ts_slice(self):
+
+        # Test data
+        values = np.linspace(1, 4, 4)
+        dt = 3600
+        times = [0.0] + [dt*v for v in values]
+
+        # Make three TimeSeries with with the same data in three different TimeAxes
+        tsv = api.TsVector()
+        tsv.append(api.TimeSeries(ta=api.TimeAxis(times[0], dt, len(values)),
+                                  values=values, point_fx=api.POINT_AVERAGE_VALUE) )
+        tsv.append(api.TimeSeries(ta=api.TimeAxis(api.Calendar(), times[0], dt, len(values)),
+                                  values=values, point_fx=api.POINT_AVERAGE_VALUE))
+        tsv.append(api.TimeSeries(ta=api.TimeAxis(times),
+                                  values=values, point_fx=api.POINT_AVERAGE_VALUE))
+
+        for ts in tsv:
+
+            # Make all possible valid slices of all timeseries
+            for start in range(len(values)):
+                for n in range(1,len(values)-start+1):
+                    sliced = ts.slice(start, n)
+
+                    # We should have a sliced TimeSeriew with n elements and identical point interpretation
+                    self.assertEqual(len(sliced), n)
+                    self.assertEqual(len(sliced.time_axis), n)
+                    self.assertEqual(sliced.point_interpretation(), ts.point_interpretation())
+
+                    # Verify n identical time_points and values
+                    for i in range(n):
+                        self.assertEqual(sliced.value(i), ts.value(start+i))
+                        self.assertEqual(sliced.time_axis.time(i), ts.time_axis.time(start+i))
+
+                    # Verify last time point
+                    last_ix = start + n
+                    end = ts.time_axis.total_period().end
+                    if last_ix < len(ts):
+                        end = ts.time_axis.time(last_ix)
+                    self.assertEqual(sliced.time_axis.total_period().end, end)
+
+            # Then verify that invalid slices fail
+            with self.assertRaises(RuntimeError):
+                ts.slice(-10, 1)  # Start before beginning
+            with self.assertRaises(RuntimeError):
+                ts.slice(10, 1)  # Start after end
+            with self.assertRaises(RuntimeError):
+                ts.slice(0, 10)  # Request too many items
+            with self.assertRaises(RuntimeError):
+                ts.slice(0, -10)  # Request too few items
+            with self.assertRaises(RuntimeError):
+                ts.slice(0, 0)  # Request no items
+
+
     def test_extend_vector_of_timeseries(self):
         t0 = api.utctime_now()
         dt = api.deltahours(1)

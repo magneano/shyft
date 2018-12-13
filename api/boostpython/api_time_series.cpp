@@ -1180,6 +1180,13 @@ namespace expose {
                  doc_parameter("ts","TimeSeries","time-series to merge the time,value points from")
                  doc_returns("self","TimeSeries","self modified with the merged points from other ts")
             )
+            .def("slice",&apoint_ts::slice,(py::arg("self"),py::arg("i0"),py::arg("n")),
+                 doc_intro("Given that self is a concrete point-ts(not an expression), or empty ts,")
+                 doc_intro("return a new TimeSeries containing the n values starting from index i0.")
+                 doc_parameters()
+                 doc_parameter("i0", "int", "Index of first element to include in the slice")
+                 doc_parameter("n", "int", "Number of elements to include in the slice")
+            )
             .def("pow",pow_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains pow(self,number)")
             .def("pow",pow_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains pow(self,ts_other)")
             .def("min",min_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains the min of self and number for each time-step")

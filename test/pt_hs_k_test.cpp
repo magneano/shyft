@@ -140,6 +140,15 @@ TEST_CASE("pt_hs_k_lake_reservoir_response") {
     FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266*0.7).epsilon(0.01)); // first with 0 precip, nothing should happen
     auto expected_1 = 0.266+0.3*0.5*mmh_to_m3s(prec.value(1),cell_area);
     FAST_CHECK_EQ(rc.avg_discharge.value(1), doctest::Approx(expected_1).epsilon(0.05)); // precip on rsv direct effect
+    //-- verify snow storage on non lake/rsv only
+    FAST_CHECK_EQ(sc.snow_swe.value(0),doctest::Approx(0.0).epsilon(0.0001));// linear, and 0.0 first point
+    FAST_CHECK_EQ(sc.snow_swe.value(1),doctest::Approx(0.0).epsilon(0.0001));// linear, and 0.0 second point
+    FAST_CHECK_EQ(sc.snow_swe.value(2),doctest::Approx(1.5).epsilon(0.0001));// linear, and 1.5  mm, 3.0/2 mm third  point
+    FAST_CHECK_EQ(rc.snow_swe.value(0),doctest::Approx(0.0).epsilon(0.0001));// stair, avg,, and 0.0 first interval
+    FAST_CHECK_EQ(rc.snow_swe.value(1),doctest::Approx(1.5).epsilon(0.0001));// stair avg, 1.5mm  second interval
+    FAST_CHECK_EQ(rc.snow_swe.value(2),doctest::Approx(3.0).epsilon(0.0001));// stair avg, 3.0mm  third interval
+    
+    
     auto expected_2 = 0.2*mmh_to_m3s(prec.value(1),cell_area)*(1.0-0.3)+0.3*mmh_to_m3s(prec.value(1),cell_area);
     FAST_CHECK_EQ(rc.avg_discharge.value(n-1), doctest::Approx(expected_2 ).epsilon(0.01));
 }

@@ -22,7 +22,8 @@ namespace expose {
         .def("reservoir",&land_type_fractions::reservoir,"returns the reservoir part")
         .def("forest",&land_type_fractions::forest,"returns the forest part")
         .def("unspecified",&land_type_fractions::unspecified,"returns the unspecified part")
-        .def("set_fractions",&land_type_fractions::set_fractions,args("glacier","lake","reservoir","forest"),"set the fractions explicit, each a value in range 0..1, sum should be 1.0")
+        .def("set_fractions",&land_type_fractions::set_fractions,(py::arg("self"),py::arg("glacier"),py::arg("lake"),py::arg("reservoir"),py::arg("forest")),"set the fractions explicit, each a value in range 0..1, sum should be 1.0")
+        .def("snow_storage",&land_type_fractions::snow_storage,(py::arg("self")),"returns the area where snow can build up, 1.0-lake-reservoir")
         ;
 
         class_<geo_cell_data>("GeoCellData",
@@ -37,7 +38,7 @@ namespace expose {
                               "  radiation_slope_factor def 0.9\n"
                               "  routing_info def(0,0.0), i.e. not routed and hydrological distance=0.0m\n"
         )
-        .def(init<geo_point,double,int,py::optional<double,const land_type_fractions&,routing_info>>(
+        .def(init<geo_point,double,int64_t,py::optional<double,const land_type_fractions&,routing_info>>(
          (py::arg("self"),py::arg("mid_point"),py::arg("area"),py::arg("catchment_id"),py::arg("radiation_slope_factor"),py::arg("land_type_fractions"),py::arg("routing_info")),
          doc_intro("Constructs a GeoCellData with all parameters specified")
          doc_parameters()

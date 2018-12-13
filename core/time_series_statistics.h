@@ -19,6 +19,7 @@ namespace shyft {
     namespace time_series {
         using namespace std;
         using namespace shyft;
+        using intv_t=vector<int64_t>;
 
         /** specialized max function that ignores nan*/
         inline double nan_max(double const& r, double const& x) {
@@ -111,7 +112,7 @@ namespace shyft {
         /// http://en.wikipedia.org/wiki/Percentile NIST definitions, we use R7, as R and excel
         /// http://www.itl.nist.gov/div898/handbook/prc/section2/prc262.htm
         /// calculate percentile using full sort.. works nice for a larger set of percentiles.
-        inline vector<double> calculate_percentiles_excel_method_full_sort(vector<double>& samples, const vector<int>& percentiles) {
+        inline vector<double> calculate_percentiles_excel_method_full_sort(vector<double>& samples, const intv_t& percentiles) {
             vector<double> result; result.reserve(percentiles.size());
             const int n_samples = (int)samples.size();
             const double silent_nan = std::numeric_limits<double>::quiet_NaN();
@@ -181,7 +182,7 @@ namespace shyft {
 
         */
         template <class ts_t, class ta_t>
-        inline std::vector< point_ts<ta_t> > calculate_percentiles(const ta_t& ta, const std::vector<ts_t>& ts_list, const std::vector<int>& percentiles, size_t min_t_steps = 1000,bool skip_nans=true) {
+        inline std::vector< point_ts<ta_t> > calculate_percentiles(const ta_t& ta, const std::vector<ts_t>& ts_list, const intv_t& percentiles, size_t min_t_steps = 1000,bool skip_nans=true) {
             std::vector<point_ts<ta_t>> result;
             auto fx_p = ts_list.size() ? ts_list.front().point_interpretation() : ts_point_fx::POINT_AVERAGE_VALUE;
             for (size_t r = 0; r < percentiles.size(); ++r) // pre-init the result ts that we are going to fill up

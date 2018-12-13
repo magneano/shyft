@@ -38,14 +38,14 @@ template <class RM>
 struct adjust_state_model {
     RM &rm;///< Just a reference to the model, no copy semantics
 	typedef  std::vector<typename RM::state_t>state_vector_t;
-    std::vector<int> cids;///< selected catchments, empty means all.
+    std::vector<int64_t> cids;///< selected catchments, empty means all.
 	size_t i0{ 0u }; ///< first step on time-axis to tune into
 	size_t n {1u}; ///< number of step to use for averaging the inflow to
     adjust_state_model()=delete;
 	state_vector_t  s0;///< the snap-shot of current state when starting the model
 	void revert_to_state_0() { rm.set_states(s0); }
     /**Construct a wrapper around the RM so that we can use multiple tune to flow*/
-    adjust_state_model( RM&rm,const std::vector<int> &cids,size_t i0=0,size_t n=1
+    adjust_state_model( RM&rm,const std::vector<int64_t> &cids,size_t i0=0,size_t n=1
 		) :rm(rm), cids(cids),i0(i0),n(n){
         rm.set_catchment_calculation_filter(cids);// only calc for cells we are working on.
 		rm.get_states(s0);// important: get the state 0 snap-shot from the model as it is now

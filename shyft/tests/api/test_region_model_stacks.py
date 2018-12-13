@@ -127,9 +127,11 @@ class RegionModel(unittest.TestCase):
         lake_area = model.statistics.lake_area(cids)
         reservoir_area = model.statistics.reservoir_area(cids)
         unspecified_area = model.statistics.unspecified_area(cids)
+        snow_area = model.statistics.snow_storage_area(cids)
+        self.assertAlmostEqual(snow_area, total_area - lake_area - reservoir_area)
         self.assertAlmostEqual(total_area, forest_area + glacier_area + lake_area + reservoir_area + unspecified_area)
         elevation = model.statistics.elevation(cids)
-        assert abs(elevation-475/2.0) < 1e-3, 'average height'
+        assert abs(elevation - 475/2.0) < 1e-3, 'average height'
         cids.append(3)
         try:
             model.statistics.total_area(cids)  # now, cids contains 3, that matches no cells
@@ -143,7 +145,7 @@ class RegionModel(unittest.TestCase):
     def test_model_initialize_and_run(self):
         num_cells = 20
         model_type = pt_gs_k.PTGSKModel
-        model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells,num_catchments=1)
+        model = self.build_model(model_type, pt_gs_k.PTGSKParameter, num_cells, num_catchments=1)
         self.assertEqual(model.size(), num_cells)
         self.verify_state_handler(model)
         # demo of feature for threads
@@ -220,10 +222,10 @@ class RegionModel(unittest.TestCase):
         sum_charge = model.statistics.charge(cids)
         sum_charge_value = model.statistics.charge_value(cids, 0)
         self.assertAlmostEqual(sum_charge_value, -110.6998, places=2)
-        cell_charge=model.statistics.charge_value(api.IntVector([0,1,3]), 0,ix_type=api.stat_scope.cell)
-        self.assertAlmostEqual(cell_charge, -16.7138,places=2)
-        charge_sum_1_2_6 = model.statistics.charge(api.IntVector([1,2, 6]), ix_type=api.stat_scope.cell).values.to_numpy().sum()
-        self.assertAlmostEqual(charge_sum_1_2_6,107.3981,places=2)
+        cell_charge = model.statistics.charge_value(api.IntVector([0, 1, 3]), 0, ix_type=api.stat_scope.cell)
+        self.assertAlmostEqual(cell_charge, -16.7138, places=2)
+        charge_sum_1_2_6 = model.statistics.charge(api.IntVector([1, 2, 6]), ix_type=api.stat_scope.cell).values.to_numpy().sum()
+        self.assertAlmostEqual(charge_sum_1_2_6, 107.3981, places=2)
         ae_output = model.actual_evaptranspiration_response.output(cids)
         ae_pot_ratio = model.actual_evaptranspiration_response.pot_ratio(cids)
         self.assertIsNotNone(ae_output)
@@ -326,14 +328,14 @@ class RegionModel(unittest.TestCase):
         adjust_result = model.adjust_state_to_target_flow(float('nan'), cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
         assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
         # then verify what happens if we put in bad values on simulated result
-        model.cells[0].env_ts.temperature.set(10,float('nan'))
+        model.cells[0].env_ts.temperature.set(10, float('nan'))
         adjust_result = model.adjust_state_to_target_flow(30.0, cids, start_step=10, scale_range=3.0, scale_eps=1e-3, max_iter=300, n_steps=2)
         assert len(adjust_result.diagnostics) > 0, 'expect diagnostics length be larger than 0'
 
     def test_model_clone_with_catchment_parameters(self):
         """ Verify we can copy an opt-model from full model including catchment specific parameters"""
         m = self.build_model(pt_gs_k.PTGSKModel, pt_gs_k.PTGSKParameter, model_size=20, num_catchments=2)
-        p2=pt_gs_k.PTGSKParameter()
+        p2 = pt_gs_k.PTGSKParameter()
         p2.kirchner.c1 = 2.3
         m.set_catchment_parameter(2, p2)
         self.assertTrue(m.has_catchment_parameter(2))
@@ -341,11 +343,9 @@ class RegionModel(unittest.TestCase):
         o = pt_gs_k.create_opt_model_clone(m, True)  # this is how to create an opt-model, with catchm. spec params
         self.assertTrue(o.has_catchment_parameter(2))
         self.assertFalse(o.has_catchment_parameter(1))
-        o = pt_gs_k.create_opt_model_clone(m, False) # default, only region param is copied(for opt-purposes)
+        o = pt_gs_k.create_opt_model_clone(m, False)  # default, only region param is copied(for opt-purposes)
         self.assertFalse(o.has_catchment_parameter(2))
         self.assertFalse(o.has_catchment_parameter(1))
-
-
 
     def test_optimization_model(self):
         num_cells = 20
@@ -405,7 +405,7 @@ class RegionModel(unittest.TestCase):
         orig_c2 = p0.kirchner.c2
         # model.get_cells()[0].env_ts.precipitation.set(0, 5.1)
         # model.get_cells()[0].env_ts.precipitation.set(1, 4.9)
-        goal_f0= optimizer.calculate_goal_function(p0)
+        goal_f0 = optimizer.calculate_goal_function(p0)
         p0.kirchner.c1 = -2.4
         p0.kirchner.c2 = 0.91
         opt_param = optimizer.optimize(p0, 1500, 0.1, 1e-5)
@@ -625,6 +625,7 @@ class RegionModel(unittest.TestCase):
         # example apply, then initial state:
         model.state.apply_state(ms_2, cids_unspecified)
         model.initial_state = model.current_state
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,6 +47,7 @@ class GeoCellData(unittest.TestCase):
         self.assertAlmostEqual(a.reservoir(), b.reservoir())
         self.assertAlmostEqual(a.forest(), b.forest())
         self.assertAlmostEqual(a.unspecified(), b.unspecified())
+        self.assertAlmostEqual(a.snow_storage(), 1.0-a.lake()-a.reservoir())
         try:
 
             b.set_fractions(glacier=0.9, forest=0.2, lake=0.0, reservoir=0.0)

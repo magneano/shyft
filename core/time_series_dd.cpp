@@ -723,6 +723,12 @@ namespace shyft{
 		apoint_ts apoint_ts::convolve_w(const std::vector<double> &w, shyft::time_series::convolve_policy conv_policy) const {
 			return apoint_ts(std::make_shared<convolve_w_ts>(*this, w, conv_policy));
 		}
+        apoint_ts apoint_ts::slice(int i0, int n) const {
+            gpoint_ts *gpts = dynamic_cast<gpoint_ts*>(ts.get());
+            if (!gpts)
+                throw std::runtime_error("apoint_ts::slice() only allowed for ts of non-expression types");
+            return apoint_ts(make_shared<gpoint_ts>(gpts->slice(i0, n)));
+        }
 
         apoint_ts apoint_ts::rating_curve(const rating_curve_parameters & rc_param) const {
             return apoint_ts(std::make_shared<rating_curve_ts>(*this, rc_param));
@@ -787,7 +793,7 @@ namespace shyft{
 			return true;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const intv_t& percentile_list) {
 			std::vector<apoint_ts> r; r.reserve(percentile_list.size());
 			auto tsvx = deflate_ts_vector<gts_t>(tsv1);
 			// check of all tsvx.time_axis is of same type
@@ -828,7 +834,7 @@ namespace shyft{
 			return r;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const intv_t& percentile_list) {
 			return percentiles(ts_list, time_axis::generic_dt(ta), percentile_list);
 		}
 
@@ -1297,13 +1303,7 @@ namespace shyft{
 			}
 			return value_at(time_axis().time(i));
 		}
-
-		double qac_ts::value(size_t i) const {
-
-			double x = ts->value(i);
-			if (p.is_ok_quality(x))
-				return x;
-			// try to fill in replacement value
+        double qac_ts:: _fill_value(size_t i) const {
 			auto t = ts->time(i);
 			if (cts) // use a correction value ts if available
 				return cts->value_at(t); // we do not check this value, assume ok!
@@ -1334,7 +1334,16 @@ namespace shyft{
 					}
 				}
 			}
-			return shyft::nan; // if we reach here, we failed to find substitute
+			return shyft::nan; // if we reach here, we failed to find substitute            
+        }
+
+		double qac_ts::value(size_t i) const {
+
+			double x = ts->value(i);
+			if (p.is_ok_quality(x))
+				return x;
+			// try to fill in replacement value
+            return _fill_value(i);
 		}
 
 		double qac_ts::value_at(utctime t) const {
@@ -1360,10 +1369,11 @@ namespace shyft{
 		}
 
 		vector<double> qac_ts::values() const {
-			const size_t n{ size() };
-			vector<double> r; r.reserve(n);
-			for (size_t i = 0; i < n; ++i)
-				r.emplace_back(value(i));
+            auto r=ts->values();
+			for (size_t i = 0; i < r.size(); ++i) {
+                if(!p.is_ok_quality(r[i]))
+                    r[i]=_fill_value(i);
+            }
 			return r;
 		}
 

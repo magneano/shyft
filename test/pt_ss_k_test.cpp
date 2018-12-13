@@ -158,6 +158,10 @@ TEST_CASE("pt_ss_k_lake_reservoir_response") {
     FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266*0.7).epsilon(0.01)); // first with 0 precip, nothing should happen
     auto expected_1 = 0.266+0.3*0.5*mmh_to_m3s(prec.value(1),cell_area);
     FAST_CHECK_EQ(rc.avg_discharge.value(1), doctest::Approx(expected_1).epsilon(0.05)); // precip on rsv direct effect
+    FAST_CHECK_EQ(sc.snow_swe.value(0),doctest::Approx(0.0).epsilon(0.001));// linear between, and the entire input first timestep is 0.0 mm/h
+    FAST_CHECK_EQ(sc.snow_swe.value(1),doctest::Approx(0.0).epsilon(0.001));// linear between
+    FAST_CHECK_EQ(sc.snow_swe.value(2),doctest::Approx(1.5).epsilon(0.001));// linear between,  average 1.5 mm at this point, since only 50% can store snow(otherwise it would be 3.0)
+    FAST_CHECK_EQ(sc.snow_swe.value(3),doctest::Approx(3.0).epsilon(0.001));// linear between,  average 3.0 mm at this point, since only 50% can store snow(otherwise it would be 6.0)
     auto expected_2 = 0.2*mmh_to_m3s(prec.value(1),cell_area)*(1.0-0.3)+0.3*mmh_to_m3s(prec.value(1),cell_area);
     FAST_CHECK_EQ(rc.avg_discharge.value(n-1), doctest::Approx(expected_2 ).epsilon(0.01));
 }

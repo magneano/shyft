@@ -82,6 +82,9 @@
 		<Unit filename="api_test.cpp">
 			<Option virtualFolder="api/" />
 		</Unit>
+		<Unit filename="geo_test.cpp">
+			<Option virtualFolder="api/" />
+		</Unit>
 		<Unit filename="bayesian_kriging_test.cpp">
 			<Option virtualFolder="interpolation/" />
 		</Unit>
@@ -226,6 +229,9 @@
 		</Unit>
 		<Unit filename="utctime_utilities_test.cpp">
 			<Option virtualFolder="time_and_calendar/" />
+		</Unit>
+		<Unit filename="time_series_qac_test.cpp">
+		     <Option virtualFolder="time_series" />
 		</Unit>
 		<Extensions>
 			<DoxyBlocks>

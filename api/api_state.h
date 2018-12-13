@@ -87,6 +87,8 @@ namespace shyft {
           extern  template void deserialize_from_bytes(const std::vector<char>& bytes, std::shared_ptr<std::vector<cell_state_with_id<shyft::core::pt_hs_k::state>>>&states);
           extern  template void deserialize_from_bytes(const std::vector<char>& bytes, std::shared_ptr<std::vector<cell_state_with_id<shyft::core::pt_ss_k::state>>>&states);
           extern  template void deserialize_from_bytes(const std::vector<char>& bytes, std::shared_ptr<std::vector<cell_state_with_id<shyft::core::pt_hps_k::state>>>&states);
+
+        using cids_t=std::vector<int64_t>;
         /** \brief state_io_handler for efficient handling of cell-identified states
         *
         * This class provides functionality to extract/apply state based on a
@@ -107,7 +109,7 @@ namespace shyft {
             /** Extract cell identified state
             *\return the state for the cells, optionally filtered by the supplied catchment ids (cids)
             */
-            std::shared_ptr<std::vector<cell_state_id_t>> extract_state(const std::vector<int>& cids) const {
+            std::shared_ptr<std::vector<cell_state_id_t>> extract_state(const cids_t& cids) const {
                 if (!cells)
                     throw std::runtime_error("No cells to extract state from");
                 auto r = std::make_shared<std::vector<cell_state_id_t>>();
@@ -121,7 +123,7 @@ namespace shyft {
             /** Restore cell identified state, filtered by cids.
             * \return a list identifying states that where not applied to cells(filtering out all that is related to non-matching cids)
             */
-            std::vector<int> apply_state(const std::shared_ptr < std::vector<cell_state_id_t> >& s, const std::vector<int>& cids) {
+            cids_t apply_state(const std::shared_ptr < std::vector<cell_state_id_t> >& s, const cids_t& cids) {
                 if (!cells)
                     throw std::runtime_error("No cells to apply state into");
                 std::map<cell_state_id, C*> cmap;// yes store pointers, we know the scope is this routine
@@ -129,7 +131,7 @@ namespace shyft {
                     if (cids.size() == 0 || std::find(cids.begin(), cids.end(), c.geo.catchment_id()) != cids.end())
                         cmap[cell_state_id_of(c.geo)] = &c;// fix the map
                 }
-                std::vector<int> missing;
+                cids_t missing;
                 for (size_t i = 0;i < s->size();++i) {
                     if (cids.size() == 0 || std::find(cids.begin(), cids.end(), (*s)[i].id.cid) != cids.end()) {
                         auto f = cmap.find((*s)[i].id);// log(n)

@@ -402,6 +402,14 @@ namespace shyft{
             void fill(double value) { std::fill(begin(v), end(v), value); }
             void fill_range(double value, int start_step, int n_steps) { if (n_steps == 0)fill(value); else std::fill(begin(v) + start_step, begin(v) + start_step + n_steps, value); }
             void scale_by(double value) { std::for_each(begin(v), end(v), [value](double&v){v *= value; }); }
+            point_ts<TA> slice(size_t first, size_t n) const {
+                if(first >= size() || first + n > size() || n == 0)
+                    throw runtime_error("slice: invalid slice parameters");
+                return point_ts<TA>(this->ta.slice(first, n),
+                                    vector<double>(this->v.begin() + first, this->v.begin() + (first + n)),
+                                    this->fx_policy);
+            }
+
             x_serialize_decl();
         };
 

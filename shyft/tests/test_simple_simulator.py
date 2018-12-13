@@ -122,8 +122,8 @@ class SimulationTestCase(unittest.TestCase):
         simulator.run(time_axis=time_axis, state=s0)
 
         target_discharge_ts = simulator.region_model.statistics.discharge([cid])
-        cell_charge = simulator.region_model.get_cells()[600].rc.avg_charge # in m3s for this cell
-        assert cell_charge.values.to_numpy().sum() > 0.001, 'some charge expected here'
+        cell_charge = simulator.region_model.get_cells()[603].rc.avg_charge # in m3s for this cell
+        assert cell_charge.values.to_numpy().max() > 0.001, 'some charge expected here'
         target_discharge_ts.set_point_interpretation(api.point_interpretation_policy.POINT_AVERAGE_VALUE)
         target_discharge = target_discharge_ts.average(target_discharge_ts.time_axis)
         # Perturb parameters
