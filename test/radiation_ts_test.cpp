@@ -143,7 +143,6 @@ namespace shyft::core::radiation_model{
         typedef shared_ptr<parameter_t> parameter_t_;
         typedef shared_ptr<response_t>  response_t_;
         struct all_response_collector {
-            double destination_area;///< in [m^2]
             // these are the one that we collects from the response, to better understand the model::
             pts_t rad_output;///< potential evap mm/h
 

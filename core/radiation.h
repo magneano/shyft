@@ -29,56 +29,56 @@ See file COPYING for more details **/
 #include <boost/math/constants/constants.hpp>
 //#include <proj.h>
 namespace shyft {
-    namespace utility {
-        namespace geometry{
-            template <class Point>
-            struct triangle{
-                Point p1, p2, p3;
-                explicit triangle(const Point& p1, const Point& p2, const Point& p3):p1(p1),p2(p2), p3(p3) {
-                    make_triangle();
-                }
-
-                Point normal = std::make_tuple(0.0,0.0,0.0);
-                Point mid_point = std::make_tuple(0.0,0.0,0.0);
-                double slope{0.0};
-                double aspect{0.0};
-                double elevation{0.0};
-
-            private:
-                void make_triangle(){
-                    // find mid-point:
-                    double x1 = std::get<0>(p1);
-                    double x2 = std::get<0>(p2);
-                    double x3 = std::get<0>(p3);
-                    double y1 = std::get<1>(p1);
-                    double y2 = std::get<1>(p2);
-                    double y3 = std::get<1>(p3);
-                    double z1 = std::get<2>(p1);
-                    double z2 = std::get<2>(p2);
-                    double z3 = std::get<2>(p3);
-                    double x = (x1+x2+x3)/3.0;
-                    double y = (y1+y2+y3)/3.0;
-                    double z = (z1+z2+z3)/3.0;
-                    mid_point = std::make_tuple(x,y,z);
-
-                    //find normal vector
-                    Point p1p2 = std::make_tuple(x2-x1,y2-y1,z2-z1);
-                    Point p1p3 = std::make_tuple(x3-x1,y3-y1,z3-z1);
-                    double normal_x = std::get<1>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<1>(p1p3);
-                    double normal_y = -std::get<0>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<0>(p1p3);
-                    double normal_z = std::get<0>(p1p2)*std::get<1>(p1p3) - std::get<1>(p1p2)*std::get<0>(p1p3);
-                    normal = std::make_tuple(normal_x,normal_y,normal_z);
-
-                    // slope, aspect, elevation
-                    slope = atan2(pow(pow(normal_x,2)+pow(normal_y,2),0.5),normal_z);
-                    aspect = atan2(normal_y, normal_x);
-                    elevation = std::get<2>(mid_point);
-                }
-
-
-            };
-        }
-    }
+//    namespace utility {
+//        namespace geometry{
+//            template <class Point>
+//            struct triangle{
+//                Point p1, p2, p3;
+//                explicit triangle(const Point& p1, const Point& p2, const Point& p3):p1(p1),p2(p2), p3(p3) {
+//                    make_triangle();
+//                }
+//
+//                Point normal = std::make_tuple(0.0,0.0,0.0);
+//                Point mid_point = std::make_tuple(0.0,0.0,0.0);
+//                double slope{0.0};
+//                double aspect{0.0};
+//                double elevation{0.0};
+//
+//            private:
+//                void make_triangle(){
+//                    // find mid-point:
+//                    double x1 = std::get<0>(p1);
+//                    double x2 = std::get<0>(p2);
+//                    double x3 = std::get<0>(p3);
+//                    double y1 = std::get<1>(p1);
+//                    double y2 = std::get<1>(p2);
+//                    double y3 = std::get<1>(p3);
+//                    double z1 = std::get<2>(p1);
+//                    double z2 = std::get<2>(p2);
+//                    double z3 = std::get<2>(p3);
+//                    double x = (x1+x2+x3)/3.0;
+//                    double y = (y1+y2+y3)/3.0;
+//                    double z = (z1+z2+z3)/3.0;
+//                    mid_point = std::make_tuple(x,y,z);
+//
+//                    //find normal vector
+//                    Point p1p2 = std::make_tuple(x2-x1,y2-y1,z2-z1);
+//                    Point p1p3 = std::make_tuple(x3-x1,y3-y1,z3-z1);
+//                    double normal_x = std::get<1>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<1>(p1p3);
+//                    double normal_y = -std::get<0>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<0>(p1p3);
+//                    double normal_z = std::get<0>(p1p2)*std::get<1>(p1p3) - std::get<1>(p1p2)*std::get<0>(p1p3);
+//                    normal = std::make_tuple(normal_x,normal_y,normal_z);
+//
+//                    // slope, aspect, elevation
+//                    slope = atan2(pow(pow(normal_x,2)+pow(normal_y,2),0.5),normal_z);
+//                    aspect = atan2(normal_y, normal_x);
+//                    elevation = std::get<2>(mid_point);
+//                }
+//
+//
+//            };
+//        }
+//    }
 
     namespace core {
 
