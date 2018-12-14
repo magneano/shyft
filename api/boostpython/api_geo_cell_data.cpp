@@ -22,7 +22,8 @@ namespace expose {
         .def("reservoir",&land_type_fractions::reservoir,"returns the reservoir part")
         .def("forest",&land_type_fractions::forest,"returns the forest part")
         .def("unspecified",&land_type_fractions::unspecified,"returns the unspecified part")
-        .def("set_fractions",&land_type_fractions::set_fractions,args("glacier","lake","reservoir","forest"),"set the fractions explicit, each a value in range 0..1, sum should be 1.0")
+        .def("set_fractions",&land_type_fractions::set_fractions,(py::arg("self"),py::arg("glacier"),py::arg("lake"),py::arg("reservoir"),py::arg("forest")),"set the fractions explicit, each a value in range 0..1, sum should be 1.0")
+        .def("snow_storage",&land_type_fractions::snow_storage,(py::arg("self")),"returns the area where snow can build up, 1.0-lake-reservoir")
         ;
 
         class_<geo_cell_data>("GeoCellData",

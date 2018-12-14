@@ -1457,9 +1457,9 @@ namespace shyft {
                 if(cts)
                     cts->do_bind();
             }
-
             x_serialize_decl();
-
+        protected:
+            double _fill_value(size_t i) const;
         };
 
         /** \brief inside ts function parameters

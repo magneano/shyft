@@ -254,6 +254,18 @@ namespace shyft {
 			}
 			return sum;
 		}
+		double snow_storage_area(const cids_t& indexes, stat_scope ix_type) const {
+			double sum = 0.0;
+			if (indexes.size() == 0) {
+				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().snow_storage();
+			} else {
+                cell_statistics::verify_cids_exist(*cells, indexes, ix_type);
+				for (auto cid : indexes)
+					for (const auto&c : *cells)
+						if ((int)c.geo.catchment_id() == cid) sum += c.geo.area()*c.geo.land_type_fractions_info().snow_storage();
+			}
+			return sum;
+		}
 		double elevation(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
             double area_sum=0;

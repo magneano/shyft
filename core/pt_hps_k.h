@@ -177,6 +177,11 @@ namespace shyft {
             * to a specified observed/wanted average
             */
             void adjust_q(double scale_factor) {kirchner.adjust_q(scale_factor);}
+            state scale_snow(const double& snow_storage_area_fraction) const {
+                state c{*this};
+                c.hps.swe *= snow_storage_area_fraction;
+                return c;
+            }
             x_serialize_decl();
         };
 
@@ -193,6 +198,15 @@ namespace shyft {
             // Stack response
             double total_discharge;
             double charge_m3s;
+                        // scale snow parts relative snow_storage_area 
+            response scale_snow(const double& snow_storage_area_fraction) const {
+                response c{*this};
+                c.hps.storage *= snow_storage_area_fraction;
+                c.hps.outflow *=snow_storage_area_fraction;
+                // are there others that we should also scale, sca, is a still meaningful, unscaled ?
+                return c;
+            }
+
         };
 
 
@@ -238,9 +252,8 @@ namespace shyft {
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
             const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
             const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
-            const double no_snow_storage_fraction = geo_cell_data.land_type_fractions_info().reservoir() + geo_cell_data.land_type_fractions_info().lake();
+            const double snow_storage_fraction = geo_cell_data.land_type_fractions_info().snow_storage();// on this part, snow builds up, and melts.-> season time-response
             const double kirchner_routed_prec =  geo_cell_data.land_type_fractions_info().reservoir()*(1.0-parameter.msp.reservoir_direct_response_fraction) + geo_cell_data.land_type_fractions_info().lake();
-            const double snow_storage_fraction = 1.0 - no_snow_storage_fraction;// on this part, snow builds up, and melts.-> season time-response
             const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
             const double kirchner_fraction = 1 - direct_response_fraction;
             const double cell_area_m2 = geo_cell_data.area();
@@ -255,7 +268,8 @@ namespace shyft {
                 double rel_hum = rel_hum_accessor.value(i);
                 double prec = p_corr.calc(prec_accessor.value(i));
                 double wind_speed = wind_speed_accessor.value(i);
-                state_collector.collect(i, state);///< \note collect the state at the beginning of each period (the end state is saved anyway)
+                auto state_snow_scaled=state.scale_snow(snow_storage_fraction);
+                state_collector.collect(i, state_snow_scaled);///< \note collect the state at the beginning of each period (the end state is saved anyway)
 
                 hbv_physical_snow.step(state.hps, response.hps, period.start, period.timespan(), temp, rad, prec, wind_speed, rel_hum); // outputs mm/h, interpreted as over the entire area
 
@@ -277,15 +291,15 @@ namespace shyft {
                     - shyft::mmh_to_m3s(response.ae.ae, cell_area_m2)
                     + response.gm_melt_m3s
                     - shyft::mmh_to_m3s(response.total_discharge, cell_area_m2);
-                response.hps.hps_state=state.hps;//< note/sih: we need snow in the response due to calibration
+                response.hps.hps_state=state_snow_scaled.hps;//< note/sih: we need snow in the response due to calibration
 
                 // Possibly save the calculated values using the collector callbacks.
-                response_collector.collect(i, response);
+                response_collector.collect(i, response.scale_snow(snow_storage_fraction));
                 if(i+1==i_end)
-                    state_collector.collect(i+1, state);///< \note last iteration,collect the  final state as well.
+                    state_collector.collect(i+1, state.scale_snow(snow_storage_fraction));///< \note last iteration,collect the  final state as well.
 
             }
-            response_collector.set_end_response(response);
+            response_collector.set_end_response(response.scale_snow(snow_storage_fraction));
         }
     }
   } // core
