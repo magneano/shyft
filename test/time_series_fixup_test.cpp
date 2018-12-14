@@ -31,17 +31,17 @@ TEST_SUITE("time_series") {
         qac_parameter q;
 
         SUBCASE("no limits set, allow all values, except nan") {
-            FAST_CHECK_EQ(q.is_ok_quality(shyft::nan),false);
-            FAST_CHECK_EQ(q.is_ok_quality(1.0),true);
+            FAST_CHECK_EQ(q.is_ok_min_max(shyft::nan),false);
+            FAST_CHECK_EQ(q.is_ok_min_max(1.0),true);
         }
 
         SUBCASE("min/max abs limits") {
             q.max_x=1.0;
-            FAST_CHECK_EQ(q.is_ok_quality(1.0),true);
-            FAST_CHECK_EQ(q.is_ok_quality(1.0+eps),false);
+            FAST_CHECK_EQ(q.is_ok_min_max(1.0),true);
+            FAST_CHECK_EQ(q.is_ok_min_max(1.0+eps),false);
             q.min_x=-1.0;
-            FAST_CHECK_EQ(q.is_ok_quality(-1.0),true);
-            FAST_CHECK_EQ(q.is_ok_quality(-1.0-eps),false);
+            FAST_CHECK_EQ(q.is_ok_min_max(-1.0),true);
+            FAST_CHECK_EQ(q.is_ok_min_max(-1.0-eps),false);
         }
     }
 
@@ -53,7 +53,7 @@ TEST_SUITE("time_series") {
         vector<double>cv {1.0,0.0,      -1.0,3.0,-20.1};
         apoint_ts src(ta,v,ts_point_fx::POINT_AVERAGE_VALUE);
         apoint_ts cts{ta,cv,ts_point_fx::POINT_AVERAGE_VALUE};
-        qac_parameter qp;
+        qac_parameter qp = qac_parameter::create_min_max_linear_interpolation_parameters(true, true, shyft::nan, shyft::nan, shyft::core::max_utctime);
         auto ts = make_shared<qac_ts>(src,qp);
 
 

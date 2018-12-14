@@ -18,7 +18,7 @@ See file COPYING for more details **/
 #include "predictions.h"
 
 namespace shyft {
-	namespace time_series {
+    namespace time_series {
     namespace dd { // dd= dynamic_dispatch version of the time_series library, aiming at python api
         using namespace shyft::core;
 
@@ -148,21 +148,21 @@ namespace shyft {
         struct inside_parameter; // fwd
         struct bit_decoder;//fwd
         struct derivative_ts; // fwd api
-		/** \brief Enumerates fill policies for time-axis extension.
-		 */
-		enum extend_ts_fill_policy {
-			EPF_NAN,   /**< Fill any gap between the time-axes with NaN. */
-			EPF_LAST,  /**< At a gap, keep the last time-axis value through a gap. */
-			EPF_FILL,  /**< Fill any gap between the time-axes with a given value. */
-		};
+        /** \brief Enumerates fill policies for time-axis extension.
+         */
+        enum extend_ts_fill_policy {
+            EPF_NAN,   /**< Fill any gap between the time-axes with NaN. */
+            EPF_LAST,  /**< At a gap, keep the last time-axis value through a gap. */
+            EPF_FILL,  /**< Fill any gap between the time-axes with a given value. */
+        };
 
-		/** \brief Enumerates split policies for time-axis extension.
-		 */
-		enum extend_ts_split_policy {
-			EPS_LHS_LAST,   /**< Split at the last value of the lhs ts. */
-			EPS_RHS_FIRST,  /**< Split at the first value of the rhs ts. */
-			EPS_VALUE,      /**< Split at a given time-value. */
-		};
+        /** \brief Enumerates split policies for time-axis extension.
+         */
+        enum extend_ts_split_policy {
+            EPS_LHS_LAST,   /**< Split at the last value of the lhs ts. */
+            EPS_RHS_FIRST,  /**< Split at the first value of the rhs ts. */
+            EPS_VALUE,      /**< Split at a given time-value. */
+        };
 
         /** \brief
          */
@@ -258,7 +258,7 @@ namespace shyft {
             const gta_t& time_axis() const { return sts()->time_axis();};
             utcperiod total_period() const {return ts&& !ts->needs_bind()?ts->total_period():utcperiod();};   ///< Returns period that covers points, given
             size_t index_of(utctime t) const {return ts&&!ts->needs_bind()?ts->index_of(t):std::string::npos;};
-			size_t index_of(utctime t,size_t ix_hint) const { return ts&&!ts->needs_bind() ? ts->time_axis().index_of(t,ix_hint) : std::string::npos; };
+            size_t index_of(utctime t,size_t ix_hint) const { return ts&&!ts->needs_bind() ? ts->time_axis().index_of(t,ix_hint) : std::string::npos; };
             size_t open_range_index_of(utctime t, size_t ix_hint = std::string::npos) const {
                 return ts && !ts->needs_bind() ? ts->time_axis().open_range_index_of(t, ix_hint):std::string::npos; }
             size_t size() const {return ts?sts()->size():0;};        ///< number of points that descr. y=f(t) on t ::= period
@@ -482,7 +482,7 @@ namespace shyft {
                     return nan;
                 return value(index_of(t));
             }
-			virtual std::vector<double> values() const;
+            virtual std::vector<double> values() const;
             virtual bool needs_bind() const { return ts->needs_bind();}
             virtual void do_bind() {ts->do_bind();}
             x_serialize_decl();
@@ -719,12 +719,12 @@ namespace shyft {
             time_shift_ts(apoint_ts&& ats, utctimespan adt)
                 :ts(std::move(ats.ts)),dt(adt) {
                 if(!ts->needs_bind())
-					local_do_bind();
+                    local_do_bind();
             }
             time_shift_ts(const std::shared_ptr<ipoint_ts> &ts, utctimespan adt )
                 :ts(ts),dt(adt){
                 if(!ts->needs_bind())
-					local_do_bind();
+                    local_do_bind();
             }
             void local_do_bind() {
                 if(ta.size()==0) {//TODO: introduce bound flag, and use that, using the ta.size() is a problem if ta *is* size 0.
@@ -764,18 +764,18 @@ namespace shyft {
             explicit abs_ts(const apoint_ts& ats)
                 :ts(ats.ts) {
                 if (!ts->needs_bind())
-					local_do_bind();
+                    local_do_bind();
 
             }
             explicit abs_ts(apoint_ts&& ats)
                 :ts(std::move(ats.ts)){
                 if (!ts->needs_bind())
-					local_do_bind();
+                    local_do_bind();
             }
             explicit abs_ts(const std::shared_ptr<ipoint_ts> &ts)
                 :ts(ts) {
                 if (!ts->needs_bind())
-					local_do_bind();
+                    local_do_bind();
             }
             void local_do_bind() {
                 if (ta.size() == 0) {//TODO: introduce bound flag, and use that, using the ta.size() is a problem if ta *is* size 0.
@@ -923,7 +923,7 @@ namespace shyft {
                   ets_split_p(split_policy ), split_at( split_at ),
                   ets_fill_p(fill_policy ), fill_value( fill_value ) {
                 if (!needs_bind())
-					local_do_bind();
+                    local_do_bind();
             }
 
             utctime get_split_at() const {
@@ -974,75 +974,75 @@ namespace shyft {
             virtual void do_bind() {
                 lhs.do_bind();
                 rhs.do_bind();
-				local_do_bind();
+                local_do_bind();
             }
 
             x_serialize_decl();
 
         };
 
-		struct rating_curve_ts : ipoint_ts {
+        struct rating_curve_ts : ipoint_ts {
 
-			using rct_t = shyft::time_series::rating_curve_ts<apoint_ts>;
-			using rc_param_t = shyft::time_series::rating_curve_parameters;
+            using rct_t = shyft::time_series::rating_curve_ts<apoint_ts>;
+            using rc_param_t = shyft::time_series::rating_curve_parameters;
 
-			rct_t ts;
+            rct_t ts;
 
-			rating_curve_ts() = default;
-			rating_curve_ts(apoint_ts && ts, rc_param_t && rcp)
-				: ts{ move(ts), move(rcp) } { }
-			rating_curve_ts(const apoint_ts & ts, const rc_param_t & rcp)
-				: ts{ ts, rcp } { }
-			// -----
-			virtual ~rating_curve_ts() = default;
-			// -----
-			rating_curve_ts(const rating_curve_ts &) = default;
-			rating_curve_ts & operator= (const rating_curve_ts &) = default;
-			// -----
-			rating_curve_ts(rating_curve_ts &&) = default;
-			rating_curve_ts & operator= (rating_curve_ts &&) = default;
+            rating_curve_ts() = default;
+            rating_curve_ts(apoint_ts && ts, rc_param_t && rcp)
+                : ts{ move(ts), move(rcp) } { }
+            rating_curve_ts(const apoint_ts & ts, const rc_param_t & rcp)
+                : ts{ ts, rcp } { }
+            // -----
+            virtual ~rating_curve_ts() = default;
+            // -----
+            rating_curve_ts(const rating_curve_ts &) = default;
+            rating_curve_ts & operator= (const rating_curve_ts &) = default;
+            // -----
+            rating_curve_ts(rating_curve_ts &&) = default;
+            rating_curve_ts & operator= (rating_curve_ts &&) = default;
 
-			virtual bool needs_bind() const { return ts.needs_bind(); }
-			virtual void do_bind() { ts.do_bind(); }
-			// -----
-			virtual ts_point_fx point_interpretation() const { return ts.point_interpretation(); }
-			virtual void set_point_interpretation(ts_point_fx policy) { return ts.set_point_interpretation(policy); }
-			// -----
-			virtual std::size_t size() const { return ts.size(); }
-			virtual utcperiod total_period() const { return ts.total_period(); }
-			virtual const gta_t & time_axis() const { return ts.time_axis(); }
-			// -----
-			virtual std::size_t index_of(utctime t) const { return ts.index_of(t); }
-			virtual double value_at(utctime t) const { return ts(t); }
-			// -----
-			virtual utctime time(std::size_t i) const { return ts.time(i); }
-			virtual double value(std::size_t i) const { return ts.value(i); }
-			// -----
-			virtual std::vector<double> values() const {
-				std::size_t dim = size();
-				std::vector<double> ret; ret.reserve(dim);
-				for ( std::size_t i = 0u; i < dim; ++i ) { ret.emplace_back(value(i)); }
-				return ret;
-			}
+            virtual bool needs_bind() const { return ts.needs_bind(); }
+            virtual void do_bind() { ts.do_bind(); }
+            // -----
+            virtual ts_point_fx point_interpretation() const { return ts.point_interpretation(); }
+            virtual void set_point_interpretation(ts_point_fx policy) { return ts.set_point_interpretation(policy); }
+            // -----
+            virtual std::size_t size() const { return ts.size(); }
+            virtual utcperiod total_period() const { return ts.total_period(); }
+            virtual const gta_t & time_axis() const { return ts.time_axis(); }
+            // -----
+            virtual std::size_t index_of(utctime t) const { return ts.index_of(t); }
+            virtual double value_at(utctime t) const { return ts(t); }
+            // -----
+            virtual utctime time(std::size_t i) const { return ts.time(i); }
+            virtual double value(std::size_t i) const { return ts.value(i); }
+            // -----
+            virtual std::vector<double> values() const {
+                std::size_t dim = size();
+                std::vector<double> ret; ret.reserve(dim);
+                for ( std::size_t i = 0u; i < dim; ++i ) { ret.emplace_back(value(i)); }
+                return ret;
+            }
 
-			x_serialize_decl();
+            x_serialize_decl();
 
-		};
+        };
 
-		/** \brief ice-packing detection time-series
-		 *
-		 * The purpose of this time-series is to provide 1.0 if
-		 * ice-packing is detected, according to specified parameters,
-		 * otherwise evaluate to 0.0 if no ice-packing occurs.
-		 *
-		 * Temperature time-series is the input to this algorithm,
-		 * and the time-axis etc. are just reflected through this class.
+        /** \brief ice-packing detection time-series
+         *
+         * The purpose of this time-series is to provide 1.0 if
+         * ice-packing is detected, according to specified parameters,
+         * otherwise evaluate to 0.0 if no ice-packing occurs.
+         *
+         * Temperature time-series is the input to this algorithm,
+         * and the time-axis etc. are just reflected through this class.
         *
-		 *
-		 * To signal error conditions, the ice-packing ts returns nan
-		 * according to specified policy flags.
-		 *
-		 */
+         *
+         * To signal error conditions, the ice-packing ts returns nan
+         * according to specified policy flags.
+         *
+         */
         struct ice_packing_ts : ipoint_ts {
 
             using ipt_t = shyft::time_series::ice_packing_ts<apoint_ts>;
@@ -1379,6 +1379,8 @@ namespace shyft {
             return fabs(a-b) <= abs_e;
         }
 
+        struct qac_ts;  // forward declare to use as argument for quality control
+
         /** \brief quality and correction parameters
          *
          *  Controls how we consider the quality of the time-series,
@@ -1386,24 +1388,144 @@ namespace shyft {
          *
          */
         struct qac_parameter {
-            utctimespan max_timespan{max_utctime};///< max time span to fix
-            double min_x{shyft::nan};    ///< x < min_x                 -> nan
-            double max_x{shyft::nan};    ///< x > max_x                 -> nan
+            bool nan_qa_enabled{false};        ///< Whether NaN QA is enabled.
+            bool infinity_qa_enabled{false};   ///< Whether +/- inf QA is enabled.
+            bool min_max_qa_enabled{false};    ///< Wheher min/max value QA is enabled.
+            bool repeating_qa_enabled{false};  ///< Whether repeating value QA is enabled.
+
+            // ----- min/max qa
+
+            double min_x{shyft::nan};    ///< Minimum allowed value, inclusive.
+            double max_x{shyft::nan};    ///< Maximum allowed value, inclusive.
+
+            // ----- repeating values qa
+
+            utctimespan repeat_timespan{ utctimespan::zero() };
+            double repeat_tolerance{1e-2};
+
+            // ----- linear interpolation correction
+
+            utctimespan max_scan_timespan{max_utctime};  ///< Max timespan to scan for next/previous valid values during infill.
+
+            // ----- constant filling correction
+
+            double constant_filler{shyft::nan};
+
+            // ----------
+
             qac_parameter()=default;
 
-            /** check agains min-max is set */
-            bool is_ok_quality(const double& x) const noexcept {
-                if(!isfinite(x))
+            // ----------
+
+            static qac_parameter create_min_max_no_fill_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x) {
+                return qac_parameter{
+                    nan_qa, infinite_qa, true, false,  // qa modes
+                    min_x, max_x,                      // min/max parameters
+                    utctimespan::zero(), 0.,           // repeat parameters
+                    utctime::zero(),                   // linear_interpolation parameters
+                    shyft::nan                         // constant filling parameters
+                };
+            }
+            static qac_parameter create_min_max_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x, utctimespan scan_span) {
+                return qac_parameter{
+                    nan_qa, infinite_qa, true, false,  // qa modes
+                    min_x, max_x,                      // min/max parameters
+                    utctimespan::zero(), 0.,           // repeat parameters
+                    scan_span,                         // linear_interpolation parameters
+                    shyft::nan                         // constant filling parameters
+                };
+            }
+            static qac_parameter create_min_max_constant_fill_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x, double constant_filler) {
+                return qac_parameter{
+                    nan_qa, infinite_qa, true, false,  // qa modes
+                    min_x, max_x,                      // min/max parameters
+                    utctimespan::zero(), 0.,           // repeat parameters
+                    utctime::zero(),                   // linear_interpolation parameters
+                    constant_filler                    // constant filling parameters
+                };
+            }
+
+            static qac_parameter create_repeating_no_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol) {
+                return qac_parameter{
+                    nan_qa, infinite_qa, false, true,  // qa modes
+                    shyft::nan, shyft::nan,            // min/max parameters
+                    repeat_span, repeat_tol,           // repeat parameters
+                    utctime::zero(),                   // linear_interpolation parameters
+                    shyft::nan                         // constant filling parameters
+                };
+            }
+            static qac_parameter create_repeating_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, utctimespan scan_span) {
+                return qac_parameter{
+                    nan_qa, infinite_qa, false, true,  // qa modes
+                    shyft::nan, shyft::nan,            // min/max parameters
+                    repeat_span, repeat_tol,           // repeat parameters
+                    scan_span,                         // linear_interpolation parameters
+                    shyft::nan                         // constant filling parameters
+                };
+            }
+            static qac_parameter create_repeating_constant_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, double constant_filler) {
+                return qac_parameter{
+                    nan_qa, infinite_qa, false, true,  // qa modes
+                    shyft::nan, shyft::nan,            // min/max parameters
+                    repeat_span, repeat_tol,           // repeat parameters
+                    utctime::zero(),                   // linear_interpolation parameters
+                    constant_filler                    // constant filling parameters
+                };
+            }
+
+            // ----------
+
+            /* Return true is the parameter block is set up with valid linear interpolation parameters. **/
+            bool can_do_linear_interpolation() const noexcept {
+                return this->max_scan_timespan.count() > 0;
+            }
+
+            /** Check QA fo a value using the set config. */
+            bool is_ok_quality(std::size_t i, double x, const qac_ts & ts) const noexcept {
+                bool ok = true;
+
+                if ( this->nan_qa_enabled )
+                    ok &= ( ! ::isnan(x));
+
+                if ( ok && this->infinity_qa_enabled )
+                    ok &= ( ! ::isinf(x));
+
+                if ( ok && this->min_max_qa_enabled )
+                    ok &= this->is_ok_min_max(x);
+
+                if ( ok && this->repeating_qa_enabled )
+                    ok &= this->is_ok_repeating(i, ts);
+
+                return ok;
+            }
+
+            /** Check a value using the min/max QA config. */
+            bool is_ok_min_max(double x) const noexcept {
+                if ( ::isnan(x) ) {
                     return false;
-                if(isfinite(min_x) && x < min_x)
+                }
+
+                if ( ::isfinite(min_x) && x < min_x ) {
                     return false;
-                if(isfinite(max_x) && x > max_x)
+                }
+                if ( ::isfinite(max_x) && x > max_x ) {
                     return false;
+                }
+
                 return true;
             }
 
+            /** Check for repetitions around a index */
+            bool is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept;
+
+            /** Is the parameter block equal to another parameter block, within a tolerance. */
             bool equal(const qac_parameter& o, double abs_e=1e-9) const {
-                return max_timespan==o.max_timespan && nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e);
+                return (
+                    max_scan_timespan == o.max_scan_timespan
+                    && nan_equal(min_x, o.min_x, abs_e) && nan_equal(max_x, o.max_x, abs_e)
+                    && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e)
+                    && nan_equal(constant_filler, o.constant_filler, abs_e)
+                );
             }
 
             // binary serialization, so no x_serialize_decl();
@@ -1417,6 +1539,9 @@ namespace shyft {
          *
          */
         struct qac_ts:ipoint_ts {
+            
+            friend struct qac_parameter;
+            
             shared_ptr<ipoint_ts> ts;///< the source ts
             shared_ptr<ipoint_ts> cts;///< optional ts with replacement values
             qac_parameter p;///< the parameters that control how the qac is done
@@ -1457,10 +1582,22 @@ namespace shyft {
                 if(cts)
                     cts->do_bind();
             }
+
             x_serialize_decl();
+
         protected:
             double _fill_value(size_t i) const;
+            double _fill_constant() const;
+            double _fill_linear_interpolation(size_t i) const;
+
+            mutable std::vector<int> _repeating_cache{};
+
+            void _scan_repeating_values(const std::vector<double> & data) const;
         };
+
+        inline bool qac_parameter::is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept {
+            return ts._repeating_cache[i] == 0;
+        }
 
         /** \brief inside ts function parameters
          *
@@ -1700,7 +1837,7 @@ namespace shyft {
             abin_op_ts(const apoint_ts &lhs,iop_t op,const apoint_ts& rhs)
                 :lhs(lhs),op(op),rhs(rhs) {
                 if( !needs_bind() )
-					local_do_bind();
+                    local_do_bind();
             }
             void bind_check() const {
                 if(!bound)
@@ -1767,7 +1904,7 @@ namespace shyft {
               abin_op_scalar_ts(double lhs,iop_t op,const apoint_ts& rhs)
               :lhs(lhs),op(op),rhs(rhs) {
                   if(!needs_bind())
-					  local_do_bind();
+                      local_do_bind();
               }
 
               virtual utcperiod total_period() const {return time_axis().total_period();}
@@ -1809,7 +1946,7 @@ namespace shyft {
               abin_op_ts_scalar(const apoint_ts &lhs,iop_t op,double rhs)
               :lhs(lhs),op(op),rhs(rhs) {
                   if(!needs_bind())
-					  local_do_bind();
+                      local_do_bind();
               }
 
               virtual utcperiod total_period() const {return time_axis().total_period();}
@@ -1956,9 +2093,9 @@ namespace shyft {
                 for (auto const &ts : *this ) r.push_back(ts(t));
                 return r;
             }
-			vector<double> values_at_time_i(int64_t t) const {
-				return values_at_time(seconds(t));
-			}
+            vector<double> values_at_time_i(int64_t t) const {
+                return values_at_time(seconds(t));
+            }
             ats_vector percentiles(gta_t const &ta,intv_t const& percentile_list) const {
                 ats_vector r;r.reserve(percentile_list.size());
                 auto rp= shyft::time_series::calculate_percentiles(ta,deflate_ts_vector<gts_t>(*this),percentile_list);
@@ -2097,17 +2234,17 @@ namespace shyft {
         ats_vector pow(apoint_ts const &b, ats_vector const &a);
         ats_vector pow(ats_vector const &a, ats_vector const & b);
     }
-	}
+    }
     namespace time_series {
         template<>
         inline size_t hint_based_search<dd::apoint_ts>(const dd::apoint_ts& source, const utcperiod& p, size_t i) {
             return source.index_of(p.start, i);
         }
-		template<>
-		inline size_t hint_based_search<dd::ipoint_ts>(const dd::ipoint_ts& source, const utcperiod& p, size_t i) {
-			return source.time_axis().index_of(p.start, i);
-		}
-	}
+        template<>
+        inline size_t hint_based_search<dd::ipoint_ts>(const dd::ipoint_ts& source, const utcperiod& p, size_t i) {
+            return source.time_axis().index_of(p.start, i);
+        }
+    }
 }
 //-- serialization support
 x_serialize_export_key(shyft::time_series::dd::ipoint_ts);
