@@ -15,6 +15,7 @@
 
 #include "mocks.h"
 #include "core/time_series.h"
+#include "core/time_series_average.h"
 #include "core/utctime_utilities.h"
 #include "core/cell_model.h"
 
@@ -142,6 +143,7 @@ namespace shyft::core::radiation_model{
         typedef response response_t;
         typedef shared_ptr<parameter_t> parameter_t_;
         typedef shared_ptr<response_t>  response_t_;
+
         struct all_response_collector {
             // these are the one that we collects from the response, to better understand the model::
             pts_t rad_output;///< potential evap mm/h
@@ -233,9 +235,13 @@ TEST_SUITE("radiation_ts_model") {
         auto model_dt = deltahours(24);
         vector<utctime> times;
         for (utctime i = t0; i <= t1; i += model_dt)
-        times.emplace_back(i);
+            times.emplace_back(i);
         ta::fixed_dt time_axis(t0, dt, n_ts_points);
         ta::fixed_dt state_time_axis(t0, dt, n_ts_points + 1);
+
+        ta::fixed_dt time_axis2(t0, deltahours(24), 3);
+
+
         // Initialize parameters
         rad::parameter rad_param;
 
@@ -257,9 +263,15 @@ TEST_SUITE("radiation_ts_model") {
 
 //        std::cout<<response.rad.psw_radiation<<"  ===== "<<std::endl;
         auto swrad = response_collector.rad_output;
+        vector swrad_average = accumulate_linear(time_axis2,swrad,true);
         for (size_t i = 0; i < swrad.size(); ++i) {
             TS_ASSERT(std::isfinite(swrad.get(i).v) && swrad.get(i).v >= 0);
             std::cout<<swrad.get(i).v<<std::endl;
+        }
+        std::cout<<"== average over 24h period ==="<<std::endl;
+        for (auto s:swrad_average) {
+            TS_ASSERT(std::isfinite(s) && s >= 0);
+            std::cout<<s<<std::endl;
         }
     }
 

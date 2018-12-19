@@ -101,7 +101,8 @@ namespace shyft {
                 double ref_radiation = 0.0; // reflected
                 double psw_radiation = 0.0; // predicted clear sky solar radiation for inclined surface [W/m2]
                 double tsw_radiation = 0.0; // translated  solar radiation on a sloping surface based on measured horizontal radiation [W/m^2]
-                double lw_radiation = 0.0;
+                double lw_radiation = 0.0; // long-wave radiation ///TODO
+                double net_radiation = 0.0; // net radiation /// TODO
             };
 
             template<class P, class R>
