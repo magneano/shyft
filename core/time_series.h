@@ -436,7 +436,7 @@ namespace shyft{
             // TA, ta.timeshift(dt) -> a clone of ta...
             ta_t ta;
             ts_point_fx fx_policy=POINT_AVERAGE_VALUE; // inherited from ts
-            utctimespan dt=0;// despite ta time-axis, we need it
+            utctimespan dt{0};// despite ta time-axis, we need it
             bool bound=false;
             ts_point_fx point_interpretation() const { return fx_policy; }
             void set_point_interpretation(ts_point_fx point_interpretation) { fx_policy=point_interpretation;}
