@@ -30,7 +30,11 @@ namespace shyft::core {
 	namespace hydro_functions {
 		using namespace std;
 		const double pi = boost::math::constants::pi<double>();
+		const double sigma = 4.90*0.000000001; //Stefan-Boltzmann constant  MJ/m^2 K^4
+        const double gsc = 1367; // W/m2 -- solar constant
 		const double Pa2kPa = 0.001;
+        const double deg2rad = pi / 180; // degrees to radians
+        const double rad2deg = 180 / pi; // rad to deg
 
 		/** \brief computes standard atmospheric pressure
          * \param height, [m] -- elevation of the point
@@ -58,6 +62,7 @@ namespace shyft::core {
 		// McMahon, T. A., Peel, M. C., Lowe, L., Srikanthan, R., and McVicar, T. R.:
 		// Estimating actual, potential, reference crop and pan evaporation using standard meteorological data: a pragmatic synthesis,
 		// Hydrol. Earth Syst. Sci., 17, 1331-1363, https://doi.org/10.5194/hess-17-1331-2013, 2013.
+		// TODO: check units
 		/**\brief wet-bulb temperature  McJannet et al., 2008b, Equation 2*/
 		inline double wetbulb_temperature(double air_temp, double dew_temp, double actual_vp) {
 			double tt = (dew_temp+237.3)*(dew_temp+237.3);

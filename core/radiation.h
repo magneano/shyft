@@ -82,6 +82,7 @@ namespace shyft {
 //    }
 
     namespace core {
+        // TODO use rasputin namespace
 
         namespace radiation {
             using namespace std;
@@ -123,8 +124,7 @@ namespace shyft {
                     return phi_ * rad2deg;
                 }// latitude, [deg] should be available from cell?/// TODO: add PROJ4 for conversion from cartesian to wgs84
 
-                double
-                ra_radiation() const { return ra_; } // extraterrestrial solar radiation for inclined surface[W/m2]
+                double ra_radiation() const { return ra_; } // extraterrestrial solar radiation for inclined surface[W/m2]
                 double ra_radiation_hor() { return rahor_; } // extraterrestrial solar radiation for horizontal surfaces
 
                 double sun_rise() const { return omega1_24_ * rad2deg; }
@@ -251,6 +251,10 @@ namespace shyft {
                                                     param.albedo * (1 - fi()));
                     return;
                 }
+                template<class V>
+                void lw_radiation(R &response, double temp){
+                    return;
+                }
 
             private:
                 double delta_;
@@ -264,10 +268,10 @@ namespace shyft {
                 double ra_ = 0.0; // extraterrestrial solar radiation for inclined surface[W/m2]
                 double rahor_ = 0.0; // extraterrestrial solar radiation for horizontal surfaces
 
-                const double gsc = 1367; // W/m2 -- solar constant
-                const double Pa2kPa = 0.001; // Pa to kPa
-                const double deg2rad = pi / 180; // degrees to radians
-                const double rad2deg = 180 / pi; // rad to deg
+//                const double gsc = 1367; // W/m2 -- solar constant
+//                const double Pa2kPa = 0.001; // Pa to kPa
+//                const double deg2rad = pi / 180; // degrees to radians
+//                const double rad2deg = 180 / pi; // rad to deg
                 calendar utc;
                 double doy_; // day of the yearI
                 double lt_; // local time
