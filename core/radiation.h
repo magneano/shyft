@@ -251,8 +251,16 @@ namespace shyft {
                                                     param.albedo * (1 - fi()));
                     return;
                 }
+                /**\brief clear-sky longwave raditiation
+                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.231*/
                 template<class V>
-                void lw_radiation(R &response, double temp){
+                void lw_radiation(R &response, double temperature, double rhumidity, double ns_air_temp){
+                    double epsilon_clr = 0.83 - 0.18*exp(-1.54*actual_vp(temperature, rhumidity));
+                    double Lin = epsilon_clr*sigma*pow(ns_air_temp,4);
+                    double ss_temp = min(ns_air_temp-2.5,273.16);
+                    double epsilon_ss = 1.0;
+                    double Lout = epsilon_ss*sigma*pow(ss_temp,4)+(1-epsilon_ss)*Lin;
+                    response.lw_radiation = Lin-Lout;
                     return;
                 }
 
