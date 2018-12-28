@@ -25,34 +25,76 @@ See file COPYING for more details **/
 //#include <proj.h>
 
 namespace shyft::core {
-	using std::vector;
-	using std::cos;
-	using std::sin;
-	using std::pow;
-	using std::exp;
-	using namespace std;
-	const double pi = boost::math::constants::pi<double>();
 
-	/** \brief computes standard atmospheric pressure
-     * \param height, [m] -- elevation of the point
-     * \return p, [kPa] -- atmospheric pressure */
-	double atm_pressure(double height){ // height < 11000
-		const double p0 = 101325.0; //[Pa]standard sea level pressure
-		const double L = 0.0065; //[K/m] temperature lapse rate
-		const double g = 9.80665; //[m/s2] earth-surface gravitational acceleration
-		const double R0 = 8.31447;//[J/mol/K] Universal gas constant
-		const double M = 0.0289644; //[kg/mol] molar mass of dry air
-		const double T0 = 288.15; // [K] sea level standard temperature
-		return p0*pow((1 - L*height/T0),(g*M/R0/L))*Pa2kPa;
+
+	namespace hydro_functions {
+		using namespace std;
+		const double pi = boost::math::constants::pi<double>();
+		const double Pa2kPa = 0.001;
+
+		/** \brief computes standard atmospheric pressure
+         * \param height, [m] -- elevation of the point
+         * \return p, [kPa] -- atmospheric pressure */
+		inline double atm_pressure(double height){ // height < 11000
+			const double p0 = 101325.0; //[Pa]standard sea level pressure
+			const double L = 0.0065; //[K/m] temperature lapse rate
+			const double g = 9.80665; //[m/s2] earth-surface gravitational acceleration
+			const double R0 = 8.31447;//[J/mol/K] Universal gas constant
+			const double M = 0.0289644; //[kg/mol] molar mass of dry air
+			const double T0 = 288.15; // [K] sea level standard temperature
+			return p0*pow((1 - L*height/T0),(g*M/R0/L))*Pa2kPa;
+		}
+		/**\brief computes actual vapor pressure from dewpoint temperature
+         * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.113
+         * \param temperature, [degC]
+         * \param rhumidity, [percent] -- relative humidity
+         * \return e, [kPa] -- actual vapor pressure*/
+		inline double actual_vp(double temperature, double rhumidity){
+			double es = (temperature>=0.0) ? (6108 * exp(17.27*temperature/(temperature + 237.3))) : 6108*exp(21.87*temperature/(temperature+265.5)) ; // saturation vapor pressure,[kPa], eq.(3.9)
+			return rhumidity/100.0*es*Pa2kPa;//[kPa], based on eq.(3.12)
+		}
+
+		// the whole section is based on supplementary materials of
+		// McMahon, T. A., Peel, M. C., Lowe, L., Srikanthan, R., and McVicar, T. R.:
+		// Estimating actual, potential, reference crop and pan evaporation using standard meteorological data: a pragmatic synthesis,
+		// Hydrol. Earth Syst. Sci., 17, 1331-1363, https://doi.org/10.5194/hess-17-1331-2013, 2013.
+		/**\brief wet-bulb temperature  McJannet et al., 2008b, Equation 2*/
+		inline double wetbulb_temperature(double air_temp, double dew_temp, double actual_vp) {
+			double tt = (dew_temp+237.3)*(dew_temp+237.3);
+			double a = 0.00066*100*air_temp + 4098*actual_vp*dew_temp/tt;
+			double b = 0.00066*100 + 4098*actual_vp/tt;
+			return a/b;
+		}
+		/**\brief dew point temperature    McJannet et al., 2008b, Equation 26*/
+		inline double dew_temperature(double act_vp) {
+			return 116.9+237.3*log(act_vp)/(16.78 - log(act_vp));
+		}
+		/**\briet slope of the saturation vapor pressure curve  Allen et al., 1998, Equation 13 */
+		inline double svp_slope(double air_temp) {
+			return 4098*(0.6108*exp(17.27*air_temp/(237.3+air_temp)))/(air_temp+237.3)/(air_temp+237.3);
+		}
+		/**\brief saturation vapor pressure at temperature  Allen et al., 1998, Equation 11*/
+		inline double svp(double temp){
+			return 0.6108*exp(17.27*temp/(temp+237.3));
+		}
+		/**\brief daily saturation vapor pressure  Allen et al., 1998, Equation 12*/
+		inline double svp_daily(double tmax, double tmin) {
+			return 0.5*(svp(tmax)+svp(tmin));
+		}
+		/**\brief mean daily actual vapor pressure  Allen et al., 1998, Equation 17*/
+		inline double avp_daily_mean(double tmax, double tmin, double rhmax, double rhmin) {
+			return 0.5*(svp(tmax)*rhmax/100+svp(tmin)*rhmin/100);
+		}
+		/**\brief mean daily actual vapor pressure using dew point temperature*/
+		inline double avp_daily_mean(double dew_temp) {
+			return svp(dew_temp);
+		}
+		/**\brief psychrometric constant Allen et al., 1998, Equation 8*/
+		inline double gamma(double pressure, double lambda = 2.45){
+		    return 0.00163*pressure/lambda;
+		}
+
 	}
-	/**\brief computes actual vapor pressure from dewpoint temperature
-     * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.113
-     * \param temperature, [degC]
-     * \param rhumidity, [percent] -- relative humidity
-     * \return e, [kPa] -- actual vapor pressure*/
-	double actual_vap_pressure(double temperature, double rhumidity){
-		double es = (temperature>=0.0) ? (611 * exp(17.27*temperature/(temperature + 237.3))) : 611*exp(21.87*temperature/(temperature+265.5)) ; // saturation vapor pressure,[kPa], eq.(3.9)
-		return rhumidity/100.0*es*Pa2kPa;//[kPa], based on eq.(3.12)
-	}
+
 
 }

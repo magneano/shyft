@@ -27,6 +27,7 @@ See file COPYING for more details **/
 
 #include <chrono>
 #include <boost/math/constants/constants.hpp>
+#include "core/hydro_functions.h"
 //#include <proj.h>
 namespace shyft {
 //    namespace utility {
@@ -82,10 +83,10 @@ namespace shyft {
 
     namespace core {
 
-
         namespace radiation {
             using namespace std;
             const double pi = boost::math::constants::pi<double>();
+            using namespace hydro_functions;
 
             struct parameter {
                 double albedo = 0.1; // average albedo of the surrounding ground surface:0.15-0.25 -- grass, 0.10-0.15 -- coniferous forest, 0.15 - 0.25 -- deciduous forest, 0.04-0.08 -- open water, 0.15-0.35 -- bare soil
@@ -174,7 +175,7 @@ namespace shyft {
                     double W; //equivalent depth of precipitable water in the atmosphere[mm]
                     eatm_ = atm_pressure(
                             elevation); // [kPa] atmospheric pressure as a function of elevation ///TODO: get elevation from cell.midpoint().z
-                    ea_ = actual_vap_pressure(temperature, rhumidity); //[kPa] actual vapor pressure
+                    ea_ = actual_vp(temperature, rhumidity); //[kPa] actual vapor pressure
                     W = 0.14 * ea_ * eatm_ + 2.1; // eq.(18)
 
                     double Kbo;
@@ -367,32 +368,32 @@ namespace shyft {
                     }
                 }
 
-                /** \brief computes standard atmospheric pressure
-                 * \param height, [m] -- elevation of the point
-                 * \return p, [kPa] -- atmospheric pressure */
-                double atm_pressure(double height) { // height < 11000
-                    const double p0 = 101325.0; //[Pa]standard sea level pressure
-                    const double L = 0.0065; //[K/m] temperature lapse rate
-                    const double g = 9.80665; //[m/s2] earth-surface gravitational acceleration
-                    const double R0 = 8.31447;//[J/mol/K] Universal gas constant
-                    const double M = 0.0289644; //[kg/mol] molar mass of dry air
-                    const double T0 = 288.15; // [K] sea level standard temperature
-                    return p0 * pow((1 - L * height / T0), (g * M / R0 / L)) * Pa2kPa;
-                }
-
-                /**\brief computes actual vapor pressure from dewpoint temperature
-                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.113
-                 * \param temperature, [degC]
-                 * \param rhumidity, [percent] -- relative humidity
-                 * \return e, [kPa] -- actual vapor pressure*/
-                double actual_vap_pressure(double temperature, double rhumidity) {
-                    double es = (temperature >= 0.0) ? (611 * exp(17.27 * temperature / (temperature + 237.3))) : 611 *
-                                                                                                                  exp(21.87 *
-                                                                                                                      temperature /
-                                                                                                                      (temperature +
-                                                                                                                       265.5)); // saturation vapor pressure,[sPa], eq.(3.9)
-                    return rhumidity / 100.0 * es * Pa2kPa;//[kPa], based on eq.(3.12)
-                }
+//                /** \brief computes standard atmospheric pressure
+//                 * \param height, [m] -- elevation of the point
+//                 * \return p, [kPa] -- atmospheric pressure */
+//                double atm_pressure(double height) { // height < 11000
+//                    const double p0 = 101325.0; //[Pa]standard sea level pressure
+//                    const double L = 0.0065; //[K/m] temperature lapse rate
+//                    const double g = 9.80665; //[m/s2] earth-surface gravitational acceleration
+//                    const double R0 = 8.31447;//[J/mol/K] Universal gas constant
+//                    const double M = 0.0289644; //[kg/mol] molar mass of dry air
+//                    const double T0 = 288.15; // [K] sea level standard temperature
+//                    return p0 * pow((1 - L * height / T0), (g * M / R0 / L)) * Pa2kPa;
+//                }
+//
+//                /**\brief computes actual vapor pressure from dewpoint temperature
+//                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.113
+//                 * \param temperature, [degC]
+//                 * \param rhumidity, [percent] -- relative humidity
+//                 * \return e, [kPa] -- actual vapor pressure*/
+//                double actual_vp(double temperature, double rhumidity) {
+//                    double es = (temperature >= 0.0) ? (611 * exp(17.27 * temperature / (temperature + 237.3))) : 611 *
+//                                                                                                                  exp(21.87 *
+//                                                                                                                      temperature /
+//                                                                                                                      (temperature +
+//                                                                                                                       265.5)); // saturation vapor pressure,[sPa], eq.(3.9)
+//                    return rhumidity / 100.0 * es * Pa2kPa;//[kPa], based on eq.(3.12)
+//                }
 
                 /**\brief computes solar hour angle from local time
                  * ref.: https://en.wikipedia.org/wiki/Equation_of_time
