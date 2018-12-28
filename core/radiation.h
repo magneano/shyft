@@ -252,13 +252,16 @@ namespace shyft {
                     return;
                 }
                 /**\brief clear-sky longwave raditiation
-                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.231*/
+                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.261
+                 * \param temperature -- air temperature
+                 * \param rhumidity -- relativ humidity
+                 * \param ss_temp -- surface temperature
+                 * response.lw_radiation MJ/m^2 day*/
                 template<class V>
-                void lw_radiation(R &response, double temperature, double rhumidity, double ns_air_temp){
-                    double epsilon_clr = 0.83 - 0.18*exp(-1.54*actual_vp(temperature, rhumidity));
-                    double Lin = epsilon_clr*sigma*pow(ns_air_temp,4);
+                void lw_radiation(R &response, double temperature, double rhumidity, doubless_temp){
+                    double Lin = 2.7*actual_vp(temperature,rhumidity)+0.245*temperature-45.14;
                     double ss_temp = min(ns_air_temp-2.5,273.16);
-                    double epsilon_ss = 1.0;
+                    double epsilon_ss = 0.95;//waters
                     double Lout = epsilon_ss*sigma*pow(ss_temp,4)+(1-epsilon_ss)*Lin;
                     response.lw_radiation = Lin-Lout;
                     return;
