@@ -2,17 +2,17 @@ stages:
     - build
     - cpp_test
     - py_test
-    
 
 build:
     stage: build
     tags: 
         - shyft
+        
     script:
-        - echo "Using: ${SHYFT_DEPENDENCIES_DIR}"
-        - echo "Path: ${PATH}"
+        - "echo Using ${SHYFT_DEPENDENCIES_DIR}"
+        - "echo Path ${PATH}"
         - "mkdir -p build"
-        - cd build&&cmake ..
+        - "cd build&&cmake .."
         - "make -j 4 VERBOSE=1"
         - make install
     
@@ -23,7 +23,7 @@ cpp_test:
     dependencies:
         - build
     script:
-        - cd build && make test
+        - "cd build && make test"
 
 py_test:
     stage: py_test
