@@ -12,9 +12,9 @@ build:
     - export BROOT=`pwd`
     - export PATH=${BROOT}/../miniconda/bin:$PATH
     - export LD_LIBRARY_PATH=${BROOT}/../shyft_dependencies/lib
-    - mkdir -p build
+    - "mkdir -p build"
     - cd build&&cmake ..
-    - make -j 4 VERBOSE=1
+    - "make -j 4 VERBOSE=1"
     - make install
     
 cpp_test:
