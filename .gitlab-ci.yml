@@ -10,7 +10,7 @@ build:
         - shyft
     script:
         - echo "Using: ${SHYFT_DEPENDENCIES_DIR}"
-        - echo "Path: ${PATH}
+        - echo "Path: ${PATH}"
         - "mkdir -p build"
         - cd build&&cmake ..
         - "make -j 4 VERBOSE=1"
