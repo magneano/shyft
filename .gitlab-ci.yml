@@ -6,20 +6,22 @@ stages:
 
 build:
     stage: build
-    tags: shyft
+    tags: 
+        - shyft
     # goes here
     script:
-    - export BROOT=`pwd`
-    - export PATH=${BROOT}/../miniconda/bin:$PATH
-    - export LD_LIBRARY_PATH=${BROOT}/../shyft_dependencies/lib
-    - "mkdir -p build"
-    - cd build&&cmake ..
-    - "make -j 4 VERBOSE=1"
-    - make install
+        - export BROOT=`pwd`
+        - export PATH=${BROOT}/../miniconda/bin:$PATH
+        - export LD_LIBRARY_PATH=${BROOT}/../shyft_dependencies/lib
+        - "mkdir -p build"
+        - cd build&&cmake ..
+        - "make -j 4 VERBOSE=1"
+        - make install
     
 cpp_test:
     stage: cpp_test
-    tags: shyft
+    tags: 
+        - shyft
     dependencies:
         - build
     script:
@@ -30,7 +32,8 @@ cpp_test:
 
 py_test:
     stage: py_test
-    tags: shyft
+    tags: 
+        - shyft
     dependencies:
         - build
     script: # TODO: add python tests here
