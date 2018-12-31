@@ -11,16 +11,10 @@ build:
         - "echo Path ${PATH}"
         - "mkdir -p build"
         - "cd build&&cmake .."
-        - "make -j 4 VERBOSE=1"
+        - "make -j 4 VERBOSE=0"
         - make install
         - make test
-        - "export min_conda=${SHYFT_DEPENDENCIES_DIR}/../miniconda"
-        - "export CONDA_PYTHON_EXE=${min_conda}/bin/python"
-        - "export CONDA_EXE=${min_conda}/bin/conda"
-        - "export CONDA_DEFAULT_ENV=shyft_env"
-        - "export CONDA_SHLVL=1"
-        - "export _CONDA_SET_PROJ_LIB=PROJ_LIB"
-        - "export PROJ_LIB=${min_conda}/envs/shyft_env/share/proj"
+        - ". activate shyft_env"
         - 'PYTHONPATH=.. python -c"import shyft; shyft.print_versions()"'
-        - "nosetests ../shyft/tests --with-coverage --cover-package=shyft.repository --cover-package=shyft.orchestration --cover-package=shyft.api"
+        - "PYTHONPATH=.. nosetests ../shyft/tests --with-coverage --cover-package=shyft.repository --cover-package=shyft.orchestration --cover-package=shyft.api"
 
