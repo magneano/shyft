@@ -103,8 +103,8 @@ namespace shyft {
                 double ref_radiation = 0.0; // reflected
                 double psw_radiation = 0.0; // predicted clear sky solar radiation for inclined surface [W/m2]
                 double tsw_radiation = 0.0; // translated  solar radiation on a sloping surface based on measured horizontal radiation [W/m^2]
-                double lw_radiation = 0.0; // long-wave radiation ///TODO
-                double net_radiation = tsw_radiation+lw_radiation; // net radiation /// TODO
+                double lw_radiation = 0.0; // long-wave radiation [W/m^2]
+                double net_radiation = tsw_radiation+lw_radiation; // net radiation
             };
 
             template<class P, class R>
@@ -253,16 +253,14 @@ namespace shyft {
                 }
                 /**\brief clear-sky longwave raditiation
                  * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.261
-                 * \param temperature -- air temperature
-                 * \param rhumidity -- relativ humidity
-                 * \param ss_temp -- surface temperature
-                 * response.lw_radiation MJ/m^2 day*/
-                 ///TODO this should be in W/m^2 as sw!!!
-                template<class V>
-                void lw_radiation(R &response, double temperature, double rhumidity, doubless_temp){
+                 * \param temperature, [K] -- air temperature
+                 * \param rhumidity, [persent] -- relative humidity
+                 * \param ss_temp, [K] -- surface temperature
+                 * response.lw_radiation W/m^2 */
+                void lw_radiation(R &response, double temperature, double rhumidity){
                     double Lin = 2.7*actual_vp(temperature,rhumidity)+0.245*temperature-45.14;
-                    double ss_temp = min(ns_air_temp-2.5,273.16);
-                    double epsilon_ss = 0.95;//waters
+                    double ss_temp = min(temperature-2.5,273.16);
+                    double epsilon_ss = 0.95;//water
                     double Lout = epsilon_ss*sigma*pow(ss_temp,4)+(1-epsilon_ss)*Lin;
                     response.lw_radiation = (Lin-Lout)*MJm2d2Wm2;
                     return;
