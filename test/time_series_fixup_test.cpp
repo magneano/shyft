@@ -1,6 +1,7 @@
 #include "test_pch.h"
 
 #include <cmath>
+#include <limits>
 #include <vector>
 
 #include "core/utctime_utilities.h"
@@ -218,7 +219,7 @@ TEST_SUITE("time_series") {
         }
 
         SUBCASE("Adjacent repetitions") {
-            /* Test that in a series without any repetitions no values are replaced.
+            /* Test that in a series with adjacent repeting seqences values are replaced as expected.
              */
 
             //                                         *     *     *     *     *     *     *
@@ -284,11 +285,97 @@ TEST_SUITE("time_series") {
             }
         }
 
-        // SUBCASE("Repetition tolerance") {
-        //     
-        //     SUBCASE("Repetition just outside tolerance") {
-        // 
-        //     }
-        // }
+        SUBCASE("Repetition tolerance") {
+
+            SUBCASE("Repetition around zero") {
+                /* Test that repetitions around zero with a detection tolerance is replaced correctly.
+                 */
+
+                //                                            *     *     *     *     *
+                std::vector<double> values  {1.1, 1.4, 2.5,  0.1, -0.2, -0.1,  0.0, -0.1, 2.5, 1.9, 2.1, 2.3, 3.1};
+                std::vector<double> expected{1.1, 1.4, 2.5, 100., 100., 100., 100., 100., 2.5, 1.9, 2.1, 2.3, 3.1};
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(40), 0.5, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+
+            SUBCASE("Repetition around value") {
+                /* Test that repetitions around a value with a detection tolerance is replaced correctly.
+                 */
+
+                //                                            *     *     *     *     *
+                std::vector<double> values  {1.1, 1.4, 2.5,  5.1,  4.9,  4.8,  5.0,  4.9, 2.5, 1.9, 2.1, 2.3, 3.1};
+                std::vector<double> expected{1.1, 1.4, 2.5, 100., 100., 100., 100., 100., 2.5, 1.9, 2.1, 2.3, 3.1};
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(40), 0.5, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+
+            SUBCASE("Repetition just inside tolerance") {
+                /* Test that repetitions exactly within the tolerance threshold is replaced.
+                 */
+
+                const double eps = std::numeric_limits<double>::epsilon();
+
+                std::vector<double> values  {1.1, 1.4, 2.5, 4.0 + 10*eps, 4.0 - 10*eps,  4.0 + 10*eps,  4.0 - 10*eps,  4.0 + 10*eps, 2.5, 1.9, 2.1, 2.3, 3.1};
+                std::vector<double> expected{1.1, 1.4, 2.5,         100.,         100.,          100.,          100.,          100., 2.5, 1.9, 2.1, 2.3, 3.1};
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(40), 20*eps, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+
+            SUBCASE("Repetition just outside tolerance") {
+                /* Test that repetitions exactly outside the tolerance threshold is not replaced.
+                */
+
+                const double eps = std::numeric_limits<double>::epsilon();
+
+                std::vector<double> values  {1.1, 1.4, 2.5, 4.0 + 10*eps, 4.0 - 10*eps,  4.0 + 10*eps,  4.0 - 10*eps,  4.0 + 10*eps, 2.5, 1.9, 2.1, 2.3, 3.1};
+                std::vector<double> expected{1.1, 1.4, 2.5, 4.0 + 10*eps, 4.0 - 10*eps,  4.0 + 10*eps,  4.0 - 10*eps,  4.0 + 10*eps, 2.5, 1.9, 2.1, 2.3, 3.1};
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(40), 15*eps, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+        }
     }
 }
