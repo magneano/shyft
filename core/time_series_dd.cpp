@@ -1332,7 +1332,7 @@ namespace shyft{
                         // value close to previous
                         if ( repeat_counter == 0u ) {
                             repeat_counter = 1u;
-                            repeat_start_i = i;
+                            repeat_start_i = i-1;
                         }
                         repeat_counter += 1u;
                     } else {
@@ -1341,13 +1341,13 @@ namespace shyft{
                         utctime t1 = this->time(i);  // not i-1 to count the full period of the last repeating value
 
                         // long enough period?
-                        if ( t1 - t0 >= this->p.repeat_timespan ) {
+                        if ( repeat_counter > 0 && t1 - t0 >= this->p.repeat_timespan ) {
                             // then replace the last few values 
                             for ( std::size_t j = repeat_start_i; j < i; ++j ) {
                                 this->_repeating_cache[j] = 1;
                             }
-                            repeat_counter = 0u;
                         }
+                        repeat_counter = 0u;
                     }
                 }
                 previous_value = value;

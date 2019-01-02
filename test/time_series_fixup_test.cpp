@@ -103,4 +103,192 @@ TEST_SUITE("time_series") {
         FAST_CHECK_EQ(ts->value(4),doctest::Approx(cts.value(4)));// own value replaces -20.1
     }
 
+    TEST_CASE("qac_ts_repeating") {
+
+        SUBCASE("No repetitions") {
+            /* Test that in a series without any repetitions no values are replaced.
+             */
+
+            std::vector<double> values{0., 1., 3., 2., 4., 2., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+            generic_dt ta{ _t(0), seconds(10), values.size() };
+
+            std::vector<double> expected = values;
+        
+            apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+            qac_parameter params = qac_parameter::create_repeating_no_fill_parameters(
+                false, false, seconds(60), 1e-2
+            );
+            auto ts = qac_ts(data_ts, params);
+            auto result = ts.values();
+
+            for ( std::size_t i = 0; i < values.size(); ++i ) {
+                FAST_CHECK_EQ(result[i], expected[i]);
+            }
+        }
+
+        SUBCASE("One repetition") {
+
+            SUBCASE("Exact detection period span") {
+                /* Test that a single repetition sequence is detected when the detection period is exactly as long as the repetition.
+                 */
+
+                //                                         *     *     *
+                std::vector<double> values  {0., 1., 3.,   2.,   2.,   2., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+                std::vector<double> expected{0., 1., 3., 100., 100., 100., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(30), 1e-2, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+
+            SUBCASE("Shorter detection period span") {
+                /* Test that a single repetition sequence is detected when the detection period is shorter than the repetition sequence.
+                 */
+
+                //                                         *     *     *
+                std::vector<double> values  {0., 1., 3.,   2.,   2.,   2., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+                std::vector<double> expected{0., 1., 3., 100., 100., 100., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(20), 1e-2, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+
+            SUBCASE("Longer detection period span") {
+                /* Test that a single repetition sequence is not detected when the detection period is longer than the repetition sequence.
+                 */
+
+                //                                       *   *   *
+                std::vector<double> values  {0., 1., 3., 2., 2., 2., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+                std::vector<double> expected{0., 1., 3., 2., 2., 2., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(40), 1e-2, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+        
+            SUBCASE("All repetition") {
+                /* Test that in a series with only repetition the entire series is flagged.
+                 */
+
+                std::vector<double> values  {  0.,   0.,   0.,   0.,   0.,   0.,   0.,   0.,   0.,   0.,   0.,   0.};
+                std::vector<double> expected{100., 100., 100., 100., 100., 100., 100., 100., 100., 100., 100., 100.};
+                generic_dt ta{ _t(0), seconds(10), values.size() };
+
+                apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+                qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                    false, false, seconds(20), 1e-2, 100.
+                );
+                auto ts = qac_ts(data_ts, params);
+                auto result = ts.values();
+
+                for ( std::size_t i = 0; i < values.size(); ++i ) {
+                    FAST_CHECK_EQ(result[i], expected[i]);
+                }
+            }
+        }
+
+        SUBCASE("Adjacent repetitions") {
+            /* Test that in a series without any repetitions no values are replaced.
+             */
+
+            //                                         *     *     *     *     *     *     *
+            std::vector<double> values  {0., 1., 3.,   2.,   2.,   2.,   3.,   3.,   3.,   3., 4., 2., 5., 2., 1. };
+            std::vector<double> expected{0., 1., 3., 100., 100., 100., 100., 100., 100., 100., 4., 2., 5., 2., 1. };
+            generic_dt ta{ _t(0), seconds(10), values.size() };
+
+            apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+            qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                false, false, seconds(30), 1e-2, 100.
+            );
+            auto ts = qac_ts(data_ts, params);
+            auto result = ts.values();
+
+            for ( std::size_t i = 0; i < values.size(); ++i ) {
+                FAST_CHECK_EQ(result[i], expected[i]);
+            }
+        }
+
+        SUBCASE("Leading repetition") {
+            /* Test that a leading repetition sequence is detected.
+             */
+
+            //                             *     *     *     *     *     *
+            std::vector<double> values  {  1.,   1.,   1.,   1.,   1.,   1., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+            std::vector<double> expected{100., 100., 100., 100., 100., 100., 3., 4., 5., 7., 4., 2., 5., 2., 1. };
+            generic_dt ta{ _t(0), seconds(10), values.size() };
+
+            apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+            qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                false, false, seconds(30), 1e-2, 100.
+            );
+            auto ts = qac_ts(data_ts, params);
+            auto result = ts.values();
+
+            for ( std::size_t i = 0; i < values.size(); ++i ) {
+                FAST_CHECK_EQ(result[i], expected[i]);
+            }
+        }
+
+        SUBCASE("End repetition") {
+            /* Test that a repetition sequence at the end of the series is detected.
+             */
+
+            //                                                                 *     *     *     *     *     *
+            std::vector<double> values  {3., 4., 5., 7., 4., 2., 5., 2., 3.,   1.,   1.,   1.,   1.,   1.,   1. };
+            std::vector<double> expected{3., 4., 5., 7., 4., 2., 5., 2., 3., 100., 100., 100., 100., 100., 100. };
+            generic_dt ta{ _t(0)
+, seconds(10), values.size() };
+
+            apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
+
+            qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
+                false, false, seconds(30), 1e-2, 100.
+            );
+            auto ts = qac_ts(data_ts, params);
+            auto result = ts.values();
+
+            for ( std::size_t i = 0; i < values.size(); ++i ) {
+                FAST_CHECK_EQ(result[i], expected[i]);
+            }
+        }
+
+        // SUBCASE("Repetition tolerance") {
+        //     
+        //     SUBCASE("Repetition just outside tolerance") {
+        // 
+        //     }
+        // }
+    }
 }
