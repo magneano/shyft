@@ -35,6 +35,7 @@ namespace shyft::core {
 		const double Pa2kPa = 0.001;
         const double deg2rad = pi / 180; // degrees to radians
         const double rad2deg = 180 / pi; // rad to deg
+        const double MJm2d2Wm2 = 0.086400;// MJ/m^2day to W/m^2
 
 		/** \brief computes standard atmospheric pressure
          * \param height, [m] -- elevation of the point
