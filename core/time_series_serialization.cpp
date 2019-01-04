@@ -529,6 +529,26 @@ void shyft::time_series::dd::qac_ts::serialize(Archive & ar, const unsigned int 
 }
 
 template<class Archive>
+void shyft::time_series::dd::qac_parameter::serialize(Archive & ar, const unsigned int version) {
+    ar
+        & core_nvp("nan_qa_enabled", nan_qa_enabled)
+        & core_nvp("infinity_qa_enabled", infinity_qa_enabled)
+        & core_nvp("min_max_qa_enabled", min_max_qa_enabled)
+        & core_nvp("repeating_qa_enabled", repeating_qa_enabled)
+
+        & core_nvp("min_x", min_x)
+        & core_nvp("max_x", max_x)
+        
+        & core_nvp("repeat_timespan", repeat_timespan)
+        & core_nvp("repeat_tolerance", repeat_tolerance)
+
+        & core_nvp("max_scan_timespan", max_scan_timespan)
+        
+        & core_nvp("constant_filler", constant_filler)
+        ;
+}
+
+template<class Archive>
 void shyft::time_series::dd::inside_ts::serialize(Archive & ar, const unsigned int version) {
 	ar
 		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))

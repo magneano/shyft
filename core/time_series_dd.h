@@ -1528,7 +1528,7 @@ namespace shyft {
                 );
             }
 
-            // binary serialization, so no x_serialize_decl();
+            x_serialize_decl();
         };
 
         /** \brief The qac_ts is used for doing quality and correction to a ts using min-max criteria
@@ -2273,8 +2273,8 @@ x_serialize_export_key_nt(shyft::time_series::dd::apoint_ts);
 x_serialize_export_key(shyft::time_series::dd::ats_vector);
 x_serialize_export_key(shyft::time_series::dd::abs_ts);
 x_serialize_export_key(shyft::time_series::dd::qac_ts);
+x_serialize_export_key(shyft::time_series::dd::qac_parameter);
 x_serialize_export_key(shyft::time_series::dd::inside_ts);
 x_serialize_export_key(shyft::time_series::dd::decode_ts);
-x_serialize_binary(shyft::time_series::dd::qac_parameter);
 x_serialize_binary(shyft::time_series::dd::inside_parameter);
 x_serialize_binary(shyft::time_series::dd::bit_decoder);
