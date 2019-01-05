@@ -3,6 +3,7 @@
 #include "core/time_axis.h"
 #include "core/time_series.h"
 #include "core/time_series_average.h"
+#include "core/time_series_dd.h"
 
 namespace shyft {namespace time_series {
 
@@ -55,6 +56,22 @@ vector<double> old_accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
     return r;
 }
 
+//-- for test; run via the python exposed apoint_ts interface
+template < class TA,class TS>
+vector<double> apoint_ts_accumulate_linear(const TA&ta, const TS& ts, bool avg) {
+    using dd::apoint_ts;
+    using dd::gta_t;
+    apoint_ts src{ts};src.set_point_interpretation(POINT_INSTANT_VALUE);
+    return avg?src.average(gta_t{ta}).values():src.integral(gta_t{ta}).values();
+}
+
+template < class TA,class TS>
+vector<double> apoint_ts_accumulate_stair_case(const TA&ta, const TS& ts, bool avg) {
+    using dd::apoint_ts;
+    using dd::gta_t;
+    apoint_ts src{ts};src.set_point_interpretation(POINT_AVERAGE_VALUE);
+    return avg?src.average(gta_t{ta}).values():src.integral(gta_t{ta}).values();
+}
 
 }
 }
@@ -369,6 +386,10 @@ TEST_SUITE("time_series") {
         auto f_lin_old=old_accumulate_linear<fixed_dt,point_ts<fixed_dt>>;
         test_linear_fx(f_lin_old);
     }
+    TEST_CASE("apoint_ts_avg_linear") {
+        auto f_lin=apoint_ts_accumulate_linear<fixed_dt,point_ts<fixed_dt>>;
+        test_linear_fx(f_lin);
+    }
     TEST_CASE("ts_avg_stair_case") {
         auto f_stair_case=accumulate_stair_case<fixed_dt,point_ts<fixed_dt>>;
         test_stair_case_fx(f_stair_case);
@@ -376,6 +397,10 @@ TEST_SUITE("time_series") {
     TEST_CASE("old_ts_avg_stair_case") {
         auto f_stair_case_old=old_accumulate_stair_case<fixed_dt,point_ts<fixed_dt>>;
         test_stair_case_fx(f_stair_case_old);
+    }
+    TEST_CASE("apoint_ts_avg_stair_case") {
+        auto f_stair_case=apoint_ts_accumulate_stair_case<fixed_dt,point_ts<fixed_dt>>;
+        test_stair_case_fx(f_stair_case);
     }
     TEST_CASE("ts_avg_speed_test") {
         using ts_t = point_ts<fixed_dt>;
@@ -433,4 +458,5 @@ TEST_SUITE("time_series") {
             CHECK( i_src.value(i) == doctest::Approx(1.0));
 
     }
+
 }

@@ -1,10 +1,12 @@
 stages:
     - build
+    - test
 
-build:
+build::linux:
     stage: build
     tags: 
         - shyft
+        - linux
         
     script:
         - "echo Using ${SHYFT_DEPENDENCIES_DIR}"
@@ -13,8 +15,72 @@ build:
         - "cd build&&cmake .."
         - "make -j 4 VERBOSE=0"
         - make install
-        - make test
+
+    artifacts:
+        name: binaries-linux
+        expire_in: 2 day
+        paths:
+            - build/test/test_shyft
+            - shyft/api/_api.so
+            - shyft/api/pt_gs_k/_pt_gs_k.so
+            - shyft/api/pt_hps_k/_pt_hps_k.so
+            - shyft/api/pt_hs_k/_pt_hs_k.so
+            - shyft/api/pt_ss_k/_pt_ss_k.so
+            - shyft/api/hbv_stack/_hbv_stack.so
+            - shyft/lib/
+
+
+
+build::win64:
+    stage: build
+    tags: 
+        - shyft
+        - win64
+    script:
+        - "echo Using $SHYFT_DEPENDENCIES"
+        - "echo Path $PATH"
+        - "build_support/win_build_shyft.cmd"
+    
+    artifacts:
+        name: binaries-win64
+        expire_in: 2 day
+        paths:
+            - bin/Release/test_shyft.exe
+            - shyft/api/_api.pyd
+            - shyft/api/pt_gs_k/_pt_gs_k.pyd
+            - shyft/api/pt_hps_k/_pt_hps_k.pyd
+            - shyft/api/pt_hs_k/_pt_hs_k.pyd
+            - shyft/api/pt_ss_k/_pt_ss_k.pyd
+            - shyft/api/hbv_stack/_hbv_stack.pyd
+
+test::win64:
+    stage: test
+    tags:
+        - shyft
+        - win64
+    dependencies:
+        - build::win64
+    script:
+        - echo starting the tests
+        - "bin\\Release\\test_shyft.exe"
+        - "set PYTHONPATH=."
+        - "nosetests shyft/tests --with-coverage --cover-package=shyft.repository --cover-package=shyft.orchestration --cover-package=shyft.api"
+
+test::linux:
+    stage: test
+    tags:
+        - shyft
+        - linux
+    dependencies:
+        - build::linux
+    script:
+        - build/test/test_shyft
         - ". activate shyft_env"
-        - 'PYTHONPATH=.. python -c"import shyft; shyft.print_versions()"'
-        - "PYTHONPATH=.. nosetests ../shyft/tests --with-coverage --cover-package=shyft.repository --cover-package=shyft.orchestration --cover-package=shyft.api"
+        - "PYTHONPATH=. nosetests shyft/tests --with-coverage --cover-html-dir=py_cover --cover-html --cover-package=shyft.repository --cover-package=shyft.orchestration --cover-package=shyft.api"
+        - coverage report -m
+    coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+    artifacts:
+        name: python_coverage_report
+        paths:
+            - py_cover
 

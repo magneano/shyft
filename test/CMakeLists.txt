@@ -23,7 +23,7 @@ set(target "test_shyft")
         set(COVERAGE_EXCLUDES '/usr/include/*' '*/boost/*' '*/armadillo*' '*/dlib/*' '*/doctest/*' '${SHYFT_DEPENDENCY_DIR}/include/*' )
         SETUP_TARGET_FOR_COVERAGE(
             NAME ${target}_coverage
-            EXECUTABLE ${target} -tse=utctime_utilities
+            EXECUTABLE ${target}
             DEPENDENCIES ${target}
         )
     endif()
