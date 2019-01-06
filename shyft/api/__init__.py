@@ -51,6 +51,7 @@ DoubleVector_FromNdArray = lambda x: DoubleVector.from_numpy(x)
 def VectorString(v):
     return str(v.to_numpy())
 
+Int64Vector=IntVector
 
 DoubleVector.__str__ = lambda self: VectorString(self)
 
@@ -202,6 +203,22 @@ time_axis : TimeAxis
 Returns
 -------
 time_points:numpy.array(dtype=np.int64)
+   [ time_axis.time(i) ].append(time_axis.total_period().end)
+""")
+
+TimeAxis.time_points_double = property( lambda self: time_axis_extract_time_points_as_utctime(self).to_numpy_double() ,doc= \
+"""
+extract all time-points from a TimeAxis with microseconds
+like
+[ time_axis.time(i) ].append(time_axis.total_period().end) if time_axis.size() else []
+
+Parameters
+----------
+time_axis : TimeAxis
+
+Returns
+-------
+time_points:numpy.array(dtype=np.float64)
    [ time_axis.time(i) ].append(time_axis.total_period().end)
 """)
 
@@ -427,8 +444,8 @@ __all__ = [] + \
          'KalmanBiasPredictor_update_with_forecast',
          'np_array',
          'nice_ta_string',
-         'StrGeoCellData',
-         'ConcatData'] + \
+         'StrGeoCellData'
+         ] + \
         ['ABS_DIFF',
          'ALLOW_ANY_MISSING',
          'ALLOW_INITIAL_MISSING',
@@ -626,7 +643,6 @@ __all__ = [] + \
          # 'exit',
          'extend_fill_policy',
          'extend_split_policy',
-         'get_ipython',
          'glacier_melt_step',
          'ice_packing_temperature_policy',
          'idw_precipitation',

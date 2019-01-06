@@ -154,7 +154,7 @@ class ERAInterimDataRepository(interfaces.GeoTsRepository):
 
         def prec_acc_conv(p):
             indx = np.nonzero([self.cal.calendar_units(int(ti)).hour in self.analysis_hours for ti in time])[0]
-            f = 1000.*api.deltahours(1)/(time[1] - time[0]) # conversion from m/delta_t to mm/1hour
+            f = 1000.*int(api.deltahours(1))/(int(time[1]) - int(time[0])) # conversion from m/delta_t to mm/1hour
             dp = np.clip((p[1:] - p[:-1])*f, 0.0, 10000.) # np.clip b/c negative values may occur after deaccumulation
             dp[indx] = p[indx+1]*f
             return dp

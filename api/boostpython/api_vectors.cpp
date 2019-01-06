@@ -429,8 +429,9 @@ namespace expose {
         expose_str_vector("StringVector");
         expose_vector<double>("DoubleVector");
 		expose_vector<vector<double>>("DoubleVectorVector");
-        expose_vector<int>("IntVector");
-        expose_vector<int64_t>("Int64Vector");
+        expose_vector<int64_t>("IntVector");
+        numpy_boost_python_register_type<int, 1>();
+        //expose_vector<int64_t>("Int64Vector");
         expose_vector<char>("ByteVector");
         //expose_vector<utctime>("UtcTimeVector");
         expose_utctime_vector();

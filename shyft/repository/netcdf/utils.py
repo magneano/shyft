@@ -348,7 +348,7 @@ def _slice_var_1D(nc_var, xy_var_name, xy_slice, xy_mask, slices={}): # , time_s
     data_slice[dims.index(xy_var_name)] = xy_slice
     #data_slice[dims.index("time")] = time_slice  # data_time_slice
     xy_slice_mask = [xy_mask[xy_slice] if dim == xy_var_name else slice(None) for dim in dims]
-    pure_arr = nc_var[data_slice][xy_slice_mask]
+    pure_arr = nc_var[data_slice][tuple(xy_slice_mask)]
     if isinstance(pure_arr, np.ma.core.MaskedArray):
         # print(pure_arr.fill_value)
         pure_arr = pure_arr.filled(np.nan)
@@ -384,9 +384,9 @@ def _slice_var_2D(nc_var, x_var_name, y_var_name, x_slice, y_slice, x_inds, y_in
             return nc_var[data_slice][new_slice][slc]
         else:
             new_slice[dims.index(hgt_dim_nm)] = 0
-            return nc_var[data_slice][new_slice]
+            return nc_var[data_slice][tuple(new_slice)]
     elif len(extra_dim) == 0:
-        return nc_var[data_slice][new_slice]
+        return nc_var[data_slice][tuple(new_slice)]
     else:
         raise err("Variable '{}' has more dimensions than required.".format(nc_var.name))
 
@@ -456,7 +456,7 @@ def calc_P(elev, seaLevelPressure=101325):
     value = seaLevelPressure * (T0 / (T0 + L * (elev))) ** (g * M / (R * L))
     return value
 
-def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
+def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err, allow_shorter_period=False):
     """
     Clip ensemble og source-keyed dictionaries of geo-ts according to utc_period
 
@@ -467,6 +467,8 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
         api vectors of geo located time series over the same time axis
     utc_period: api.UtcPeriod
         The utc time period that should (as a minimum) be covered.
+    allow_shorter_period: bool, optional
+        may return ts for shorter period if time_axis does not cover utc_period
     """
     if utc_period is None:
         return ensemble
@@ -480,9 +482,16 @@ def _clip_ensemble_of_geo_timeseries(ensemble, utc_period, err):
         point_type = geo_ts[0].ts.point_interpretation() == api.POINT_INSTANT_VALUE
         ta = geo_ts[0].ts.time_axis
         if ta.total_period().start > utc_period.start or ta.time_points[-1] - point_type < utc_period.end:
-            raise err("Found time axis that does not cover utc_period.")
-        idx_start = np.argmax(ta.time_points > utc_period.start) - 1
-        idx_end = np.argmin(ta.time_points < utc_period.end + point_type)
+            if not allow_shorter_period:
+                raise err("Found time axis that does not cover utc_period.")
+            else:
+                period_start = max(ta.time_points[0], int(utc_period.start))
+                period_end = min(ta.time_points[-1] - point_type, int(utc_period.end))
+        else:
+            period_start = utc_period.start
+            period_end = utc_period.end
+        idx_start = np.argmax(ta.time_points > period_start) - 1
+        idx_end = np.argmin(ta.time_points < period_end + point_type)
         if idx_start > 0 or idx_end < len(ta.time_points) - 1:
             if ta.timeaxis_type == api.TimeAxisType.FIXED:
                 dt = ta.time(1) - ta.time(0)

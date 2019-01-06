@@ -7,7 +7,7 @@ set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_tes
     region_model_test.cpp routing_test.cpp runner.cpp sceua_test.cpp serialization_test.cpp skaugen_test.cpp time_axis_test.cpp 
     time_series_average_test.cpp time_series_fixup_test.cpp time_series_test.cpp utctime_utilities_test.cpp hbv_physical_snow_test.cpp
     pt_hps_k_test.cpp test_ice_packing.cpp dtss_stress_test.cpp dtss_mutex_test.cpp time_series_decode_test.cpp time_series_derivative_test.cpp
-    dtss_db_test.cpp dtss_url_test.cpp dtss_krls_pred_db_test.cpp
+    dtss_db_test.cpp dtss_url_test.cpp dtss_krls_pred_db_test.cpp geo_test.cpp time_series_qac_test.cpp
 )
 
 set(target "test_shyft")
@@ -23,7 +23,7 @@ set(target "test_shyft")
         set(COVERAGE_EXCLUDES '/usr/include/*' '*/boost/*' '*/armadillo*' '*/dlib/*' '*/doctest/*' '${SHYFT_DEPENDENCY_DIR}/include/*' )
         SETUP_TARGET_FOR_COVERAGE(
             NAME ${target}_coverage
-            EXECUTABLE ${target} -tse=utctime_utilities
+            EXECUTABLE ${target}
             DEPENDENCIES ${target}
         )
     endif()
@@ -69,4 +69,5 @@ set(target "test_shyft")
     add_test(hbv_physical_snow ${target} --test-suite=hbv_physical_snow)
     add_test(dtss_url ${target} -nv --test-suite=dtss_url)
     add_test(dtss_krls_pred_db ${target} -nv --test_suite=dtss_krls_pred_db)
+    add_test(geo_cell_data  ${target} -nv --test_suite=geo_cell_data)
 

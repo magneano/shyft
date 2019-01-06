@@ -16,6 +16,8 @@ See file COPYING for more details **/
 #include "precipitation_correction.h"
 #include "unit_conversion.h"
 #include "routing.h"
+#include "mstack_param.h"
+
 namespace shyft {
   namespace core {
     namespace pt_hps_k {
@@ -29,6 +31,7 @@ namespace shyft {
             typedef precipitation_correction::parameter precipitation_correction_parameter_t;
             typedef glacier_melt::parameter glacier_parameter_t;
             typedef routing::uhg_parameter routing_parameter_t;
+            typedef mstack_parameter mstack_parameter_t;
 
             pt_parameter_t pt;
             hps_parameter_t hps;
@@ -37,6 +40,7 @@ namespace shyft {
             precipitation_correction_parameter_t p_corr;
             glacier_parameter_t gm;
             routing_parameter_t routing;
+            mstack_parameter_t msp;
 
             parameter(const pt_parameter_t& pt,
                         const hps_parameter_t& hps,
@@ -44,9 +48,10 @@ namespace shyft {
                         const kirchner_parameter_t& kirchner,
                         const precipitation_correction_parameter_t& p_corr,
                         glacier_parameter_t gm = glacier_parameter_t(),
-                        routing_parameter_t routing=routing_parameter_t()
+                        routing_parameter_t routing=routing_parameter_t(),
+                        mstack_parameter_t msp=mstack_parameter_t()
                       ) // for backwards compatibility pass default glacier parameter
-             : pt(pt), hps(hps), ae(ae), kirchner(kirchner), p_corr(p_corr), gm(gm),routing(routing) { /* Do nothing */ }
+             : pt(pt), hps(hps), ae(ae), kirchner(kirchner), p_corr(p_corr), gm(gm),routing(routing),msp{msp} { /* Do nothing */ }
 
 			parameter()=default;
 			parameter(const parameter&)=default;
@@ -54,7 +59,7 @@ namespace shyft {
 			parameter& operator=(const parameter &c)=default;
 			parameter& operator=(parameter&&c)=default;
             ///< Calibration support, size is the total number of calibration parameters
-            size_t size() const { return 23; }
+            size_t size() const { return 24; }
 
             void set(const vector<double>& p) {
                 if (p.size() != size())
@@ -83,6 +88,7 @@ namespace shyft {
                 routing.velocity = p[i++];
                 routing.alpha = p[i++];
                 routing.beta  = p[i++];
+                msp.reservoir_direct_response_fraction = p[i++];
             }
             //
             ///< calibration support, get the value of i'th parameter
@@ -111,6 +117,7 @@ namespace shyft {
                     case 20:return routing.velocity;
                     case 21:return routing.alpha;
                     case 22:return routing.beta;
+                    case 23:return msp.reservoir_direct_response_fraction;
 
                 default:
                     throw runtime_error("pt_hp_k parameter accessor:.get(i) Out of range.");
@@ -144,6 +151,7 @@ namespace shyft {
                     "routing.velocity",
                     "routing.alpha",
                     "routing.beta",
+                    "msp.reservoir_direct_response_fraction"
 				};
                 if (i >= size())
                     throw runtime_error("pt_hps_k parameter accessor:.get_name(i) Out of range.");
@@ -169,6 +177,11 @@ namespace shyft {
             * to a specified observed/wanted average
             */
             void adjust_q(double scale_factor) {kirchner.adjust_q(scale_factor);}
+            state scale_snow(const double& snow_storage_area_fraction) const {
+                state c{*this};
+                c.hps.swe *= snow_storage_area_fraction;
+                return c;
+            }
             x_serialize_decl();
         };
 
@@ -185,6 +198,15 @@ namespace shyft {
             // Stack response
             double total_discharge;
             double charge_m3s;
+                        // scale snow parts relative snow_storage_area 
+            response scale_snow(const double& snow_storage_area_fraction) const {
+                response c{*this};
+                c.hps.storage *= snow_storage_area_fraction;
+                c.hps.outflow *=snow_storage_area_fraction;
+                // are there others that we should also scale, sca, is a still meaningful, unscaled ?
+                return c;
+            }
+
         };
 
 
@@ -227,9 +249,13 @@ namespace shyft {
             state.hps.distribute(parameter.hps,false);// fixup state to match parameter dimensions for snow-bins, but only if they are empty
 
             R response;
-            const double total_lake_fraction = geo_cell_data.land_type_fractions_info().lake() + geo_cell_data.land_type_fractions_info().reservoir();
             const double glacier_fraction = geo_cell_data.land_type_fractions_info().glacier();
-            const double kirchner_fraction = 1 - glacier_fraction;
+            const double gm_direct = parameter.gm.direct_response; //glacier melt directly out of cell
+            const double gm_routed = 1-gm_direct; // glacier melt routed through kirchner
+            const double snow_storage_fraction = geo_cell_data.land_type_fractions_info().snow_storage();// on this part, snow builds up, and melts.-> season time-response
+            const double kirchner_routed_prec =  geo_cell_data.land_type_fractions_info().reservoir()*(1.0-parameter.msp.reservoir_direct_response_fraction) + geo_cell_data.land_type_fractions_info().lake();
+            const double direct_response_fraction = glacier_fraction*gm_direct + geo_cell_data.land_type_fractions_info().reservoir()*parameter.msp.reservoir_direct_response_fraction;// only direct response on reservoirs
+            const double kirchner_fraction = 1 - direct_response_fraction;
             const double cell_area_m2 = geo_cell_data.area();
             const double glacier_area_m2 = geo_cell_data.area()*glacier_fraction;
 
@@ -242,7 +268,8 @@ namespace shyft {
                 double rel_hum = rel_hum_accessor.value(i);
                 double prec = p_corr.calc(prec_accessor.value(i));
                 double wind_speed = wind_speed_accessor.value(i);
-                state_collector.collect(i, state);///< \note collect the state at the beginning of each period (the end state is saved anyway)
+                auto state_snow_scaled=state.scale_snow(snow_storage_fraction);
+                state_collector.collect(i, state_snow_scaled);///< \note collect the state at the beginning of each period (the end state is saved anyway)
 
                 hbv_physical_snow.step(state.hps, response.hps, period.start, period.timespan(), temp, rad, prec, wind_speed, rel_hum); // outputs mm/h, interpreted as over the entire area
 
@@ -252,27 +279,27 @@ namespace shyft {
                 response.ae.ae = actual_evapotranspiration::calculate_step(state.kirchner.q, response.pt.pot_evapotranspiration,
                                     parameter.ae.ae_scale_factor,std::max(state.hps.sca,glacier_fraction),  // a evap only on non-snow/non-glac area
                                     period.timespan());
+                double gm_mmh= shyft::m3s_to_mmh(response.gm_melt_m3s, cell_area_m2);
+                kirchner.step(period.start, period.end, state.kirchner.q, response.kirchner.q_avg, response.hps.outflow*snow_storage_fraction+prec*kirchner_routed_prec + gm_routed*gm_mmh, response.ae.ae); //all units mm/h over 'same' area
 
-                kirchner.step(period.start, period.end, state.kirchner.q, response.kirchner.q_avg, response.hps.outflow, response.ae.ae); //all units mm/h over 'same' area
-                double bare_lake_fraction = total_lake_fraction*(1.0 - state.hps.sca);// only direct response on bare (no snow-cover) lakes
                 response.total_discharge =
-                      std::max(0.0, prec - response.ae.ae)*bare_lake_fraction // when it rains, remove ae. from direct response
-                    + m3s_to_mmh(response.gm_melt_m3s, cell_area_m2)
-                    + response.kirchner.q_avg * (kirchner_fraction-bare_lake_fraction);
+                      std::max(0.0, prec - response.ae.ae)*direct_response_fraction // when it rains, remove ae. from direct response
+                    + gm_direct*gm_mmh  // glacier melt direct response                    
+                    + response.kirchner.q_avg*kirchner_fraction;
                 response.charge_m3s =
                     + shyft::mmh_to_m3s(prec, cell_area_m2)
                     - shyft::mmh_to_m3s(response.ae.ae, cell_area_m2)
                     + response.gm_melt_m3s
                     - shyft::mmh_to_m3s(response.total_discharge, cell_area_m2);
-                response.hps.hps_state=state.hps;//< note/sih: we need snow in the response due to calibration
+                response.hps.hps_state=state_snow_scaled.hps;//< note/sih: we need snow in the response due to calibration
 
                 // Possibly save the calculated values using the collector callbacks.
-                response_collector.collect(i, response);
+                response_collector.collect(i, response.scale_snow(snow_storage_fraction));
                 if(i+1==i_end)
-                    state_collector.collect(i+1, state);///< \note last iteration,collect the  final state as well.
+                    state_collector.collect(i+1, state.scale_snow(snow_storage_fraction));///< \note last iteration,collect the  final state as well.
 
             }
-            response_collector.set_end_response(response);
+            response_collector.set_end_response(response.scale_snow(snow_storage_fraction));
         }
     }
   } // core

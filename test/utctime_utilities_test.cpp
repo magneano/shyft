@@ -67,7 +67,7 @@ TEST_CASE("test_utcperiod_trim") {
 TEST_CASE("test_calendar_trim") {
     // simple trim test
     calendar cet(deltahours(1));
-    utctime t=cet.time(YMDhms(2012,3,8,12,16,44));
+    utctime t=cet.time(YMDhms(2012,3,8,12,16,44,123456));
     YMDhms t_y  (2012, 1, 1, 0, 0, 0);
     YMDhms t_m  (2012, 3, 1, 0, 0, 0);
     YMDhms t_w  (2012, 3, 5, 0, 0, 0);

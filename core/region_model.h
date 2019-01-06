@@ -227,8 +227,8 @@ namespace shyft {
             std::map<int, parameter_t_> catchment_parameters;///<  for each catchment (with cid) parameter is possible
 
             std::vector<bool> catchment_filter;///<if active (alias .size()>0), only calc if catchment_filter[catchment_id] is true.
-            std::vector<int> cix_to_cid;///< maps internal zero-based catchment index ix to externally supplied catchment id.
-            std::map<int,int> cid_to_cix;///< map external catchment id to internal index
+            std::vector<int64_t> cix_to_cid;///< maps internal zero-based catchment index ix to externally supplied catchment id.
+            std::map<int64_t,int64_t> cid_to_cix;///< map external catchment id to internal index
 
             void update_ix_to_id_mapping() {
                 // iterate over cell-vector
@@ -316,12 +316,12 @@ namespace shyft {
             /** \brief compute and return number of catchments inspecting call cells.geo.catchment_id() */
             size_t number_of_catchments() const { return cix_to_cid.size(); }
             /** \brief provide a copy of computed cids to python */
-            vector<int> catchment_ids() const {return vector<int>{cix_to_cid};}
+            vector<int64_t> catchment_ids() const {return vector<int64_t>{cix_to_cid};}
             /** connect all cells in a catchment to a river
              * \param cid catchment id for the cells to be connected to the specified river
              * \param rid river id for the target river. Note it can be 0 to set no routing for the cells
              */
-            void connect_catchment_to_river(int cid,int rid) {
+            void connect_catchment_to_river(int64_t cid,int rid) {
                 if(cid_to_cix.find(cid)==cid_to_cix.end()) throw std::runtime_error(string("specified catchment id=") + std::to_string(cid)+string(" not found"));
                 if(routing::valid_routing_id(rid)) river_network.check_rid(rid);// verify it exists.
                 for(auto&c:*cells)
@@ -545,13 +545,13 @@ namespace shyft {
             */
             bool run_interpolation(const interpolation_parameter& ip_parameter, const timeaxis_t& time_axis, const region_env_t& env, bool best_effort=true) {
 				initialize_cell_environment(time_axis);
-				return interpolate(ip_parameter, env);
+				return interpolate(ip_parameter, env,best_effort);
             }
 
             /** overload with generic-time-axis to help user-interface in python*/
             bool run_interpolation_g(const interpolation_parameter& ip_parameter, const generic_dt& ta, const region_env_t& env, bool best_effort=true) {
 				initialize_cell_environment_g(ta);
-				return interpolate(ip_parameter, env);
+				return interpolate(ip_parameter, env,best_effort);
             }
             /** \brief run_cells calculations over specified time_axis
             *  the cell method stack is invoked for all the cells, using multicore up to a maximum number of
@@ -623,7 +623,7 @@ namespace shyft {
 			 * \param start_step, specifies the time_axis start-step/period to use during adjustment
 			 * \return obtained flow in m3/s units. This can deviate from wanted flow due to model and state constraints
 			 */
-			q_adjust_result adjust_state_to_target_flow(double wanted_flow_m3s,const std::vector<int>& cids,size_t start_step=0,double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300,size_t n_steps=1) {
+			q_adjust_result adjust_state_to_target_flow(double wanted_flow_m3s,const std::vector<int64_t>& cids,size_t start_step=0,double scale_range=3.0,double scale_eps=1e-3,size_t max_iter=300,size_t n_steps=1) {
 			    auto old_catchment_filter=catchment_filter;
                 adjust_state_model<region_model> a(*this,cids, start_step,n_steps);
                 q_adjust_result r;
@@ -665,12 +665,12 @@ namespace shyft {
                 \param catchment_id the 0 based catchment_id that correlates to the cells catchment_id
                 \param p a reference to the parameter that will be used/applied to those cells
             */
-            void set_catchment_parameter(int catchment_id, const parameter_t & p) {
+            void set_catchment_parameter(int64_t catchment_id, const parameter_t & p) {
                 if (catchment_parameters.find(catchment_id) == catchment_parameters.end()) {
                     auto shared_p = parameter_t_(new parameter_t(p));// add to map, a copy of p
                     catchment_parameters[catchment_id] = shared_p;
                     for(auto &c:*cells)
-                        if (int(c.geo.catchment_id()) == catchment_id)
+                        if (int64_t(c.geo.catchment_id()) == catchment_id)
                             c.set_parameter(shared_p);
                 } else {
                     *(catchment_parameters[catchment_id]) = p; //copy values into existing parameters
@@ -685,7 +685,7 @@ namespace shyft {
                 if (it != catchment_parameters.end()) {
                     catchment_parameters.erase(catchment_id);// get rid of it, and update the affected cells with the global parameter
                     for(auto & c:*cells)
-                        if (int(c.geo.catchment_id()) == catchment_id)
+                        if (int64_t(c.geo.catchment_id()) == catchment_id)
                             c.set_parameter(region_parameter);
                 }
             }
@@ -712,7 +712,7 @@ namespace shyft {
              *
              * \param catchment_id_list is a catchment id vector
              */
-            void set_catchment_calculation_filter(const std::vector<int>& catchment_id_list) {
+            void set_catchment_calculation_filter(const std::vector<int64_t>& catchment_id_list) {
                 if (catchment_id_list.size()) {
                     if(catchment_id_list.size()> cix_to_cid.size())
                         throw std::runtime_error("set_catchment_calculation_filter: supplied list > available catchments");
@@ -735,7 +735,7 @@ namespace shyft {
              * \param catchment_id_list is a catchment id vector
              * \param river_id_list is a river id vector
              */
-            void set_calculation_filter(const std::vector<int>& catchment_id_list, const std::vector<int>& river_id_list) {
+            void set_calculation_filter(const std::vector<int64_t>& catchment_id_list, const std::vector<int64_t>& river_id_list) {
                 set_catchment_calculation_filter(catchment_id_list);
                 for (auto rid : river_id_list) {
                     auto catchments_involved = get_catchment_feeding_to_river(rid);
@@ -748,8 +748,8 @@ namespace shyft {
             }
 
             /**compute the unique set of catchments feeding into this river_id, or any river upstream */
-            std::set<int> get_catchment_feeding_to_river(int river_id) const {
-                std::set<int> r;
+            std::set<int64_t> get_catchment_feeding_to_river(int64_t river_id) const {
+                std::set<int64_t> r;
                 auto all_upstreams_rid = river_network.all_upstreams_by_id(river_id);
                 all_upstreams_rid.push_back(river_id);// remember to add this river
                 for (const auto&c : *cells) {
@@ -828,7 +828,7 @@ namespace shyft {
             * \param q_scale the scale factor to apply to current storage state
             * \param cids if empty, all cells are in scope, otherwise only cells that have specified catchment ids.
             */
-            void adjust_q(double q_scale,vector<int>&cids ) {
+            void adjust_q(double q_scale,vector<int64_t>&cids ) {
                 for(auto& cell:*cells) {
                     if(cids.size()==0 || (find(begin(cids),end(cids),cell.geo.catchment_id())!=end(cids) )) {
                         cell.state.adjust_q(q_scale);
@@ -841,9 +841,9 @@ namespace shyft {
              *       do state collection. THis is typically not the  case for
              *       cell-types that are used during calibration/optimization
              */
-            void set_state_collection(int catchment_id, bool on_or_off) {
+            void set_state_collection(int64_t catchment_id, bool on_or_off) {
                 for(auto& cell:*cells)
-                    if (catchment_id == -1 || (int)cell.geo.catchment_id() == catchment_id )
+                    if (catchment_id == -1 || (int64_t)cell.geo.catchment_id() == catchment_id )
                         cell.set_state_collection(on_or_off);
             }
             /** \brief enable/disable collection of snow sca|sca for calibration purposes
@@ -851,9 +851,9 @@ namespace shyft {
              * \param on_or_off true|or false.
              * \note if the underlying cell do not support snow sca|swe collection, this call has no effect
              */
-            void set_snow_sca_swe_collection(int catchment_id,bool on_or_off) {
+            void set_snow_sca_swe_collection(int64_t catchment_id,bool on_or_off) {
                 for(auto& cell:*cells)
-                    if (catchment_id == -1 || (int)cell.geo.catchment_id() == catchment_id )
+                    if (catchment_id == -1 || (int64_t)cell.geo.catchment_id() == catchment_id )
                         cell.set_snow_sca_swe_collection(on_or_off);
             }
             /** \return cells as shared_ptr<vector<cell_t>> */
@@ -923,7 +923,7 @@ namespace shyft {
                 }
                 return cr;
             }
-            std::shared_ptr<pts_t> river_output_flow_m3s(int rid) const {
+            std::shared_ptr<pts_t> river_output_flow_m3s(int64_t rid) const {
                 auto r= std::make_shared<pts_t>(time_axis,0.0,time_series::ts_point_fx::POINT_AVERAGE_VALUE);
                 if(has_routing()) {
                     routing::model<C> rn(river_network,cells,time_axis);
@@ -931,7 +931,7 @@ namespace shyft {
                 }
                 return r;
             }
-            std::shared_ptr<pts_t> river_upstream_inflow_m3s(int rid) const {
+            std::shared_ptr<pts_t> river_upstream_inflow_m3s(int64_t rid) const {
                 auto r= std::make_shared<pts_t>(time_axis,0.0,time_series::ts_point_fx::POINT_AVERAGE_VALUE);
                 if(has_routing()) {
                     routing::model<C> rn(river_network,cells,time_axis);
@@ -939,7 +939,7 @@ namespace shyft {
                 }
                 return r;
             }
-            std::shared_ptr<pts_t> river_local_inflow_m3s(int rid) const {
+            std::shared_ptr<pts_t> river_local_inflow_m3s(int64_t rid) const {
                 auto r= std::make_shared<pts_t>(time_axis,0.0,time_series::ts_point_fx::POINT_AVERAGE_VALUE);
                 if(has_routing()) {
                     routing::model<C> rn(river_network,cells,time_axis);

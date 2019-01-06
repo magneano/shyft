@@ -170,7 +170,7 @@ static void print(ostream&os, const ts_t& ts, size_t i0, size_t max_sz) {
 }
 
 template <class cell_t>
-void run_full_model_test(const std::vector<int>& calibration_parameter_list){
+void run_full_model_test(const std::vector<int64_t>& calibration_parameter_list){
  // calibration_parameter list, contains the indexes to calibrate ref. pt_gs_k.h, parameter.get(i) etc.
 	//
 	// Arrange
@@ -248,9 +248,9 @@ void run_full_model_test(const std::vector<int>& calibration_parameter_list){
 	cout << " - ncore set to " << rm.ncore << endl;
 	ec::interpolation_parameter ip;
 	ip.use_idw_for_temperature = false;
-    vector<int> all_catchment_ids;// empty vector means no filtering
-    vector<int> catchment_ids{ 87,115 };
-    vector<int> other_ids{ 38,188,259,295,389,465,496,516,551,780 };
+    vector<int64_t> all_catchment_ids;// empty vector means no filtering
+    vector<int64_t> catchment_ids{ 87,115 };
+    vector<int64_t> other_ids{ 38,188,259,295,389,465,496,516,551,780 };
 	auto ti1 = timing::now();
     rm.initialize_cell_environment(ta);
     rm.set_catchment_calculation_filter(catchment_ids);
@@ -509,10 +509,10 @@ void run_full_model_test(const std::vector<int>& calibration_parameter_list){
 }
 
 TEST_CASE("test_read_and_run_region_model_pt_gs_k") {
-    run_full_model_test<shyft::core::pt_gs_k::cell_complete_response_t>(vector<int>{ 0,4,14,16,22});
+    run_full_model_test<shyft::core::pt_gs_k::cell_complete_response_t>(vector<int64_t>{ 0,4,14,16,22});
 }
 TEST_CASE("test_read_and_run_region_model_pt_hs_k") {
-    run_full_model_test<shyft::core::pt_hs_k::cell_complete_response_t>(vector<int>{ 0,4,5,6,9});
+    run_full_model_test<shyft::core::pt_hs_k::cell_complete_response_t>(vector<int64_t>{ 0,4,5,6,9});
 }
 //TEST_CASE("test_read_and_run_region_model_pt_hps_k") {
 //   run_full_model_test<shyft::core::pt_hps_k::cell_complete_response_t>(vector<int>{ 0,4,5,6,9});

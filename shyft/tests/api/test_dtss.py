@@ -149,6 +149,7 @@ class DtssTestCase(unittest.TestCase):
         tsv1x = tsv.inside(-0.5, 0.5)
         tsv1x.append(tsv1x[-1].decode(start_bit=1, n_bits=1))  # just to verify serialization/bind
         tsv1x.append(store_tsv[1].derivative())
+        tsv1x.append(store_tsv[1].pow(2.0)) # just for verify pow serialization(well, it's a bin-op..)
         r1x = dts.evaluate(tsv1x, ta.total_period())
         r2 = dts.percentiles(tsv, ta.total_period(), ta24, percentile_list)
         r3 = dts.find('netcdf://dummy\.nc/ts\d')

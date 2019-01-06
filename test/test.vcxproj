@@ -140,6 +140,7 @@
     <ClCompile Include="dtss_test.cpp" />
     <ClCompile Include="dtss_db_test.cpp" />
     <ClCompile Include="dtss_url_test.cpp" />
+    <ClCompile Include="geo_test.cpp" />
     <ClCompile Include="glacier_melt_test.cpp" />
     <ClCompile Include="gridpp_test.cpp" />
     <ClCompile Include="hbv_actual_evapotranspiration_test.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="time_series_average_test.cpp" />
     <ClCompile Include="time_series_fixup_test.cpp" />
     <ClCompile Include="time_series_test.cpp" />
+    <ClCompile Include="time_series_qac_test.cpp" />
     <ClCompile Include="time_series_decode_test.cpp" />
     <ClCompile Include="time_series_derivative_test.cpp" />
     <ClCompile Include="time_axis_test.cpp" />

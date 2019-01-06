@@ -61,7 +61,7 @@ TEST_CASE("test_state_with_id_functionality") {
     cv->push_back(c3);
     cv->push_back(c4);
     state_io_handler<xcell_t> xh(cv);
-    auto s0 = xh.extract_state(vector<int>());
+    auto s0 = xh.extract_state(cids_t());
     TS_ASSERT_EQUALS(s0->size(), cv->size());
     for (size_t i = 0;i < cv->size();++i)
         TS_ASSERT_EQUALS((*s0)[i].id, cell_state_id_of((*cv)[i].geo));// ensure we got correct id's out.
@@ -75,21 +75,21 @@ TEST_CASE("test_state_with_id_functionality") {
         TS_ASSERT_EQUALS((*s0_x)[i].id, (*s0)[i].id);//equality by identity only check
         TS_ASSERT_DELTA( (*s0_x)[i].state.kirchner.q, (*s0)[i].state.kirchner.q, 0.01);
     }
-    auto s1 = xh.extract_state(vector<int>{2}); // ok, now specify cids, 2, only two cells match
+    auto s1 = xh.extract_state(cids_t{2}); // ok, now specify cids, 2, only two cells match
     TS_ASSERT_EQUALS(s1->size(), size_t( 2));
     for (size_t i = 0;i < s1->size();++i)
         TS_ASSERT_EQUALS((*s1)[i].id, cell_state_id_of((*cv)[i+2].geo));// ensure we got correct id's out.
 
-    auto s_missing = xh.extract_state(vector<int>{3});
+    auto s_missing = xh.extract_state(cids_t{3});
     TS_ASSERT_EQUALS(s_missing->size(), 0u);
 
-    auto m0 = xh.apply_state(s0, vector<int>());
+    auto m0 = xh.apply_state(s0, cids_t());
     TS_ASSERT_EQUALS(m0.size(), 0u);
 
-    auto m0_x = xh.apply_state(s0, vector<int>{4});
+    auto m0_x = xh.apply_state(s0, cids_t{4});
     TS_ASSERT_EQUALS(m0_x.size(), 0u); // because we passed in states not containing 4
     (*s0)[0].id.cid = 4; //stuff in a 4, and get one missing below
-    auto m0_y = xh.apply_state(s0, vector<int>{4});
+    auto m0_y = xh.apply_state(s0, cids_t{4});
     TS_ASSERT_EQUALS(m0_y.size(), 1u);
     TS_ASSERT_EQUALS(m0_y[0], 0);
 }

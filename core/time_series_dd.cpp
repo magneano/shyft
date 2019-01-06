@@ -6,6 +6,7 @@ See file COPYING for more details **/
 #include "time_series_merge.h"
 #include "time_series_qm.h"
 #include "time_series_point_merge.h"
+#include "time_series_average.h"
 
 namespace shyft{
     namespace time_series {
@@ -38,6 +39,9 @@ namespace shyft{
             const TA& ta;
             const std::vector<double>& v;
             ts_src(const TA& ta,const std::vector<double>&v):ta{ta},v{v} {}
+            size_t index_of(const utctime t) const {return ta.index_of(t);}
+            utctime time(size_t i) const {return ta.time(i);}
+            utcperiod total_period() const {return ta.total_period();}
             point get(size_t i ) const {return point{ta.time(i),v[i]};}
             size_t size() const {return v.size();}
         };
@@ -71,6 +75,7 @@ namespace shyft{
 			case iop_t::OP_MUL:return a * b;
 			case iop_t::OP_MAX:return std::max(a, b);
 			case iop_t::OP_MIN:return std::min(a, b);
+            case iop_t::OP_POW:return std::pow(a, b);
 			case iop_t::OP_NONE:break;// just fall to exception
 			}
 			throw std::runtime_error("unsupported shyft::api::iop_t");
@@ -112,6 +117,11 @@ namespace shyft{
 		apoint_ts min(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MIN, rhs)); }
 		apoint_ts min(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MIN, rhs)); }
 
+		apoint_ts pow(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts>(lhs, iop_t::OP_POW, rhs)); }
+		apoint_ts pow(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_POW, rhs)); }
+		apoint_ts pow(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_POW, rhs)); }
+
+		
 		double abin_op_ts::value_at(utctime t) const {
 			if (!time_axis().total_period().contains(t))
 				return nan;
@@ -127,6 +137,7 @@ namespace shyft{
 			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] / r[i]); return x;
 			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::max(l[i], r[i])); return x;
 			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::min(l[i], r[i])); return x;
+            case OP_POW:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::pow(l[i], r[i])); return x;
 			default: break;
 			}
 			throw runtime_error("Unsupported operation " + to_string(int(op)));
@@ -140,6 +151,7 @@ namespace shyft{
 			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) l[i] /= r[i]; return;
 			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) l[i] = std::max(l[i], r[i]); return;
 			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) l[i] = std::min(l[i], r[i]); return;
+			case OP_POW:for (size_t i = 0; i < r.size(); ++i) l[i] = std::pow(l[i], r[i]); return;
 			default: break;
 			}
 			throw runtime_error("Unsupported operation " + to_string(int(op)));
@@ -152,6 +164,7 @@ namespace shyft{
 			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) r[i] = l[i] / r[i]; return;
 			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(l[i], r[i]); return;
 			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(l[i], r[i]); return;
+			case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l[i], r[i]); return;
 			default: break;
 			}
 			throw runtime_error("Unsupported operation " + to_string(int(op)));
@@ -216,26 +229,18 @@ namespace shyft{
 		* Help creating implementation of interval type of results (average/integral value)
 		* at highest possible speed
 		*/
-		template < class FX, class TA, class TS, class ATA >
-		static std::vector<double> make_interval(FX&&fx, const TA &ta, const TS& ts, const ATA& avg_ta) {
+		template < bool avg, class TA, class TS, class ATA >
+		static std::vector<double> make_interval( const TA &ta, const TS& ts, const ATA& avg_ta) {
 			auto pfx = ts->point_interpretation();
 			const bool linear_interpretation = pfx == ts_point_fx::POINT_INSTANT_VALUE;
 			const vector<double>* src_v{ terminal_values(ts) };//fetch terminal value
 			if (src_v) {// if values are already in place, use reference
 				const ts_src<TA> rts{ ta,*src_v };
-				std::vector<double> r; r.reserve(avg_ta.size());
-				size_t ix_hint = ta.index_of(avg_ta.time(0));
-				for (size_t i = 0; i < avg_ta.size(); ++i)
-					r.emplace_back(fx(rts, avg_ta.period(i), ix_hint, linear_interpretation));
-				return r;
+                return linear_interpretation?accumulate_linear(avg_ta,rts,avg):accumulate_stair_case(avg_ta,rts,avg);
 			} else {
 				auto tsv{ ts->values() };// pull out values from underlying expression.
 				const ts_src<TA> rts{ ta,tsv };// note that ->values() deflates any underlying expression, this could be sub optimal in some cases.
-				std::vector<double> r; r.reserve(avg_ta.size());
-				size_t ix_hint = ta.index_of(avg_ta.time(0));
-				for (size_t i = 0; i < avg_ta.size(); ++i)
-					r.emplace_back(fx(rts, avg_ta.period(i), ix_hint, linear_interpretation));
-				return r;
+                return linear_interpretation?accumulate_linear(avg_ta,rts,avg):accumulate_stair_case(avg_ta,rts,avg);
 			}
 		}
 
@@ -250,26 +255,20 @@ namespace shyft{
 				return ts->values(); // elide trivial average_ts cases
 			}
 			switch (ts->time_axis().gt) { // pull out the real&fast time-axis before doing computations here:
-			case time_axis::generic_dt::FIXED:    return make_interval(average_value<ts_src<time_axis::fixed_dt>>, ts->time_axis().f, ts, ta);
-			case time_axis::generic_dt::CALENDAR: return make_interval(average_value<ts_src<time_axis::calendar_dt>>, ts->time_axis().c, ts, ta);
-			case time_axis::generic_dt::POINT:    return make_interval(average_value<ts_src<time_axis::point_dt>>, ts->time_axis().p, ts, ta);
+			case time_axis::generic_dt::FIXED:    return make_interval<true>(ts->time_axis().f, ts, ta);
+			case time_axis::generic_dt::CALENDAR: return make_interval<true>(ts->time_axis().c, ts, ta);
+			case time_axis::generic_dt::POINT:    return make_interval<true>(ts->time_axis().p, ts, ta);
 			}
-			return make_interval(average_value<ts_src<time_axis::generic_dt>>, ts->time_axis(), ts, ta);
-		}
-
-		template<class S>
-		inline double integral_value(const S& source, const utcperiod&p, size_t& last_idx, bool linear) {
-			utctimespan tsum{ 0 };
-			return accumulate_value<S>(source, p, last_idx, tsum, linear);
+			return make_interval<true>(ts->time_axis(), ts, ta);
 		}
 
 		std::vector<double> integral_ts::values() const {
 			switch (ts->time_axis().gt) { // pull out the real&fast time-axis before doing computations here:
-			case time_axis::generic_dt::FIXED:    return make_interval(integral_value<ts_src<time_axis::fixed_dt>>, ts->time_axis().f, ts, ta);
-			case time_axis::generic_dt::CALENDAR: return make_interval(integral_value<ts_src<time_axis::calendar_dt>>, ts->time_axis().c, ts, ta);
-			case time_axis::generic_dt::POINT:    return make_interval(integral_value<ts_src<time_axis::point_dt>>, ts->time_axis().p, ts, ta);
+			case time_axis::generic_dt::FIXED:    return make_interval<false>(ts->time_axis().f, ts, ta);
+			case time_axis::generic_dt::CALENDAR: return make_interval<false>(ts->time_axis().c, ts, ta);
+			case time_axis::generic_dt::POINT:    return make_interval<false>(ts->time_axis().p, ts, ta);
 			}
-			return make_interval(integral_value<ts_src<time_axis::generic_dt>>, ts->time_axis(), ts, ta);
+			return make_interval<false>(ts->time_axis(), ts, ta);
 		}
 		/** helpers */
 		static inline utctimespan fixed_timestep(const time_axis::fixed_dt& ta) {
@@ -707,9 +706,19 @@ namespace shyft{
 		apoint_ts apoint_ts::max(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::max(a, b); }
 		apoint_ts apoint_ts::min(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::min(a, b); }
 
+        apoint_ts apoint_ts::pow(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::pow(a, b); }
+		apoint_ts apoint_ts::pow(double a) const { return shyft::time_series::dd::pow(*this, a); }
+		apoint_ts apoint_ts::pow(const apoint_ts& other) const { return shyft::time_series::dd::pow(*this, other); }
+
 		apoint_ts apoint_ts::convolve_w(const std::vector<double> &w, shyft::time_series::convolve_policy conv_policy) const {
 			return apoint_ts(std::make_shared<convolve_w_ts>(*this, w, conv_policy));
 		}
+        apoint_ts apoint_ts::slice(int i0, int n) const {
+            gpoint_ts *gpts = dynamic_cast<gpoint_ts*>(ts.get());
+            if (!gpts)
+                throw std::runtime_error("apoint_ts::slice() only allowed for ts of non-expression types");
+            return apoint_ts(make_shared<gpoint_ts>(gpts->slice(i0, n)));
+        }
 
         apoint_ts apoint_ts::rating_curve(const rating_curve_parameters & rc_param) const {
             return apoint_ts(std::make_shared<rating_curve_ts>(*this, rc_param));
@@ -774,7 +783,7 @@ namespace shyft{
 			return true;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& tsv1, const gta_t& ta, const intv_t& percentile_list) {
 			std::vector<apoint_ts> r; r.reserve(percentile_list.size());
 			auto tsvx = deflate_ts_vector<gts_t>(tsv1);
 			// check of all tsvx.time_axis is of same type
@@ -815,7 +824,7 @@ namespace shyft{
 			return r;
 		}
 
-		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const vector<int>& percentile_list) {
+		std::vector<apoint_ts> percentiles(const std::vector<apoint_ts>& ts_list, const time_axis::fixed_dt& ta, const intv_t& percentile_list) {
 			return percentiles(ts_list, time_axis::generic_dt(ta), percentile_list);
 		}
 
@@ -847,6 +856,7 @@ namespace shyft{
 				case OP_DIV:for (const auto&v : r_v) r.emplace_back(l / v); return r;
 				case OP_MAX:for (const auto&v : r_v) r.emplace_back(std::max(v, l)); return r;
 				case OP_MIN:for (const auto&v : r_v) r.emplace_back(std::min(v, l)); return r;
+                case OP_POW:for (const auto&v : r_v) r.emplace_back(std::pow(l, v)); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			} else {
@@ -859,6 +869,7 @@ namespace shyft{
 				case OP_DIV:for (size_t i = 0; i < r.size(); ++i) r[i] = l / r[i]; return r;
 				case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(r[i], l); return r;
 				case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(r[i], l); return r;
+				case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l,r[i]); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			}
@@ -885,6 +896,7 @@ namespace shyft{
 				case OP_DIV:for (const auto&lv : *lhs_v) r.emplace_back(lv / rv); return r;
 				case OP_MAX:for (const auto&lv : *lhs_v) r.emplace_back(std::max(lv, rv)); return r;
 				case OP_MIN:for (const auto&lv : *lhs_v) r.emplace_back(std::min(lv, rv)); return r;
+				case OP_POW:for (const auto&lv : *lhs_v) r.emplace_back(std::pow(lv, rv)); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			} else {
@@ -897,6 +909,7 @@ namespace shyft{
 				case OP_DIV:for (size_t i = 0; i < l.size(); ++i) l[i] /= r; return l;
 				case OP_MAX:for (size_t i = 0; i < l.size(); ++i) l[i] = std::max(l[i], r); return l;
 				case OP_MIN:for (size_t i = 0; i < l.size(); ++i) l[i] = std::min(l[i], r); return l;
+                case OP_POW:for (size_t i = 0; i < l.size(); ++i) l[i] = std::pow(l[i], r); return l;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			}
@@ -1059,6 +1072,13 @@ namespace shyft{
 			ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].max(x[i]));
 			return r;
 		}
+
+		ats_vector ats_vector::pow(ats_vector const& x) const {
+			if (size() != x.size()) throw runtime_error(string("ts-vector pow require same sizes: lhs.size=") + std::to_string(size()) + string(",rhs.size=") + std::to_string(x.size()));
+			ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].pow(x[i]));
+			return r;
+		}
+
 		ats_vector ats_vector::inside(double min_v,double max_v,double nan_v, double inside_v, double outside_v) const {
             ats_vector r; r.reserve(size()); for (size_t i = 0; i < size(); ++i) r.push_back((*this)[i].inside(min_v,max_v,nan_v,inside_v,outside_v));
 			return r;
@@ -1074,6 +1094,25 @@ namespace shyft{
 		ats_vector max(ats_vector const &a, apoint_ts const & b) { return a.max(b); }
 		ats_vector max(apoint_ts const &b, ats_vector const &a) { return a.max(b); }
 		ats_vector max(ats_vector const &a, ats_vector const & b) { return a.max(b); }
+
+		ats_vector pow(ats_vector const &a, double b) { return a.pow(b); }
+		ats_vector pow(double b, ats_vector const &a) { 
+            ats_vector r;
+            r.reserve(a.size());
+            for(const auto&ts:a) 
+                r.push_back(pow(b,ts));
+            return r; 
+        }
+		ats_vector pow(ats_vector const &a, apoint_ts const & b) { return a.pow(b); }
+		ats_vector pow(apoint_ts const &b, ats_vector const &a) { 
+            ats_vector r;
+            r.reserve(a.size());
+            for(const auto&ts:a) 
+                r.push_back(pow(b,ts));
+            return r;             
+        }
+		ats_vector pow(ats_vector const &a, ats_vector const & b) { return a.pow(b); }
+
 		apoint_ts  ats_vector::forecast_merge(utctimespan lead_time, utctimespan fc_interval) const {
 			//verify arguments
 			if (lead_time.count() < 0)
@@ -1254,13 +1293,7 @@ namespace shyft{
 			}
 			return value_at(time_axis().time(i));
 		}
-
-		double qac_ts::value(size_t i) const {
-
-			double x = ts->value(i);
-			if (p.is_ok_quality(x))
-				return x;
-			// try to fill in replacement value
+        double qac_ts:: _fill_value(size_t i) const {
 			auto t = ts->time(i);
 			if (cts) // use a correction value ts if available
 				return cts->value_at(t); // we do not check this value, assume ok!
@@ -1291,7 +1324,16 @@ namespace shyft{
 					}
 				}
 			}
-			return shyft::nan; // if we reach here, we failed to find substitute
+			return shyft::nan; // if we reach here, we failed to find substitute            
+        }
+
+		double qac_ts::value(size_t i) const {
+
+			double x = ts->value(i);
+			if (p.is_ok_quality(x))
+				return x;
+			// try to fill in replacement value
+            return _fill_value(i);
 		}
 
 		double qac_ts::value_at(utctime t) const {
@@ -1317,10 +1359,11 @@ namespace shyft{
 		}
 
 		vector<double> qac_ts::values() const {
-			const size_t n{ size() };
-			vector<double> r; r.reserve(n);
-			for (size_t i = 0; i < n; ++i)
-				r.emplace_back(value(i));
+            auto r=ts->values();
+			for (size_t i = 0; i < r.size(); ++i) {
+                if(!p.is_ok_quality(r[i]))
+                    r[i]=_fill_value(i);
+            }
 			return r;
 		}
 

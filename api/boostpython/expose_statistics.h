@@ -6,7 +6,7 @@ namespace expose {
     namespace statistics {
         typedef shyft::time_series::dd::apoint_ts rts_;
         typedef std::vector<double> vd_;
-        typedef const std::vector<int>& cids_;
+        typedef const std::vector<int64_t>& cids_;
         typedef size_t ix_;
         using shyft::core::stat_scope;
         using namespace boost::python;
@@ -501,6 +501,7 @@ namespace expose {
 				.def("lake_area", &bc_stat::lake_area, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns lake area[m2] for cells matching catchments_ids")
 				.def("reservoir_area", &bc_stat::reservoir_area, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns reservoir area[m2] for cells matching catchments_ids")
 				.def("unspecified_area", &bc_stat::unspecified_area, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns unspecified area[m2] for cells matching catchments_ids")
+                .def("snow_storage_area", &bc_stat::snow_storage_area, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_storage area where snow can build up[m2], eg total_area - lake and reservoir")
 				.def("elevation", &bc_stat::elevation, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns area-average elevation[m.a.s.l] for cells matching catchments_ids")
 				;
         }

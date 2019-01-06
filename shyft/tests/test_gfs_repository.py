@@ -13,17 +13,23 @@ class GFSDataRepositoryTestCase(unittest.TestCase):
     def start_date(self):
         utc = api.Calendar()
         today = utc.trim(api.utctime_now(), api.Calendar.DAY)
-        return today - api.Calendar.DAY  # yesterday
+        return today - api.Calendar.DAY*2  # yesterday
 
-    @unittest.skipIf("SHYFT_SKIP_OPENDAP_TEST" in environ, "gfs repository is not available from everywhere")
-    def test_get_timeseries(self):
+    @unittest.skipIf("SHYFT_OPENDAP_TEST" not in environ, "gfs repository is not available from everywhere")
+    def test_open_dap_app(self):
+        self._get_timeseries()
+        self._get_forecast()
+        self._get_ensemble()
+
+
+    def _get_timeseries(self):
         """
         Simple regression test of OpenDAP data repository.
         """
         epsg, bbox, bpoly = self.epsg_bbox
         dem_file = path.join(shyftdata_dir, "netcdf", "etopo180.nc")
         n_hours = 30
-        t0 = self.start_date + api.deltahours(7) - api.deltahours(24)
+        t0 = self.start_date + api.deltahours(7)
         period = api.UtcPeriod(t0, t0 + api.deltahours(n_hours))
             
         repos = GFSDataRepository(epsg=epsg, dem_file=dem_file, padding=5000.0, utc=t0) #//epsg, dem_file, padding=5000., utc=None
@@ -39,8 +45,7 @@ class GFSDataRepositoryTestCase(unittest.TestCase):
         self.assertLessEqual(data1.ts.time(0), period.start, 'expect returned fc ts to cover requested period')
         self.assertGreaterEqual(data1.ts.total_period().end, period.end, 'expect returned fc ts to cover requested period')
 
-    @unittest.skipIf("SHYFT_SKIP_OPENDAP_TEST" in environ, "gfs repository is not available from everywhere")
-    def test_get_forecast(self):
+    def _get_forecast(self):
         """
         Simple forecast regression test of OpenDAP data repository.
         """
@@ -65,8 +70,7 @@ class GFSDataRepositoryTestCase(unittest.TestCase):
         self.assertLessEqual(data1.ts.time(0), period.start, 'expect returned fc ts to cover requested period')
         self.assertGreaterEqual(data1.ts.total_period().end, period.end, 'expect returned fc ts to cover requested period')
 
-    @unittest.skipIf("SHYFT_SKIP_OPENDAP_TEST" in environ, "gfs repository is not available from everywhere")
-    def test_get_ensemble(self):
+    def _get_ensemble(self):
         """
         Simple ensemble regression test of OpenDAP data repository.
         """

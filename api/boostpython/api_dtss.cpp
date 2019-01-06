@@ -172,11 +172,11 @@ struct py_server : server<standard_dtss_dispatcher> {
             unique_lock<mutex> lck(mx);
             impl.reopen(timeout_ms);
         }
-        ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
+        ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
             scoped_gil_release gil;
             unique_lock<mutex> lck(mx);
-            std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
-            return impl.percentiles(tsv,p,ta,p_spec,use_ts_cached_read,update_ts_cache);
+            //std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
+            return impl.percentiles(tsv,p,ta,percentile_spec,use_ts_cached_read,update_ts_cache);
         }
         ts_vector_t evaluate(const ts_vector_t& tsv, core::utcperiod p,bool use_ts_cached_read,bool update_ts_cache) {
             scoped_gil_release gil;
@@ -551,10 +551,21 @@ namespace expose {
                 doc_see_also(".evaluate(), DtsServer")
             )
             .def("evaluate", &DtsClient::evaluate, (py::arg("self"),py::arg("ts_vector"), py::arg("utcperiod"),py::arg("use_ts_cached_read")=true,py::arg("update_ts_cache")=false ),
-                doc_intro("Evaluates the expressions in the ts_vector for the specified utcperiod.")
+                doc_intro("Evaluates the expressions in the ts_vector.")
                 doc_intro("If the expression includes unbound symbolic references to time-series,")
                 doc_intro("these time-series will be passed to the binding service callback")
-                doc_intro("on the serverside.")
+                doc_intro("on the serverside, passing on the specifed utcperiod.")
+                doc_intro("")
+                doc_intro("NOTE: That the ts-backing-store, either cached or by read, will return data for")
+                doc_intro("      at least the period needed to evaluate the utcperiod")
+                doc_intro("      In case of cached result, this will currently involve the entire")
+                doc_intro("      matching cached time-series segment.")
+                doc_intro("      In particular, this means that the returned result could be larger  than the specified utcperiod.")
+                doc_intro("      Other available methods, such as the expression (x.average(ta)), including time-axis,")
+                doc_intro("      can be used to exactly control the returned result size.")
+                doc_intro("      Also note that the semantics of utcperiod is ")
+                doc_intro("      to ensure that enough data is read from the backend, so that it can evaluate the expressions.")
+                doc_intro("      ")
                 doc_parameters()
                 doc_parameter("ts_vector","TsVector","a list of time-series (expressions), including unresolved symbolic references")
                 doc_parameter("utcperiod","UtcPeriod","the period that the binding service should read from the backing ts-store/ts-service")

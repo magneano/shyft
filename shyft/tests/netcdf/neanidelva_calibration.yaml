@@ -143,3 +143,6 @@
     pt.alpha:
       min: 1.26
       max: 1.26
+    msp.reservoir_direct_response_fraction:
+      min: 1.0
+      max: 1.0

@@ -910,6 +910,7 @@ private:
         ts_vector_t vec = this->server_read_cb(source_url, period, false, false);
 
         if ( vec.size() > 0 ) {
+            predictor.set_predicted_ts_point_policy(vec[0].point_interpretation());
             for ( auto && ts : vec ) {
                 predictor.train(ts);
             }

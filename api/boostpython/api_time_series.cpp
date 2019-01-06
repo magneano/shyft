@@ -42,12 +42,13 @@ namespace expose {
 
 	static string nice_str(const string& lhs,iop_t op,const string &rhs) {
 		switch (op) {
-		case iop_t::OP_ADD:return "("+ lhs + "+ " + rhs +")";
-		case iop_t::OP_SUB:return "(" + lhs + "- " + rhs + ")";
+		case iop_t::OP_ADD:return "("+ lhs + " + " + rhs +")";
+		case iop_t::OP_SUB:return "(" + lhs + " - " + rhs + ")";
 		case iop_t::OP_DIV:return "(" + lhs + "/" + rhs + ")";
 		case iop_t::OP_MUL:return "(" + lhs + "*" + rhs + ")";
 		case iop_t::OP_MAX:return "max("+lhs+", "+rhs+")";
 		case iop_t::OP_MIN:return "min(" + lhs + ", " + rhs + ")";
+        case iop_t::OP_POW:return "pow(" + lhs + ", " + rhs + ")";
 		case iop_t::OP_NONE:break;// just fall to exception
 		}
 		return "unsupported_op(" + lhs + "," + rhs + ")";
@@ -139,6 +140,7 @@ namespace expose {
 
     static void expose_ats_vector() {
         using namespace shyft::api;
+        using shyft::time_series::dd::pow;
         typedef ats_vector(ats_vector::*m_double)(double)const;
         typedef ats_vector(ats_vector::*m_ts)(apoint_ts const&)const;
         typedef ats_vector(ats_vector::*m_tsv) (ats_vector const&)const;
@@ -276,12 +278,15 @@ namespace expose {
                 doc_parameter("fill_value", "float", "value to fill any gap with if fill_policy == EPF_FILL")
                 doc_returns("new_ts_vec" ,"TsVector", "a new time-series vector where all time-series in self have been extended by the corresponding time-series in ts_vec")
             )
-            .def("min",(m_double)&ats_vector::min,args("number"),"returns min of vector and a number")
-            .def("min", (m_ts)&ats_vector::min, args("ts"), "returns min of ts-vector and a ts")
+            .def("min",(m_double)&ats_vector::min,(py::arg("self"),py::arg("number")),"returns min of vector and a number")
+            .def("min", (m_ts)&ats_vector::min, (py::arg("self"),py::arg("ts")), "returns min of ts-vector and a ts")
             .def("min", (m_tsv)&ats_vector::min, args("tsv"), "returns min of ts-vector and another ts-vector")
-            .def("max", (m_double)&ats_vector::max, args("number"), "returns max of vector and a number")
-            .def("max", (m_ts)&ats_vector::max, args("ts"), "returns max of ts-vector and a ts")
-            .def("max", (m_tsv)&ats_vector::max, args("tsv"), "returns max of ts-vector and another ts-vector")
+            .def("max", (m_double)&ats_vector::max, (py::arg("self"),py::arg("number")), "returns max of vector and a number")
+            .def("max", (m_ts)&ats_vector::max, (py::arg("self"),py::arg("ts")), "returns max of ts-vector and a ts")
+            .def("max", (m_tsv)&ats_vector::max, (py::arg("self"),py::arg("tsv")), "returns max of ts-vector and another ts-vector")
+            .def("pow", (m_double)&ats_vector::pow, (py::arg("self"),py::arg("number")), "returns TsVector pow(self,number)")
+            .def("pow", (m_ts)&ats_vector::pow, (py::arg("self"),py::arg("ts")), "returns TsVector pow(self,ts)")
+            .def("pow", (m_tsv)&ats_vector::pow,  (py::arg("self"),py::arg("tsv")), "returns TsVector pow(self,tsv)")
             .def("forecast_merge",&ats_vector::forecast_merge,args("lead_time","fc_interval"),
                  doc_intro("merge the forecasts in this vector into a time-series that is constructed")
                  doc_intro("taking a slice of length fc_interval starting lead_time into each of the forecasts")
@@ -384,6 +389,12 @@ namespace expose {
             def("max", (f_atsv_double)max, args("ts_vector", "number"), "return max of ts_vector and number");
             def("max", (f_double_atsv)max, args("number", "ts_vector"), "return max of number and ts_vector");
             def("max", (f_atsv_atsv)max, args("a", "b"), "return max of ts_vectors a and b (requires equal size!)");
+
+            def("pow", (f_ats_atsv)pow, args("ts", "ts_vector"), "return pow(ts,ts_vector)->TsVector");
+            def("pow", (f_atsv_ats)pow, args("ts_vector", "ts"), "return pow(ts_vector,ts)->TsVector");
+            def("pow", (f_atsv_double)pow, args("ts_vector", "number"), "return pow(ts_vector,number)->TsVector");
+            def("pow", (f_double_atsv)pow, args("number", "ts_vector"), "return pow(number,ts_vector)->TsVector");
+            def("pow", (f_atsv_atsv)pow, args("a", "b"), "return pow(a,b)->TsVector, (requires equal size!)");
 
             // we also need a vector of ats_vector for quantile_map_forecast function
             typedef std::vector<ats_vector> TsVectorSet;
@@ -601,6 +612,8 @@ namespace expose {
         self_ts_t  min_ts_f =&pts_t::min;
         self_dbl_t max_double_f=&pts_t::max;
         self_ts_t  max_ts_f =&pts_t::max;
+        self_dbl_t pow_double_f=&pts_t::pow;
+        self_ts_t  pow_ts_f =&pts_t::pow;
 
         typedef ts_bind_info TsBindInfo;
         class_<TsBindInfo>("TsBindInfo",
@@ -1167,6 +1180,15 @@ namespace expose {
                  doc_parameter("ts","TimeSeries","time-series to merge the time,value points from")
                  doc_returns("self","TimeSeries","self modified with the merged points from other ts")
             )
+            .def("slice",&apoint_ts::slice,(py::arg("self"),py::arg("i0"),py::arg("n")),
+                 doc_intro("Given that self is a concrete point-ts(not an expression), or empty ts,")
+                 doc_intro("return a new TimeSeries containing the n values starting from index i0.")
+                 doc_parameters()
+                 doc_parameter("i0", "int", "Index of first element to include in the slice")
+                 doc_parameter("n", "int", "Number of elements to include in the slice")
+            )
+            .def("pow",pow_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains pow(self,number)")
+            .def("pow",pow_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains pow(self,ts_other)")
             .def("min",min_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains the min of self and number for each time-step")
             .def("min",min_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains the min of self and ts_other")
             .def("max",max_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains the max of self and number for each time-step")
@@ -1344,6 +1366,13 @@ namespace expose {
         def("min",min_ts_ts    ,args("ts_a","ts_b"),"returns a new ts as min(ts_a,ts_b)");
         def("min",min_double_ts,args("a"   ,"ts_b"),"returns a new ts as min(a,ts_b)");
         def("min",min_ts_double,args("ts_a","b"   ),"returns a new ts as min(ts_a,b)");
+
+        ts_op_ts_t pow_ts_ts         = time_series::dd::pow;
+        double_op_ts_t pow_double_ts = time_series::dd::pow;
+        ts_op_double_t pow_ts_double = time_series::dd::pow;
+        def("pow",pow_ts_ts    ,args("ts_a","ts_b"),"returns a new ts as pow(ts_a,ts_b)");
+        def("pow",pow_double_ts,args("a"   ,"ts_b"),"returns a new ts as pow(a,ts_b)");
+        def("pow",pow_ts_double,args("ts_a","b"   ),"returns a new ts as pow(ts_a,b)");
 
         def("time_shift", time_series::dd::time_shift,args("timeseries","delta_t"),
             "returns a delta_t time-shifted time-series\n"

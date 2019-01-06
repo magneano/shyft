@@ -11,7 +11,7 @@ namespace expose {
     void routing_path_info() {
 
         py::class_<routing_info>("RoutingInfo","Describe the hydrological distance and the id of the target routing element (river)")
-         .def(py::init<py::optional<int,double>>(py::args("id","distance"),"create an object with the supplied parameters"))
+         .def(py::init<py::optional<int64_t,double>>(py::args("id","distance"),"create an object with the supplied parameters"))
          .def_readwrite("id",&routing_info::id,"id of the target,down-stream river")
          .def_readwrite("distance",&routing_info::distance,"the hydrological distance, in unit of [m]")
          ;
@@ -55,7 +55,7 @@ namespace expose {
             " This definition is recursive, and we use RiverNetwork to ensure the routing graph\n"
             " is directed and with no cycles.\n"
             )
-            .def(py::init<int,py::optional<routing_info,routing::uhg_parameter>>(py::args("id","downstream","parameter"),
+            .def(py::init<int64_t,py::optional<routing_info,routing::uhg_parameter>>(py::args("id","downstream","parameter"),
                 "a new object with specified parameters, notice that a valid river-id|routing-id must be >0"
                 )
             )
@@ -74,7 +74,7 @@ namespace expose {
 
     }
     void routing_river_network() {
-        routing::river& (routing::river_network::*griver)(int)= &routing::river_network::river_by_id;
+        routing::river& (routing::river_network::*griver)(int64_t)= &routing::river_network::river_by_id;
         py::class_<routing::river_network>("RiverNetwork",
             "A RiverNetwork takes care of the routing\n"
             "see also description of River\n"
@@ -98,11 +98,27 @@ namespace expose {
             .def("network_contains_directed_cycle",&routing::river_network::network_contains_directed_cycle,"True if network have cycles detected")
             ;
     }
+    
+    void mstack_parameter_x() {
+        py::class_<mstack_parameter>("MethodStackParameter",
+            "Contains the parameters for the method-stack,\n"
+            "related to inter-method and routing behaviour\n"
+            )
+            .def(py::init<const mstack_parameter&>(py::args("clone"),"make a clone"))
+            .def_readwrite("reservoir_direct_response_fraction",&mstack_parameter::reservoir_direct_response_fraction,
+                 doc_intro(
+                     "range 0..1, default 1.0, e.g. all precipitation on a reservoir goes to direct response\n"
+                     " - set to 0.0, then all precipitation is routed as pr. standard for the stack\n"
+                )
+             )
+            ;
+    }
 
     void routing() {
         routing_path_info();
         routing_ugh_parameter();
         routing_river();
         routing_river_network();
+        mstack_parameter_x();
     }
 }

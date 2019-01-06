@@ -12,8 +12,8 @@ import numpy as np
 class NetCdfTimeTestCase(unittest.TestCase):
     def test_extract_conversion_factors_from_string(self):
         u = utime('hours since 1970-01-01 00:00:00')
-        t_origin = api.Calendar(u.tzoffset).time(
-            api.YMDhms(u.origin.year, u.origin.month, u.origin.day, u.origin.hour, u.origin.minute, u.origin.second))
+        t_origin = api.Calendar(int(u.tzoffset)).time(
+            api.YMDhms(int(u.origin.year), int(u.origin.month), int(u.origin.day), int(u.origin.hour), int(u.origin.minute), int(u.origin.second)))
         delta_t_dic = {'days': api.deltahours(24), 'hours': api.deltahours(1), 'minutes': api.deltaminutes(1)}
         delta_t = delta_t_dic[u.units]
         self.assertIsNotNone(u)

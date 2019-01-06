@@ -1,6 +1,7 @@
 from os import path
 import unittest
 
+from shyft import shyftdata_dir
 from shyft.repository.default_state_repository import DefaultStateRepository
 from shyft.orchestration.configuration.yaml_configs import YAMLSimConfig
 from shyft.orchestration.configuration.yaml_configs import YAMLCalibConfig
@@ -20,14 +21,13 @@ class ConfigSimulationTestCase(unittest.TestCase):
         self.assertEqual(t1, utc.time(2015, 6, 1, 2, 3, 4))
 
     def test_run_geo_ts_data_config_simulator(self):
-        # These config files are versioned in shyft git
-        config_dir = path.join(path.dirname(__file__), "netcdf")
+        # These config files are versioned in shyft-data git
+        config_dir = path.join(shyftdata_dir, "neanidelv", "yaml_config")
         config_file = path.join(config_dir, "neanidelva_simulation.yaml")
         config_section = "neanidelva"
         cfg = YAMLSimConfig(config_file, config_section, overrides={'config': {'number_of_steps': 168}})
 
         # These config files are versioned in shyft-data git. Read from ${SHYFTDATA}/netcdf/orchestration-testdata/
-        # TODO: Put all config files needed to run this test under the same versioning system (shyft git)
         simulator = ConfigSimulator(cfg)
 
         # Regression tests on interpolation parameters
@@ -40,8 +40,8 @@ class ConfigSimulationTestCase(unittest.TestCase):
         discharge = simulator.region_model.statistics.discharge(cids)
 
         # Regression tests on discharge values
-        self.assertAlmostEqual(discharge.values[0], 0.1000929, 3)
-        self.assertAlmostEqual(discharge.values[3], 3.9918816, 3)
+        self.assertAlmostEqual(discharge.values[0], 80.23843199, 3)
+        self.assertAlmostEqual(discharge.values[3], 82.50344985, 3)
         # Regression tests on geo fractions
         self.assertAlmostEqual(simulator.region_model.cells[0].geo.land_type_fractions_info().unspecified(), 1.0, 3)
         self.assertAlmostEqual(simulator.region_model.cells[2].geo.land_type_fractions_info().unspecified(), 0.1433, 3)
@@ -50,7 +50,7 @@ class ConfigSimulationTestCase(unittest.TestCase):
 
     def test_run_geo_ts_data_config_calibrator(self):
         # These config files are versioned in shyft git
-        config_dir = path.join(path.dirname(__file__), "netcdf")
+        config_dir = path.join(shyftdata_dir,"neanidelv","yaml_config")
         config_file = path.join(config_dir, "neanidelva_calibration.yaml")
         print(config_file)
         config_section = "neanidelva"

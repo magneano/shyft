@@ -170,6 +170,7 @@ namespace shyft {
     typedef shyft::time_series::point_ts<time_axis::fixed_dt> result_ts_t;
     typedef std::shared_ptr<result_ts_t> result_ts_t_;
     using core::cell_statistics;
+    using cids_t=std::vector<int64_t>;
     /** \brief A class that facilitates fast state io, the yaml in Python is too slow
      *
      */
@@ -179,7 +180,7 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit basic_cell_statistics( const shared_ptr<vector<cell>>& cells):cells(cells) {}
 
-		double total_area(const vector<int>& indexes, stat_scope ix_type) const {
+		double total_area(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
 			if (indexes.size() == 0) {
 				for (const auto &c : *cells) sum += c.geo.area();
@@ -193,7 +194,7 @@ namespace shyft {
 			}
 			return sum;
 		}
-		double forest_area(const vector<int>& indexes, stat_scope ix_type) const {
+		double forest_area(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
 			if (indexes.size() == 0) {
 				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().forest();
@@ -205,7 +206,7 @@ namespace shyft {
 			}
 			return sum;
 		}
-		double glacier_area(const vector<int>& indexes, stat_scope ix_type) const {
+		double glacier_area(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
 			if (indexes.size() == 0) {
 				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().glacier();
@@ -217,7 +218,7 @@ namespace shyft {
 			}
 			return sum;
 		}
-		double lake_area(const vector<int>& indexes, stat_scope ix_type) const {
+		double lake_area(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
 			if (indexes.size() == 0) {
 				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().lake();
@@ -229,7 +230,7 @@ namespace shyft {
 			}
 			return sum;
 		}
-		double reservoir_area(const vector<int>& indexes, stat_scope ix_type) const {
+		double reservoir_area(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
 			if (indexes.size() == 0) {
 				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().reservoir();
@@ -241,7 +242,7 @@ namespace shyft {
 			}
 			return sum;
 		}
-		double unspecified_area(const vector<int>& indexes, stat_scope ix_type) const {
+		double unspecified_area(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
 			if (indexes.size() == 0) {
 				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().unspecified();
@@ -253,7 +254,19 @@ namespace shyft {
 			}
 			return sum;
 		}
-		double elevation(const vector<int>& indexes, stat_scope ix_type) const {
+		double snow_storage_area(const cids_t& indexes, stat_scope ix_type) const {
+			double sum = 0.0;
+			if (indexes.size() == 0) {
+				for (const auto &c : *cells) sum += c.geo.area()*c.geo.land_type_fractions_info().snow_storage();
+			} else {
+                cell_statistics::verify_cids_exist(*cells, indexes, ix_type);
+				for (auto cid : indexes)
+					for (const auto&c : *cells)
+						if ((int)c.geo.catchment_id() == cid) sum += c.geo.area()*c.geo.land_type_fractions_info().snow_storage();
+			}
+			return sum;
+		}
+		double elevation(const cids_t& indexes, stat_scope ix_type) const {
 			double sum = 0.0;
             double area_sum=0;
 			if (indexes.size() == 0) {
@@ -273,112 +286,112 @@ namespace shyft {
 			return sum/area_sum;
 		}
 		
-        apoint_ts discharge(const vector<int>& indexes, stat_scope ix_type) const {
+        apoint_ts discharge(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                      sum_catchment_feature(*cells, indexes,
                             [](const cell& c){ return c.rc.avg_discharge; },ix_type));
         }
-		vector<double> discharge(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> discharge(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.avg_discharge; }, ith_timestep,ix_type);
 		}
-		double discharge_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double discharge_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.avg_discharge; }, ith_timestep,ix_type);
 		}
-        apoint_ts charge(const vector<int>& indexes, stat_scope ix_type) const {
+        apoint_ts charge(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.rc.charge_m3s; },ix_type));
         }
-        vector<double> charge(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> charge(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.rc.charge_m3s; }, ith_timestep,ix_type);
         }
-        double charge_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        double charge_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 sum_catchment_feature_value(*cells, indexes,
                     [](const cell& c) { return c.rc.charge_m3s; }, ith_timestep,ix_type);
         }
 
-		apoint_ts temperature(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts temperature(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                      average_catchment_feature(*cells, indexes,
                             [](const cell& c){ return c.env_ts.temperature; },ix_type));
         }
-		vector<double> temperature(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> temperature(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.env_ts.temperature; }, ith_timestep,ix_type);
 		}
-		double temperature_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double temperature_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.env_ts.temperature; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts precipitation(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts precipitation(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                      average_catchment_feature(*cells, indexes,
                             [](const cell& c){ return c.env_ts.precipitation; },ix_type));
         }
-		vector<double> precipitation(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> precipitation(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.env_ts.precipitation; }, ith_timestep,ix_type);
 		}
-		double precipitation_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double precipitation_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.env_ts.precipitation; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts radiation(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts radiation(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                      average_catchment_feature(*cells, indexes,
                             [](const cell& c){ return c.env_ts.radiation; },ix_type));
         }
-		vector<double> radiation(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> radiation(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.env_ts.radiation; }, ith_timestep,ix_type);
 		}
-		double radiation_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double radiation_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.env_ts.radiation; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts wind_speed(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts wind_speed(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                      average_catchment_feature(*cells, indexes,
                             [](const cell& c){ return c.env_ts.wind_speed; },ix_type));
         }
-		vector<double> wind_speed(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> wind_speed(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.env_ts.wind_speed; }, ith_timestep,ix_type);
 		}
-		double wind_speed_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double wind_speed_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.env_ts.wind_speed; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts rel_hum(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts rel_hum(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                      average_catchment_feature(*cells, indexes,
                             [](const cell& c){ return c.env_ts.rel_hum; },ix_type));
         }
-		vector<double> rel_hum(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> rel_hum(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.env_ts.rel_hum; }, ith_timestep,ix_type);
 		}
-		double rel_hum_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double rel_hum_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.env_ts.rel_hum; }, ith_timestep,ix_type);
@@ -390,17 +403,17 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit kirchner_cell_state_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts discharge(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts discharge(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.kirchner_discharge; },ix_type));
         }
-		vector<double> discharge(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> discharge(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.kirchner_discharge; }, ith_timestep,ix_type);
 		}
-		double discharge_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double discharge_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.kirchner_discharge; }, ith_timestep,ix_type);
@@ -412,17 +425,17 @@ namespace shyft {
 		shared_ptr<vector<cell>> cells;
 		explicit hbv_soil_cell_state_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts discharge(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts discharge(const cids_t& indexes, stat_scope ix_type) const {
 			return apoint_ts(*cell_statistics::
 				sum_catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.sc.soil_moisture; },ix_type));
 		}
-		vector<double> discharge(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> discharge(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.sc.soil_moisture; }, ith_timestep,ix_type);
 		}
-		double discharge_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double discharge_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.soil_moisture; }, ith_timestep,ix_type);
@@ -434,17 +447,17 @@ namespace shyft {
 		shared_ptr<vector<cell>> cells;
 		explicit hbv_tank_cell_state_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts discharge(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts discharge(const cids_t& indexes, stat_scope ix_type) const {
 			return apoint_ts(*cell_statistics::
 				sum_catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.sc.tank_uz; },ix_type));			//to be modified
 		}
-		vector<double> discharge(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> discharge(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.sc.tank_uz; }, ith_timestep,ix_type);		//to be modified
 		}
-		double discharge_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double discharge_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.tank_uz; }, ith_timestep,ix_type);			//to be modified
@@ -458,129 +471,129 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit gamma_snow_cell_state_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts albedo(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts albedo(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_albedo; },ix_type));
         }
-		vector<double> albedo(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> albedo(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_albedo; }, ith_timestep,ix_type);
 		}
-		double albedo_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double albedo_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_albedo; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts lwc(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts lwc(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_lwc; },ix_type));
         }
-		vector<double> lwc(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> lwc(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_lwc; }, ith_timestep,ix_type);
 		}
-		double lwc_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double lwc_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_lwc; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts surface_heat(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts surface_heat(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_surface_heat; },ix_type));
         }
-		vector<double> surface_heat(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> surface_heat(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_surface_heat; }, ith_timestep,ix_type);
 		}
-		double surface_heat_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double surface_heat_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_surface_heat; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts alpha(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts alpha(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_alpha; },ix_type));
         }
-		vector<double> alpha(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> alpha(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_alpha; }, ith_timestep,ix_type);
 		}
-		double alpha_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double alpha_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_alpha; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts sdc_melt_mean(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sdc_melt_mean(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_sdc_melt_mean; },ix_type));
         }
-		vector<double> sdc_melt_mean(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> sdc_melt_mean(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_sdc_melt_mean; }, ith_timestep,ix_type);
 		}
-		double sdc_melt_mean_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sdc_melt_mean_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_sdc_melt_mean; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts acc_melt(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts acc_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_acc_melt; },ix_type));
         }
-		vector<double> acc_melt(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> acc_melt(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_acc_melt; }, ith_timestep,ix_type);
 		}
-		double acc_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double acc_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_acc_melt; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts iso_pot_energy(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts iso_pot_energy(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_iso_pot_energy; },ix_type));
         }
-		vector<double> iso_pot_energy(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> iso_pot_energy(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_iso_pot_energy; }, ith_timestep,ix_type);
 		}
-		double iso_pot_energy_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double iso_pot_energy_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_iso_pot_energy; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts temp_swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts temp_swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.gs_temp_swe; },ix_type));
         }
-		vector<double> temp_swe(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> temp_swe(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_temp_swe; }, ith_timestep,ix_type);
 		}
-		double temp_swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double temp_swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.sc.gs_temp_swe; }, ith_timestep,ix_type);
@@ -593,65 +606,65 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit gamma_snow_cell_response_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts sca(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sca(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_sca; },ix_type));
         }
-		vector<double> sca(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sca(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_sca; }, ith_timestep,ix_type);
 		}
-		double sca_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sca_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_sca; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_swe; },ix_type));
         }
-		vector<double> swe(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> swe(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
 		}
-		double swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts outflow(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts outflow(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_outflow; },ix_type));
         }
-		vector<double> outflow(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> outflow(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
-		double outflow_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double outflow_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
-        apoint_ts glacier_melt(const vector<int>& indexes, stat_scope ix_type) const {
+        apoint_ts glacier_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) {return c.rc.glacier_melt;},ix_type)
             );
         }
-        vector<double> glacier_melt(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> glacier_melt(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
         }
-        double glacier_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        double glacier_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 sum_catchment_feature_value(*cells, indexes,
                 [](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
@@ -665,129 +678,129 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         universal_snow_cell_state_statistics(shared_ptr<vector<cell>> cells) :cells(cells) {}
 
-		apoint_ts albedo(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts albedo(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_albedo; },ix_type));
         }
-		vector<double> albedo(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> albedo(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_albedo; }, ith_timestep,ix_type);
 		}
-		double albedo_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double albedo_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_albedo; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts lwc(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts lwc(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_lwc; },ix_type));
         }
-		vector<double> lwc(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> lwc(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_lwc; }, ith_timestep,ix_type);
 		}
-		double lwc_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double lwc_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_lwc; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts surface_heat(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts surface_heat(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_surface_heat; },ix_type));
         }
-		vector<double> surface_heat(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> surface_heat(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_surface_heat; }, ith_timestep,ix_type);
 		}
-		double surface_heat_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double surface_heat_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_surface_heat; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts alpha(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts alpha(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_alpha; },ix_type));
         }
-		vector<double> alpha(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> alpha(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_alpha; }, ith_timestep,ix_type);
 		}
-		double alpha_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double alpha_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_alpha; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts sdc_melt_mean(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sdc_melt_mean(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_sdc_melt_mean; },ix_type));
         }
-		vector<double> sdc_melt_mean(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> sdc_melt_mean(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_sdc_melt_mean; }, ith_timestep,ix_type);
 		}
-		double sdc_melt_mean_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sdc_melt_mean_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_sdc_melt_mean; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts acc_melt(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts acc_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_acc_melt; },ix_type));
         }
-		vector<double> acc_melt(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> acc_melt(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_acc_melt; }, ith_timestep,ix_type);
 		}
-		double acc_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double acc_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_acc_melt; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts iso_pot_energy(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts iso_pot_energy(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_iso_pot_energy; },ix_type));
         }
-		vector<double> iso_pot_energy(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> iso_pot_energy(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_iso_pot_energy; }, ith_timestep,ix_type);
 		}
-		double iso_pot_energy_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double iso_pot_energy_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_iso_pot_energy; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts temp_swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts temp_swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.us_temp_swe; },ix_type));
         }
-		vector<double> temp_swe(const vector<int>& indexes,size_t ith_timestep,stat_scope ix_type) const {
+		vector<double> temp_swe(const cids_t& indexes,size_t ith_timestep,stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.us_temp_swe; }, ith_timestep,ix_type);
 		}
-		double temp_swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double temp_swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.us_temp_swe; }, ith_timestep,ix_type);
@@ -800,54 +813,54 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         universal_snow_cell_response_statistics(shared_ptr<vector<cell>> cells) :cells(cells) {}
 
-		apoint_ts sca(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sca(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_sca; },ix_type));
         }
-		vector<double> sca(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sca(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_sca; }, ith_timestep,ix_type);
 		}
-		double sca_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sca_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.snow_sca; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_swe; },ix_type));
         }
-		vector<double> swe(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> swe(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
 		}
-		double swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts outflow(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts outflow(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_outflow; },ix_type));
         }
-		vector<double> outflow(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> outflow(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
-		double outflow_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double outflow_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
-        apoint_ts glacier_melt(const vector<int>& indexes, stat_scope ix_type) const {
+        apoint_ts glacier_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                     [](const cell& c) {
@@ -856,12 +869,12 @@ namespace shyft {
                 )
             );
         }
-        vector<double> glacier_melt(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> glacier_melt(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
         }
-        double glacier_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        double glacier_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 sum_catchment_feature_value(*cells, indexes,
                     [](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
@@ -876,97 +889,97 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit skaugen_cell_state_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts alpha(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts alpha(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_alpha; },ix_type));
         }
-		vector<double> alpha(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> alpha(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_alpha; }, ith_timestep,ix_type);
 		}
-		double alpha_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double alpha_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_alpha; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts nu(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts nu(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_nu; },ix_type));
         }
-		vector<double> nu(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> nu(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_nu; }, ith_timestep,ix_type);
 		}
-		double nu_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double nu_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_nu; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts lwc(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts lwc(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_lwc; },ix_type));
         }
-		vector<double> lwc(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> lwc(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_lwc; }, ith_timestep,ix_type);
 		}
-		double lwc_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double lwc_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_lwc; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts residual(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts residual(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_residual; },ix_type));
         }
-		vector<double> residual(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> residual(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_residual; }, ith_timestep,ix_type);
 		}
-		double residual_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double residual_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_residual; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_swe; },ix_type));
         }
-		vector<double> swe(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> swe(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_swe; }, ith_timestep,ix_type);
 		}
-		double swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_swe; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts sca(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sca(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_sca; },ix_type));
         }
-		vector<double> sca(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sca(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_sca; }, ith_timestep,ix_type);
 		}
-		double sca_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sca_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_sca; }, ith_timestep,ix_type);
@@ -979,38 +992,38 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit skaugen_cell_response_statistics(const shared_ptr<vector<cell>>& cells) : cells(cells) {}
 
-		apoint_ts outflow(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts outflow(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_outflow; },ix_type));
         }
-		vector<double> outflow(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> outflow(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
-		double outflow_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double outflow_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts total_stored_water(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts total_stored_water(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_total_stored_water; },ix_type));
         }
-		vector<double> total_stored_water(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> total_stored_water(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_total_stored_water; }, ith_timestep,ix_type);
 		}
-		double total_stored_water_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double total_stored_water_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.snow_total_stored_water; }, ith_timestep,ix_type);
 		}
-        apoint_ts glacier_melt(const vector<int>& indexes, stat_scope ix_type) const {
+        apoint_ts glacier_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                     [](const cell& c) {
@@ -1019,12 +1032,12 @@ namespace shyft {
                 )
             );
         }
-        vector<double> glacier_melt(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> glacier_melt(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
         }
-        double glacier_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        double glacier_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 sum_catchment_feature_value(*cells, indexes,
                     [](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
@@ -1038,38 +1051,38 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit hbv_snow_cell_state_statistics(const shared_ptr<vector<cell>>& cells) : cells(move(cells)) {}
 
-		apoint_ts swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_swe; },ix_type));
         }
-		vector<double> swe(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> swe(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_swe; }, ith_timestep,ix_type);
 		}
-		double swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_swe; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts sca(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sca(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.sc.snow_sca; },ix_type));
         }
-		vector<double> sca(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sca(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.sc.snow_sca; }, ith_timestep,ix_type);
 		}
-		double sca_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sca_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.snow_sca; }, ith_timestep,ix_type);
 		}
-		size_t find_size(const vector<int>& indexes, stat_scope ix_type) const {
+		size_t find_size(const cids_t& indexes, stat_scope ix_type) const {
 			if (indexes.size() == 0)
 				return (*cells)[0].sc.sp.size();
 			auto ci = indexes[0];
@@ -1079,7 +1092,7 @@ namespace shyft {
 			}
 			return 0;
 		}
-		ats_vector sp(const vector<int>& indexes, stat_scope ix_type) const {
+		ats_vector sp(const cids_t& indexes, stat_scope ix_type) const {
 			ats_vector r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1089,7 +1102,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<vector<double>> sp(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<vector<double>> sp(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<vector<double>> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1099,7 +1112,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<double> sp_value(const vector<int>& indexes,
+		vector<double> sp_value(const cids_t& indexes,
 			size_t ith_timestep) const {
 			vector<double> r;
 			size_t size = find_size(indexes);
@@ -1111,7 +1124,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		ats_vector sw(const vector<int>& indexes, stat_scope ix_type) const {
+		ats_vector sw(const cids_t& indexes, stat_scope ix_type) const {
 			ats_vector r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1121,7 +1134,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<vector<double>> sw(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<vector<double>> sw(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<vector<double>> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1131,7 +1144,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<double> sw_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sw_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<double> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1151,23 +1164,23 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit hbv_snow_cell_response_statistics(const shared_ptr<vector<cell>>& cells) : cells(cells) {}
 
-		apoint_ts outflow(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts outflow(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.snow_outflow; },ix_type));
         }
-		vector<double> outflow(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> outflow(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
-		double outflow_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double outflow_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.snow_outflow; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts glacier_melt(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts glacier_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                     [](const cell& c) {
@@ -1176,12 +1189,12 @@ namespace shyft {
                 )
             );
         }
-        vector<double> glacier_melt(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> glacier_melt(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
 		}
-		double glacier_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double glacier_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
@@ -1196,59 +1209,59 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         hbv_physical_snow_cell_state_statistics(shared_ptr<vector<cell>> cells) : cells(move(cells)) {}
 
-		apoint_ts swe(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts swe(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.sc.hps_swe; },ix_type));
         }
-		vector<double> swe(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> swe(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.sc.hps_swe; }, ith_timestep,ix_type);
 		}
-		double swe_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.hps_swe; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts sca(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts sca(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.sc.hps_sca; },ix_type));
         }
-		vector<double> sca(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sca(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
                     [](const cell& c) { return c.sc.hps_sca; }, ith_timestep,ix_type);
 		}
-		double sca_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double sca_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.sc.hps_sca; }, ith_timestep,ix_type);
 		}
 
-        apoint_ts surface_heat(const vector<int>& indexes, stat_scope ix_type) const {
+        apoint_ts surface_heat(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [] (const cell& c) { return c.sc.hps_surface_heat; },ix_type));
         }
 
-        vector<double> surface_heat(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> surface_heat(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 catchment_feature(*cells, indexes,
                     [] (const cell& c) { return c.sc.hps_surface_heat; },
                     ith_timestep,ix_type);
         }
 
-        double surface_heat_value(const vector<int>& indexes,
+        double surface_heat_value(const cids_t& indexes,
                                   size_t ith_timestep, stat_scope ix_type) const {
             return cell_statistics::
                 average_catchment_feature_value(*cells, indexes,
                         [] (const cell& c) {return c.sc.hps_surface_heat; },
                         ith_timestep,ix_type);
         }
-		size_t find_size(const vector<int>& indexes, stat_scope ix_type) const {
+		size_t find_size(const cids_t& indexes, stat_scope ix_type) const {
 			if (indexes.size() == 0)
 				return (*cells)[0].sc.sp.size();
 			auto ci = indexes[0];
@@ -1259,7 +1272,7 @@ namespace shyft {
 			}
 			return 0;
 		}
-		ats_vector albedo(const vector<int>& indexes, stat_scope ix_type) const {
+		ats_vector albedo(const cids_t& indexes, stat_scope ix_type) const {
 			ats_vector r;
 			size_t size = find_size(indexes,ix_type);
 			for (size_t i = 0; i < size; ++i) {
@@ -1269,7 +1282,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<vector<double>> albedo(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<vector<double>> albedo(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<vector<double>> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1279,7 +1292,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<double> albedo_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> albedo_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<double> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1290,7 +1303,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		ats_vector iso_pot_energy(const vector<int>& indexes, stat_scope ix_type) const {
+		ats_vector iso_pot_energy(const cids_t& indexes, stat_scope ix_type) const {
 			ats_vector r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1300,7 +1313,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<vector<double>> iso_pot_energy(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<vector<double>> iso_pot_energy(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<vector<double>> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1311,7 +1324,7 @@ namespace shyft {
 			return r;
 		}
 
-		vector<double> iso_pot_energy_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> iso_pot_energy_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<double> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1322,7 +1335,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		ats_vector sp(const vector<int>& indexes, stat_scope ix_type) const {
+		ats_vector sp(const cids_t& indexes, stat_scope ix_type) const {
 			ats_vector r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1332,7 +1345,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<vector<double>> sp(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<vector<double>> sp(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<vector<double>> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1342,7 +1355,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<double> sp_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sp_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<double> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1353,7 +1366,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		ats_vector sw(const vector<int>& indexes, stat_scope ix_type) const {
+		ats_vector sw(const cids_t& indexes, stat_scope ix_type) const {
 			ats_vector r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1363,7 +1376,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<vector<double>> sw(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<vector<double>> sw(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			vector<vector<double>> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1373,7 +1386,7 @@ namespace shyft {
 			}
 			return r;
 		}
-		vector<double> sw_value(const vector<int>& indexes,	size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> sw_value(const cids_t& indexes,	size_t ith_timestep, stat_scope ix_type) const {
 			vector<double> r;
 			size_t size = find_size(indexes);
 			for (size_t i = 0; i < size; ++i) {
@@ -1393,23 +1406,23 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         hbv_physical_snow_cell_response_statistics(shared_ptr<vector<cell>> cells) : cells(cells) {}
 
-		apoint_ts outflow(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts outflow(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.hps_outflow; },ix_type));
         }
-		vector<double> outflow(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> outflow(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.hps_outflow; }, ith_timestep,ix_type);
 		}
-		double outflow_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double outflow_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.hps_outflow; }, ith_timestep,ix_type);
 		}
 
-		apoint_ts glacier_melt(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts glacier_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
                     [](const cell& c) {
@@ -1418,12 +1431,12 @@ namespace shyft {
                 )
             );
         }
-        vector<double> glacier_melt(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+        vector<double> glacier_melt(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
 		}
-		double glacier_melt_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double glacier_melt_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				sum_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.glacier_melt; }, ith_timestep,ix_type);
@@ -1437,17 +1450,17 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit priestley_taylor_cell_response_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts output(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts output(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.pe_output; },ix_type));
         }
-		vector<double> output(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> output(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.pe_output; }, ith_timestep,ix_type);
 		}
-		double output_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double output_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.pe_output; }, ith_timestep,ix_type);
@@ -1460,17 +1473,17 @@ namespace shyft {
 		shared_ptr<vector<cell>> cells;
 		explicit hbv_soil_cell_response_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts output(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts output(const cids_t& indexes, stat_scope ix_type) const {
 			return apoint_ts(*cell_statistics::
 				average_catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.rc.soil_outflow; },ix_type));
 		}
-		vector<double> output(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> output(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.rc.soil_outflow; }, ith_timestep,ix_type);
 		}
-		double output_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double output_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.soil_outflow; }, ith_timestep,ix_type);
@@ -1487,17 +1500,17 @@ namespace shyft {
         shared_ptr<vector<cell>> cells;
         explicit actual_evapotranspiration_cell_response_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts output(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts output(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) { return c.rc.ae_output; },ix_type));
         }
-		vector<double> output(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> output(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[](const cell& c) { return c.rc.ae_output; }, ith_timestep,ix_type);
 		}
-		double output_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double output_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.ae_output; }, ith_timestep,ix_type);
@@ -1511,7 +1524,7 @@ namespace shyft {
          *   water_level = kirchner.state.q(t) [mm/h]
          *   scale_factor = cell.parameter.ae.scale_factor
          */
-		apoint_ts pot_ratio(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts pot_ratio(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 average_catchment_feature(*cells, indexes,
                 [](const cell& c) {
@@ -1527,7 +1540,7 @@ namespace shyft {
                 },ix_type)
             );
         }
-		vector<double> pot_ratio(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> pot_ratio(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 				[ith_timestep](const cell& c) {
@@ -1538,7 +1551,7 @@ namespace shyft {
                     return pot_ratio_single_value_ts{pot_ratio_value};
                 }, ith_timestep,ix_type);
 		}
-		double pot_ratio_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double pot_ratio_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[ith_timestep](const cell& c) {
@@ -1557,17 +1570,17 @@ namespace shyft {
 		shared_ptr<vector<cell>> cells;
 		explicit hbv_actual_evapotranspiration_cell_response_statistics(const shared_ptr<vector<cell>>& cells) :cells(cells) {}
 
-		apoint_ts output(const vector<int>& indexes, stat_scope ix_type) const {
+		apoint_ts output(const cids_t& indexes, stat_scope ix_type) const {
 			return apoint_ts(*cell_statistics::
 				average_catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.rc.ae_output; },ix_type));
 		}
-		vector<double> output(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		vector<double> output(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
 					[](const cell& c) { return c.rc.ae_output; }, ith_timestep,ix_type);
 		}
-		double output_value(const vector<int>& indexes, size_t ith_timestep, stat_scope ix_type) const {
+		double output_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
 					[](const cell& c) { return c.rc.ae_output; }, ith_timestep,ix_type);

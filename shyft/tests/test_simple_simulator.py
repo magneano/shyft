@@ -35,13 +35,13 @@ def print_param(header_text, param):
 class SimulationTestCase(unittest.TestCase):
 
     def setUp(self):
-        dir = path.dirname(__file__)
-        self.region_config_file = path.join(dir, "netcdf", "neanidelva_region.yaml")
-        self.model_config_file = path.join(dir, "netcdf", "neanidelva_model.yaml")
-        self.dataset_config_file = path.join(dir, "netcdf", "neanidelva_datasets.yaml")
-        self.interpolation_config_file = path.join(dir, "netcdf", "neanidelva_interpolation.yaml")
-        self.sim_config_file = path.join(dir, "netcdf", "neanidelva_simulation.yaml")
-        self.calib_config_file = path.join(dir, "netcdf", "neanidelva_calibration.yaml")
+        dir = shyftdata_dir #path.dirname(__file__)
+        self.region_config_file = path.join(dir, "neanidelv", "yaml_config", "neanidelva_region.yaml")
+        self.model_config_file = path.join(dir, "neanidelv", "yaml_config", "neanidelva_model.yaml")
+        self.dataset_config_file = path.join(dir, "neanidelv", "yaml_config", "neanidelva_datasets.yaml")
+        self.interpolation_config_file = path.join(dir, "neanidelv", "yaml_config", "neanidelva_interpolation.yaml")
+        self.sim_config_file = path.join(dir, "neanidelv", "yaml_config", "neanidelva_simulation.yaml")
+        self.calib_config_file = path.join(dir, "neanidelv", "yaml_config", "neanidelva_calibration.yaml")
 
         self.region_config = RegionConfig(self.region_config_file)
         self.model_config = ModelConfig(self.model_config_file)
@@ -122,8 +122,8 @@ class SimulationTestCase(unittest.TestCase):
         simulator.run(time_axis=time_axis, state=s0)
 
         target_discharge_ts = simulator.region_model.statistics.discharge([cid])
-        cell_charge = simulator.region_model.get_cells()[600].rc.avg_charge # in m3s for this cell
-        assert cell_charge.values.to_numpy().sum() > 0.001, 'some charge expected here'
+        cell_charge = simulator.region_model.get_cells()[603].rc.avg_charge # in m3s for this cell
+        assert cell_charge.values.to_numpy().max() > 0.001, 'some charge expected here'
         target_discharge_ts.set_point_interpretation(api.point_interpretation_policy.POINT_AVERAGE_VALUE)
         target_discharge = target_discharge_ts.average(target_discharge_ts.time_axis)
         # Perturb parameters

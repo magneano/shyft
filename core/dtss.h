@@ -684,7 +684,7 @@ inline ts_vector_t server<ContainerDispatcher>::do_evaluate_ts_vector(utcperiod 
 template < class ContainerDispatcher >
 inline ts_vector_t server<ContainerDispatcher>::do_evaluate_percentiles(utcperiod bind_period, ts_vector_t& atsv, gta_t const&ta, std::vector<int64_t> const& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
     do_bind_ts(bind_period, atsv,use_ts_cached_read,update_ts_cache);
-    std::vector<int> p_spec;for(const auto p:percentile_spec) p_spec.push_back(int(p));// convert
+    std::vector<int64_t> p_spec;for(const auto p:percentile_spec) p_spec.push_back(int(p));// convert
     return percentiles(atsv, ta, p_spec);// we can assume the result is trivial to serialize
 }
 

@@ -353,6 +353,14 @@ namespace expose {
                     doc_parameter("ix_hint", "int", "index-hint to make search in point-time-axis faster")
                     doc_returns("index", "int", "the index the time-axis period that contains t, npos if before first period n-1, if t is after last period")
                 )
+                .def("slice",&generic_dt::slice,(py::arg("self"),py::arg("start"),py::arg("n")),
+                    doc_intro("returns slice of time-axis as a new time-axis")
+                    doc_parameters()
+                    doc_parameter("start","int","first interval to include")
+                    doc_parameter("n","int","number of intervals to include")
+                    doc_returns("time-axis","TimeAxis","A new time-axis with the specified slice")
+                )
+
                 .def(self == self)
                 .def(self != self)
                 ;//.def("full_range",&point_dt::full_range,"returns a timeaxis that covers [-oo..+oo> ").staticmethod("full_range")

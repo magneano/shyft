@@ -2,16 +2,17 @@
 export WORKSPACE=$(readlink --canonicalize --no-newline `dirname ${0}`/../..)
 # to align the cmake support:
 export SHYFT_DEPENDENCIES_DIR=${WORKSPACE}/shyft_dependencies
-armadillo_name=armadillo-9.100.5
-dlib_name=dlib-${SHYFT_DLIB_VERSION:-19.15}
+armadillo_name=armadillo-9.200.6
+dlib_name=dlib-${SHYFT_DLIB_VERSION:-19.16}
 boost_ver=${SHYFT_BOOST_VERSION:-1_68}_0
-numpy_ver=${SHYFT_BOOST_NUMPY_VERSION:-1.14}
-cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER"
+numpy_ver=${SHYFT_BOOST_NUMPY_VERSION:-1.15}
+cmake_common="-DCMAKE_INSTALL_MESSAGE=NEVER  -DCMAKE_SYSTEM_VERSION=10.0"
+miniconda_ver=4.5.4
 echo ---------------
 echo Windows Update/build shyft-dependencies
 echo WORKSPACE..............: ${WORKSPACE}
 echo SHYFT_DEPENDENCIES_DIR.: ${SHYFT_DEPENDENCIES_DIR}
-echo PACKAGES...............: miniconda w/shyft_env, doctest, boost_${boost_ver}, ${armadillo_name}, ${dlib_name}, numpy=${numpy_ver} 
+echo PACKAGES...............: miniconda ${minconda_ver} w/shyft_env, doctest, boost_${boost_ver}, ${armadillo_name}, ${dlib_name}, numpy=${numpy_ver} 
 WGET='curl -L -O'
 
 # A helper function to compare versions
@@ -75,10 +76,13 @@ if [ ! ${python_tst} -eq 0 ]; then
 		if [ -d miniconda ]; then
 			rm -rf miniconda
 		fi;
-		if [ ! -f Miniconda3-latest-Windows-x86_64.exe ]; then
-			${WGET}  http://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe
+		if [ ! -f Miniconda3-${miniconda_ver}-Windows-x86_64.exe ]; then
+			${WGET}  http://repo.continuum.io/miniconda/Miniconda3-${miniconda_ver}-Windows-x86_64.exe
 		fi;
-		echo 'start /wait "" .\Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /S /D=%cd%\miniconda' >install_miniconda.cmd
+        if [ ! -f Miniconda3-Windows-x86_64.exe ]; then
+            cp Miniconda3-${miniconda_ver}-Windows-x86_64.exe Miniconda3-Windows-x86_64.exe
+        fi;
+		echo 'start /wait "" .\Miniconda3-Windows-x86_64.exe /InstallationType=JustMe /S /D=%cd%\miniconda' >install_miniconda.cmd
 		./install_miniconda.cmd
 		# Update conda to latest version, assume we start with 4.3 which
 		# requires PATH to be set

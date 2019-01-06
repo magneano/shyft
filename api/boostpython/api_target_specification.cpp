@@ -63,7 +63,7 @@ namespace expose {
 
         static TargetSpecificationPts* create_cids(
                const core_ts_t& ts,
-               vector<int> cids,
+               vector<int64_t> cids,
                double scale_factor,
                model_calibration::target_spec_calc_type calc_mode = model_calibration::NASH_SUTCLIFFE,
                double s_r = 1.0,
@@ -76,7 +76,7 @@ namespace expose {
         }
         static TargetSpecificationPts* acreate_cids(
                const shyft::time_series::dd::apoint_ts& ats,
-               const vector<int>& cids,
+               const vector<int64_t>& cids,
                double scale_factor,
                model_calibration::target_spec_calc_type calc_mode = model_calibration::NASH_SUTCLIFFE,
                double s_r = 1.0,
@@ -90,7 +90,7 @@ namespace expose {
 
         static TargetSpecificationPts* create_cids2(
                const core_ts_t& ts,
-               const vector<int>& cids,
+               const vector<int64_t>& cids,
                double scale_factor,
                model_calibration::target_spec_calc_type calc_mode )
         {
@@ -99,7 +99,7 @@ namespace expose {
 
         static TargetSpecificationPts* acreate_cids2(
                const shyft::time_series::dd::apoint_ts& ats,
-               const vector<int>& cids,
+               const vector<int64_t>& cids,
                double scale_factor,
                model_calibration::target_spec_calc_type calc_mode )
         {
@@ -108,7 +108,7 @@ namespace expose {
 
         static TargetSpecificationPts* create_rid(
                const core_ts_t& ts,
-               int river_id,
+               int64_t river_id,
                double scale_factor,
                model_calibration::target_spec_calc_type calc_mode = model_calibration::NASH_SUTCLIFFE,
                double s_r = 1.0,
@@ -120,7 +120,7 @@ namespace expose {
         }
         static TargetSpecificationPts* acreate_rid(
                const shyft::time_series::dd::apoint_ts& ats,
-               int river_id,
+               int64_t river_id,
                double scale_factor,
                model_calibration::target_spec_calc_type calc_mode = model_calibration::NASH_SUTCLIFFE,
                double s_r = 1.0,

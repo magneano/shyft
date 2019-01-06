@@ -260,24 +260,27 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             std::shared_ptr<core::calendar> utc_ptr = std::make_shared<core::calendar>();
             const core::utctime t0 = core::utctime_now();
             const core::utctimespan dt_h = core::calendar::HOUR;
-            const core::utctimespan dt_d = core::calendar::DAY;
             const std::size_t n = 1000;
             // -----
-            ta::fixed_dt f_ta_h{ t0, dt_h, n };
-            ta::fixed_dt f_ta_d{ t0, dt_d, n };
-            ts::point_ts<ta::generic_dt> pts_h{ gta_t(f_ta_h), 0., ts::POINT_INSTANT_VALUE };
-            ts::point_ts<ta::generic_dt> pts_d{ gta_t(f_ta_d), 0., ts::POINT_AVERAGE_VALUE };
+            ta::fixed_dt f_ta_h_1{ t0, dt_h, n };
+            ta::fixed_dt f_ta_h_2{ t0+n*dt_h, dt_h, n };
+            ts::point_ts<ta::generic_dt> pts_h_1{ gta_t(f_ta_h_1), 0., ts::POINT_INSTANT_VALUE };
+            ts::point_ts<ta::generic_dt> pts_h_2{ gta_t(f_ta_h_2), 0., ts::POINT_AVERAGE_VALUE };
             // -----
             std::string fn("dtss_save_merge/ext_diff_fx.db");
 
             // save initital data
-            db.save(fn, pts_d, false);
+            db.save(fn, pts_h_1, false);
             auto find_res = db.find(string("dtss_save_merge/ext_diff_fx\\.db"));
             FAST_REQUIRE_EQ(find_res.size(), 1);
 
             // add data to the same path
-            CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
-                std::runtime_error, "dtss_store: cannot merge with different point interpretation");
+            if ( time_in_micro_seconds ) {
+                db.save(fn, pts_h_2, false);
+            } else {
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h_2, false),
+                    std::runtime_error, "dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+            }
 
             // cleanup
             db.remove(fn);
@@ -303,9 +306,14 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             auto find_res = db.find(string("dtss_save_merge/ext_fixed_diff_dt\\.db"));
             FAST_CHECK_EQ(find_res.size(), 1);
 
-            // add data to the same path
-            CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
-                std::runtime_error, "dtss_store: cannot merge unaligned fixed_dt");
+            if ( time_in_micro_seconds ) {
+                // add data to the same path
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge unaligned fixed_dt");
+            } else {
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+            }
 
             // cleanup
             db.remove(fn);
@@ -332,9 +340,14 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             auto find_res = db.find(string("dtss_save_merge/ext_fixed_unaligned\\.db"));
             FAST_CHECK_EQ(find_res.size(), 1);
 
-            // add data to the same path
-            CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
-                std::runtime_error, "dtss_store: cannot merge unaligned fixed_dt");
+            if ( time_in_micro_seconds ) {
+                // add data to the same path
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge unaligned fixed_dt");
+            } else {
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+            }
 
             // cleanup
             db.remove(fn);
@@ -361,9 +374,14 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             auto find_res = db.find(string("dtss_save_merge/ext_cal_diff_dt\\.db"));
             FAST_CHECK_EQ(find_res.size(), 1);
 
-            // add data to the same path
-            CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
-                std::runtime_error, "dtss_store: cannot merge unaligned calendar_dt");
+            if ( time_in_micro_seconds ) {
+                // add data to the same path
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge unaligned calendar_dt");
+            } else {
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+            }
 
             // cleanup
             db.remove(fn);
@@ -390,9 +408,14 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             auto find_res = db.find(string("dtss_save_merge/ext_cal_unaligned\\.db"));
             FAST_CHECK_EQ(find_res.size(), 1);
 
-            // add data to the same path
-            CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
-                std::runtime_error, "dtss_store: cannot merge unaligned calendar_dt");
+            if ( time_in_micro_seconds ) {
+                // add data to the same path
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge unaligned calendar_dt");
+            } else {
+                CHECK_THROWS_AS_MESSAGE(db.save(fn, pts_h, false),
+                    std::runtime_error, "dtss_store: cannot merge microseconds to old seconds based storage ts-file");
+            }
 
             // cleanup
             db.remove(fn);
@@ -464,6 +487,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 // values
                 FAST_CHECK_EQ(res.v.at(0), 10.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -507,6 +532,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - drop - 1), 10.);
                 FAST_CHECK_EQ(res.v.at(n - drop), 1.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -546,6 +573,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 // values
                 FAST_CHECK_EQ(res.v.at(0), 10.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -587,6 +616,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
                 FAST_CHECK_EQ(res.v.at(n), 1.);
                 FAST_CHECK_EQ(res.v.at(n + n/2 - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -626,6 +657,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n/2 - 1), 1.);
                 FAST_CHECK_EQ(res.v.at(n/2), 10.);
                 FAST_CHECK_EQ(res.v.at(n + n/2 - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -665,6 +698,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - 1), 1.);
                 FAST_CHECK_EQ(res.v.at(n), 10.);
                 FAST_CHECK_EQ(res.v.at(2 * n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -707,6 +742,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_UNARY(std::isnan(res.v.at(2*n - 1)));
                 FAST_CHECK_EQ(res.v.at(2 * n), 10.);
                 FAST_CHECK_EQ(res.v.at(3 * n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -749,6 +786,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_UNARY(std::isnan(res.v.at(2*n - 1)));
                 FAST_CHECK_EQ(res.v.at(2 * n), 1.);
                 FAST_CHECK_EQ(res.v.at(3 * n - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -786,6 +825,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 // values
                 FAST_CHECK_EQ(res.v.at(0), 10.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -829,6 +870,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - drop - 1), 10.);
                 FAST_CHECK_EQ(res.v.at(n - drop), 1.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -868,6 +911,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 // values
                 FAST_CHECK_EQ(res.v.at(0), 10.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -909,6 +954,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
                 FAST_CHECK_EQ(res.v.at(n), 1.);
                 FAST_CHECK_EQ(res.v.at(n + n/2 - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -948,6 +995,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n/2 - 1), 1.);
                 FAST_CHECK_EQ(res.v.at(n/2), 10.);
                 FAST_CHECK_EQ(res.v.at(n + n/2 - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -987,6 +1036,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - 1), 1.);
                 FAST_CHECK_EQ(res.v.at(n), 10.);
                 FAST_CHECK_EQ(res.v.at(2 * n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1029,6 +1080,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_UNARY(std::isnan(res.v.at(2*n - 1)));
                 FAST_CHECK_EQ(res.v.at(2 * n), 10.);
                 FAST_CHECK_EQ(res.v.at(3 * n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1071,6 +1124,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_UNARY(std::isnan(res.v.at(2*n - 1)));
                 FAST_CHECK_EQ(res.v.at(2 * n), 1.);
                 FAST_CHECK_EQ(res.v.at(3 * n - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1121,6 +1176,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 // values
                 FAST_CHECK_EQ(res.v.at(0), 10.);
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1167,6 +1224,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at((n+1) - drop - 1), 10.);
                 FAST_CHECK_EQ(res.v.at((n+1) - drop), 1.);
                 FAST_CHECK_EQ(res.v.at((n+1) - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1247,6 +1306,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - 1), 10.);
                 FAST_CHECK_EQ(res.v.at(n), 1.);
                 FAST_CHECK_EQ(res.v.at(n + n/2 - 1), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1286,6 +1347,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n/2), 1.);
                 FAST_CHECK_EQ(res.v.at(n/2 + 1), 10.);
                 FAST_CHECK_EQ(res.v.at(n + n/2), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1325,6 +1388,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_EQ(res.v.at(n - 1), 1.);
                 FAST_CHECK_EQ(res.v.at(n), 10.);
                 FAST_CHECK_EQ(res.v.at(2 * n - 1), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1366,6 +1431,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_UNARY(std::isnan(res.v.at(n)));
                 FAST_CHECK_EQ(res.v.at(n + 1), 10.);
                 FAST_CHECK_EQ(res.v.at(2 * n), 10.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1407,6 +1474,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
                 FAST_CHECK_UNARY(std::isnan(res.v.at(n)));
                 FAST_CHECK_EQ(res.v.at(n + 1), 1.);
                 FAST_CHECK_EQ(res.v.at(2 * n), 1.);
+                auto i=db.get_ts_info(fn);
+                FAST_CHECK_UNARY(i.data_period==res.total_period());
 
                 // cleanup
                 db.remove(fn);
@@ -1439,7 +1508,7 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             db.save(fn, pts_new, true);
 
             // check merged data
-            ts::point_ts<ta::generic_dt> res = db.read("dtss_save_merge/force_overwrite.db", core::utcperiod{ });
+            ts::point_ts<ta::generic_dt> res = db.read(fn, core::utcperiod{ });
             // time-axis
             FAST_CHECK_EQ(res.ta.gt, time_axis::generic_dt::FIXED);
             FAST_CHECK_EQ(res.total_period().start, f_ta_new.total_period().start);
@@ -1447,7 +1516,8 @@ void test_dtss_db_store_merge_write(bool time_in_micro_seconds ) {
             // values
             FAST_CHECK_EQ(res.v.at(0), 10.);
             FAST_CHECK_EQ(res.v.at(n - 2 * drop - 1), 10.);
-
+            auto i=db.get_ts_info(fn);
+            FAST_CHECK_UNARY(i.data_period==res.total_period());
             // cleanup
             db.remove(fn);
             find_res = db.find(string("dtss_save_merge/force_overwrite\\.db"));
@@ -1469,7 +1539,7 @@ TEST_SUITE("dtss_db") {
     TEST_CASE("dtss_db_basics_seconds") {
         test_dtss_db_basics(false);
     }
-   TEST_CASE("dtss_db_merge_write_micro_seconds") {
+    TEST_CASE("dtss_db_merge_write_micro_seconds") {
         test_dtss_db_store_merge_write(true);
     }
     TEST_CASE("dtss_db_merge_write_seconds") {
@@ -1516,6 +1586,12 @@ TEST_SUITE("dtss_db") {
         } catch( const runtime_error&) {
             FAST_CHECK_UNARY(true);
         }
+        // 4. read back the merged ts.
+        utcperiod rp(o.total_period().start,pta2.total_period().end);
+        auto rts=db.read(fn,rp);
+        FAST_CHECK_EQ(rts.total_period(),rp);
+        auto tsi= db.get_ts_info(fn);
+        FAST_CHECK_UNARY(tsi.data_period==rp);
         db.remove(fn);
     }
 }

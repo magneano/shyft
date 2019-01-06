@@ -269,6 +269,88 @@ TEST_CASE("test_mass_balance") {
         expected_discharge =2.778e-5;
         FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.01e-5));
     }
+    SUBCASE("reservoir_direct_response") {
+        // verify that glacier melt goes through kirchner according to gm.direct_response
+        // glac lake, reservoir
+        land_type_fractions ltf(0.0,0.0,0.5,0.0,0.5);// 50-50 rsv unspecified
+        gcd.set_land_type_fractions(ltf);
+        state.kirchner.q=1e-4;// so small, that it's close to zero
+        state.gs.lwc=0.0;// no snow, should have direct response, 3 mm/h, over the cell_area
+        state.gs.acc_melt=-1;// should be no snow, should go straight through
+
+        parameter.msp.reservoir_direct_response_fraction=1.0;// all direct(default)
+        pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
+        double expected_discharge =0.5*mmh_to_m3s(prec.value(0),cell_area);
+        FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.001));
+
+        parameter.msp.reservoir_direct_response_fraction=0.5;//  direct
+        pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
+        expected_discharge =0.5*(0.5*mmh_to_m3s(prec.value(0),cell_area));
+        FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.001));
+
+        parameter.msp.reservoir_direct_response_fraction=0.0;// no direct
+        pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,state,sc,rc);
+        expected_discharge =2.778e-5;
+        FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx( expected_discharge).epsilon(0.01e-5));
+    }
+
+}
+TEST_CASE("ptgsk_lake_reservoir_response") {
+    calendar cal;
+    utctime t0 = cal.time(2014, 8, 1, 0, 0, 0);
+    utctimespan dt=deltahours(1);
+    const int n=50;// need to run some steps to observe kirchner response
+    ta::fixed_dt tax(t0,dt,n);
+	ta::fixed_dt tax_state(t0, dt, n + 1);
+    pt::parameter pt_param;
+    gs::parameter gs_param;
+    ae::parameter ae_param;
+    kr::parameter k_param;
+    pc::parameter p_corr_param;
+    parameter parameter{pt_param, gs_param, ae_param, k_param, p_corr_param};
+
+    pts_t temp(tax,-15.0,POINT_AVERAGE_VALUE);// freezing cold
+    pts_t prec(tax,3.0,POINT_AVERAGE_VALUE);prec.set(0,0.0);// rain except 1.step we use to get initial kirchner response
+    pts_t rel_hum(tax,0.8,POINT_AVERAGE_VALUE);
+    pts_t wind_speed(tax,2.0,POINT_AVERAGE_VALUE);
+    pts_t radiation(tax,300.0,POINT_AVERAGE_VALUE);
+
+    kr::state kirchner_state{1};// 1 mm 
+    gs::state gs_state;
+    gs_state.lwc=100.0;
+    gs_state.acc_melt=100.0; 
+    
+    state s0{gs_state, kirchner_state};// need a equal state for the second run
+    state s1{gs_state, kirchner_state};
+    
+    pt_gs_k::state_collector sc;
+    pt_gs_k::all_response_collector rc;
+    const double cell_area=1000*1000;
+    sc.collect_state=true;
+    sc.initialize(tax_state,0,0,cell_area);
+    rc.initialize(tax,0,0,cell_area);
+    geo_cell_data gcd(geo_point(1000,1000,100));
+    land_type_fractions ltf(0.0,0.2,0.3,0.0,0.5);// 0.2 lake, 0.3 reservoir , 0.5 unspec
+    gcd.set_land_type_fractions(ltf);
+    
+    parameter.msp.reservoir_direct_response_fraction=0.0;// all rsv goes to kirchner
+    pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,s0,sc,rc);
+    FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266).epsilon(0.01)); // first with 0 precip, nothing should happen
+    FAST_CHECK_EQ(rc.avg_discharge.value(n-1), doctest::Approx( 0.5*mmh_to_m3s(prec.value(1),cell_area)).epsilon(0.01));
+    
+    parameter.msp.reservoir_direct_response_fraction=1.0;// all rsv goes directly to output, lake goes to kirchner
+    sc.initialize(tax_state,0,0,cell_area);
+    rc.initialize(tax,0,0,cell_area);
+    pt_gs_k::run_pt_gs_k<direct_accessor,pt_gs_k::response>(gcd,parameter,tax,0,0,temp,prec,wind_speed,rel_hum,radiation,s1,sc,rc);
+    FAST_CHECK_EQ(rc.avg_discharge.value(0), doctest::Approx(0.266*0.7).epsilon(0.01)); // first with 0 precip, nothing should happen
+    //-- verify that buildup is only on non lake + reservoir area
+    FAST_CHECK_EQ(rc.snow_swe.value(0), doctest::Approx(0.0).epsilon(0.001));// first step is 0.0 on the average, there is no precip
+    FAST_CHECK_EQ(rc.snow_swe.value(1), doctest::Approx(1.548).epsilon(0.01));// average second step is 1.5 mm + initial bareground mm, since it only build on non-lake,rsv area
+    FAST_CHECK_EQ(rc.snow_swe.value(2), doctest::Approx(3.048).epsilon(0.01));// average third step is 1.5 +1.5 mm + initial bareground mm, etc..
+    auto expected_1 = 0.266+0.3*0.5*mmh_to_m3s(prec.value(1),cell_area);
+    FAST_CHECK_EQ(rc.avg_discharge.value(1), doctest::Approx(expected_1).epsilon(0.05)); // precip on rsv direct effect
+    auto expected_2 = 0.2*mmh_to_m3s(prec.value(1),cell_area)*(1.0-0.3)+0.3*mmh_to_m3s(prec.value(1),cell_area);
+    FAST_CHECK_EQ(rc.avg_discharge.value(n-1), doctest::Approx(expected_2 ).epsilon(0.01));
 }
 
 }
