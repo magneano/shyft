@@ -1402,6 +1402,7 @@ namespace shyft {
 
             utctimespan repeat_timespan{ utctimespan::zero() };
             double repeat_tolerance{1e-2};
+            std::vector<double> repeat_allowed{};
 
             // ----- linear interpolation correction
 
@@ -1421,7 +1422,7 @@ namespace shyft {
                 return qac_parameter{
                     nan_qa, infinite_qa, true, false,  // qa modes
                     min_x, max_x,                      // min/max parameters
-                    utctimespan::zero(), 0.,           // repeat parameters
+                    utctimespan::zero(), 0., { },      // repeat parameters
                     utctime::zero(),                   // linear_interpolation parameters
                     shyft::nan                         // constant filling parameters
                 };
@@ -1430,7 +1431,7 @@ namespace shyft {
                 return qac_parameter{
                     nan_qa, infinite_qa, true, false,  // qa modes
                     min_x, max_x,                      // min/max parameters
-                    utctimespan::zero(), 0.,           // repeat parameters
+                    utctimespan::zero(), 0., { },      // repeat parameters
                     scan_span,                         // linear_interpolation parameters
                     shyft::nan                         // constant filling parameters
                 };
@@ -1439,37 +1440,37 @@ namespace shyft {
                 return qac_parameter{
                     nan_qa, infinite_qa, true, false,  // qa modes
                     min_x, max_x,                      // min/max parameters
-                    utctimespan::zero(), 0.,           // repeat parameters
+                    utctimespan::zero(), 0., { },      // repeat parameters
                     utctime::zero(),                   // linear_interpolation parameters
                     constant_filler                    // constant filling parameters
                 };
             }
 
-            static qac_parameter create_repeating_no_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol) {
+            static qac_parameter create_repeating_no_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, const std::vector<double> & allowed_repeating) {
                 return qac_parameter{
-                    nan_qa, infinite_qa, false, true,  // qa modes
-                    shyft::nan, shyft::nan,            // min/max parameters
-                    repeat_span, repeat_tol,           // repeat parameters
-                    utctime::zero(),                   // linear_interpolation parameters
-                    shyft::nan                         // constant filling parameters
+                    nan_qa, infinite_qa, false, true,            // qa modes
+                    shyft::nan, shyft::nan,                      // min/max parameters
+                    repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
+                    utctime::zero(),                             // linear_interpolation parameters
+                    shyft::nan                                   // constant filling parameters
                 };
             }
-            static qac_parameter create_repeating_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, utctimespan scan_span) {
+            static qac_parameter create_repeating_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, utctimespan scan_span, const std::vector<double> & allowed_repeating) {
                 return qac_parameter{
-                    nan_qa, infinite_qa, false, true,  // qa modes
-                    shyft::nan, shyft::nan,            // min/max parameters
-                    repeat_span, repeat_tol,           // repeat parameters
-                    scan_span,                         // linear_interpolation parameters
-                    shyft::nan                         // constant filling parameters
+                    nan_qa, infinite_qa, false, true,            // qa modes
+                    shyft::nan, shyft::nan,                      // min/max parameters
+                    repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
+                    scan_span,                                   // linear_interpolation parameters
+                    shyft::nan                                   // constant filling parameters
                 };
             }
-            static qac_parameter create_repeating_constant_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, double constant_filler) {
+            static qac_parameter create_repeating_constant_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, double constant_filler, const std::vector<double> & allowed_repeating) {
                 return qac_parameter{
-                    nan_qa, infinite_qa, false, true,  // qa modes
-                    shyft::nan, shyft::nan,            // min/max parameters
-                    repeat_span, repeat_tol,           // repeat parameters
-                    utctime::zero(),                   // linear_interpolation parameters
-                    constant_filler                    // constant filling parameters
+                    nan_qa, infinite_qa, false, true,            // qa modes
+                    shyft::nan, shyft::nan,                      // min/max parameters
+                    repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
+                    utctime::zero(),                             // linear_interpolation parameters
+                    constant_filler                              // constant filling parameters
                 };
             }
 
@@ -1523,7 +1524,7 @@ namespace shyft {
                 return (
                     max_scan_timespan == o.max_scan_timespan
                     && nan_equal(min_x, o.min_x, abs_e) && nan_equal(max_x, o.max_x, abs_e)
-                    && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e)
+                    && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e) && repeat_allowed == o.repeat_allowed
                     && nan_equal(constant_filler, o.constant_filler, abs_e)
                 );
             }

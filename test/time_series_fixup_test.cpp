@@ -118,7 +118,7 @@ TEST_SUITE("time_series") {
             apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
             qac_parameter params = qac_parameter::create_repeating_no_fill_parameters(
-                false, false, seconds(60), 1e-2
+                false, false, seconds(60), 1e-2, { }
             );
             auto ts = qac_ts(data_ts, params);
             auto result = ts.values();
@@ -142,7 +142,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(30), 1e-2, 100.
+                    false, false, seconds(30), 1e-2, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -164,7 +164,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(20), 1e-2, 100.
+                    false, false, seconds(20), 1e-2, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -186,7 +186,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(40), 1e-2, 100.
+                    false, false, seconds(40), 1e-2, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -207,7 +207,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(20), 1e-2, 100.
+                    false, false, seconds(20), 1e-2, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -230,7 +230,7 @@ TEST_SUITE("time_series") {
             apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
             qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                false, false, seconds(30), 1e-2, 100.
+                false, false, seconds(30), 1e-2, 100., { }
             );
             auto ts = qac_ts(data_ts, params);
             auto result = ts.values();
@@ -252,7 +252,7 @@ TEST_SUITE("time_series") {
             apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
             qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                false, false, seconds(30), 1e-2, 100.
+                false, false, seconds(30), 1e-2, 100., { }
             );
             auto ts = qac_ts(data_ts, params);
             auto result = ts.values();
@@ -269,13 +269,12 @@ TEST_SUITE("time_series") {
             //                                                                 *     *     *     *     *     *
             std::vector<double> values  {3., 4., 5., 7., 4., 2., 5., 2., 3.,   1.,   1.,   1.,   1.,   1.,   1. };
             std::vector<double> expected{3., 4., 5., 7., 4., 2., 5., 2., 3., 100., 100., 100., 100., 100., 100. };
-            generic_dt ta{ _t(0)
-, seconds(10), values.size() };
+            generic_dt ta{ _t(0), seconds(10), values.size() };
 
             apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
             qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                false, false, seconds(30), 1e-2, 100.
+                false, false, seconds(30), 1e-2, 100., { }
             );
             auto ts = qac_ts(data_ts, params);
             auto result = ts.values();
@@ -299,7 +298,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(40), 0.5, 100.
+                    false, false, seconds(40), 0.5, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -321,7 +320,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(40), 0.5, 100.
+                    false, false, seconds(40), 0.5, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -344,7 +343,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(40), 20*eps, 100.
+                    false, false, seconds(40), 20*eps, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
@@ -367,7 +366,7 @@ TEST_SUITE("time_series") {
                 apoint_ts data_ts{ ta, values, ts_point_fx::POINT_AVERAGE_VALUE };
 
                 qac_parameter params = qac_parameter::create_repeating_constant_fill_parameters(
-                    false, false, seconds(40), 15*eps, 100.
+                    false, false, seconds(40), 15*eps, 100., { }
                 );
                 auto ts = qac_ts(data_ts, params);
                 auto result = ts.values();
