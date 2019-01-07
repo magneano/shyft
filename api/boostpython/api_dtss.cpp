@@ -331,9 +331,10 @@ namespace expose {
                 doc_paramcont("typically it could be 20000 (avoid using official reserved numbers)")
                 doc_returns("nothing","None","")
             )
-            .def("start_async",&DtsServer::start_async,(py::arg("self")),
+            .def("start_async",&DtsServer::start_server,(py::arg("self")),
                 doc_intro("start server listening in background, and processing messages")
                 doc_see_also("set_listening_port(port_no),is_running,cb,process_messages(msec)")
+                doc_returns("port_no","in","the port used for listening operations, either the value as by set_listening_port, or if it was unspecified, a new available port")
                 doc_notes()
                 doc_note("you should have setup up the callback, cb before calling start_async")
                 doc_note("Also notice that processing will acquire the GIL\n -so you need to release the GIL to allow for processing messages")

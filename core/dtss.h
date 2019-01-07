@@ -158,7 +158,7 @@ public:
 };
 
 
-/** \brief A dtss server with time-series server-side functions
+/** @brief A dtss server with time-series server-side functions
  *
  * The dtss server listens on a port, receives messages, interpret them
  * and ship the response back to the client.
@@ -172,17 +172,16 @@ public:
  *   shyft://<container>/<local_ts_name>
  * resolves to the internal implementation.
  *
- * TODO: container and thread-safety, given user changes the containers after
- *       the server is started.
+ * @tparam CD ContainerDispatcher class that helps implementing static dispatch to special containers, like the KRLS for training expressions
  *
  */
-template < class ContainerDispatcher >
+template < class CD >
 struct server : dlib::server_iostream {
 
-    friend ContainerDispatcher;  // the dispatcher have full access to the server
+    friend CD;  // the dispatcher have full access to the server
 
     using ts_cache_t = cache<apoint_ts_frag, apoint_ts>;
-    using cwrp_t = typename ContainerDispatcher::container_wrapper_t;
+    using cwrp_t = typename CD::container_wrapper_t;
 
     // callbacks for extensions
     read_call_back_t bind_ts_cb;    ///< called to read non shyft:// unbound ts
@@ -227,13 +226,24 @@ struct server : dlib::server_iostream {
         std::string container_type = std::string{}
     ) {
         unique_lock<mutex> sl(c_mx);
-        ContainerDispatcher::create_container(container_name, container_type, root_dir, *this);
+        CD::create_container(container_name, container_type, root_dir, *this);
     }
 
     cwrp_t & internal(const std::string & container_name, const std::string & container_query = std::string{}) {
-        return ContainerDispatcher::get_container(container_name, container_query, *this);
+        return CD::get_container(container_name, container_query, *this);
     }
 
+    /** start the server in background, return the listening port used in case it was set unspecified */
+    int start_server() {
+        if(get_listening_port()==0) {
+            start_async();
+            while(is_running()&& get_listening_port()==0) //because dlib do not guarantee that listening port is set
+                std::this_thread::sleep_for(std::chrono::milliseconds(10)); // upon return, so we have to wait until it's done
+        } else {
+            start_async();
+        }
+        return get_listening_port();
+    }
     //-- expose cache functions
 
     void add_to_cache(id_vector_t&ids, ts_vector_t& tss) { ts_cache.add(ids,tss);}
@@ -257,17 +267,17 @@ struct server : dlib::server_iostream {
         throw runtime_error("dtss store.extract_url:supplied type must be of type ref_ts");
     }
 
-    void do_cache_update_on_write(const ts_vector_t&tsv);
+    void do_cache_update_on_write(const ts_vector_t&tsv,bool overwrite_on_write);
 
     void do_store_ts(const ts_vector_t & tsv, bool overwrite_on_write, bool cache_on_write);
 
     void do_merge_store_ts(const ts_vector_t & tsv, bool cache_on_write);
-    /** \brief Read the time-series from providers for specified period
+    /** @brief Read the time-series from providers for specified period
     *
-    * \param ts_ids identifiers, url form, where shyft://.. is specially filtered
-    * \param p the period to read
-    * \param use_ts_cached_read allow reading results from already existing cached results
-    * \param update_ts_cache when reading, also update the ts-cache with the results
+    * @param ts_ids identifiers, url form, where shyft://.. is specially filtered
+    * @param p the period to read
+    * @param use_ts_cached_read allow reading results from already existing cached results
+    * @param update_ts_cache when reading, also update the ts-cache with the results
     * \return read ts-vector in the order of the ts_ids
     */
     ts_vector_t do_read(const id_vector_t& ts_ids,utcperiod p,bool use_ts_cached_read,bool update_ts_cache);
@@ -305,11 +315,11 @@ struct standard_dtss_dispatcher {
     /** Sequence of query keys to remove before passing the query map to the containers. */
     inline static const std::array<std::string, 1> remove_queries{{ container_query }};
 
-    /** \brief Create a new container into the server.
-     * \param  container_name  Name of the new container. Used to access the container.
-     * \param  container_type  Identifier of the container type to add.
-     * \param  root_path  Root path to where the container data is stored.
-     * \param  dtss_server  Dtss server instance the container is added to.
+    /** @brief Create a new container into the server.
+     * @param  container_name  Name of the new container. Used to access the container.
+     * @param  container_type  Identifier of the container type to add.
+     * @param  root_path  Root path to where the container data is stored.
+     * @param  dtss_server  Dtss server instance the container is added to.
      */
     static void create_container(
         const std::string & container_name,
@@ -382,20 +392,20 @@ struct utcperiod_hasher {
 
 // NOTE: The following methods may be implemented in-class, remove inline in that case.
 
-template < class ContainerDispatcher >
-inline ts_info_vector_t server<ContainerDispatcher>::do_find_ts(const std::string& search_expression) {
+template < class CD >
+inline ts_info_vector_t server<CD>::do_find_ts(const std::string& search_expression) {
     // 1. filter shyft://<container>/
     auto pattern = extract_shyft_url_container(search_expression);
     if ( pattern.size() > 0 ) {
         // assume it is a shyft url -> look for query flags
         auto queries = extract_shyft_url_query_parameters(search_expression);
-        auto container_query_it = queries.find(ContainerDispatcher::container_query);
+        auto container_query_it = queries.find(CD::container_query);
         if ( ! queries.empty() && container_query_it != queries.end() ) {
             auto container_query = container_query_it->second;
-            filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+            filter_shyft_url_parsed_queries(queries, CD::remove_queries);
             return internal(pattern, container_query).find(extract_shyft_url_path(search_expression), queries);
         } else {
-            filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+            filter_shyft_url_parsed_queries(queries, CD::remove_queries);
             return internal(pattern).find(extract_shyft_url_path(search_expression), queries);
         }
     } else if (find_ts_cb) {
@@ -406,20 +416,20 @@ inline ts_info_vector_t server<ContainerDispatcher>::do_find_ts(const std::strin
 }
 
 
-template < class ContainerDispatcher >
-inline ts_info server<ContainerDispatcher>::do_get_ts_info(const std::string & ts_name) {
+template < class CD >
+inline ts_info server<CD>::do_get_ts_info(const std::string & ts_name) {
     // 1. filter shyft://<container>/
     auto pattern = extract_shyft_url_container(ts_name);
     if ( pattern.size() > 0 ) {
         // assume it is a shyft url -> look for query flags
         auto queries = extract_shyft_url_query_parameters(ts_name);
-        auto container_query_it = queries.find(ContainerDispatcher::container_query);
+        auto container_query_it = queries.find(CD::container_query);
         if ( ! queries.empty() && container_query_it != queries.end() ) {
             auto container_query = container_query_it->second;
-             filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+             filter_shyft_url_parsed_queries(queries, CD::remove_queries);
             return internal(pattern, container_query).get_ts_info(extract_shyft_url_path(ts_name), queries);
         } else {
-            filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+            filter_shyft_url_parsed_queries(queries, CD::remove_queries);
             return internal(pattern).get_ts_info(extract_shyft_url_path(ts_name), queries);
         }
     } else {
@@ -428,17 +438,22 @@ inline ts_info server<ContainerDispatcher>::do_get_ts_info(const std::string & t
 }
 
 
-template < class ContainerDispatcher >
-inline void server<ContainerDispatcher>::do_cache_update_on_write(const ts_vector_t&tsv) {
+/** if overwrite on write, then flush the cache prior to writing */
+template < class CD >
+inline void server<CD>::do_cache_update_on_write(const ts_vector_t&tsv,bool overwrite_on_write) {
+    vector<string> ts_ids;ts_ids.reserve(tsv.size()); 
+    ts_vector_t tss;
     for (std::size_t i = 0; i < tsv.size(); ++i) {
         auto rts = dynamic_pointer_cast<aref_ts>(tsv[i].ts);
-        ts_cache.add(rts->id, apoint_ts(rts->rep));
+        ts_ids.emplace_back(rts->id);
+        tss.emplace_back(apoint_ts(rts->rep));
     }
+    ts_cache.add(ts_ids,tss,overwrite_on_write);
 }
 
 
-template < class ContainerDispatcher >
-inline void server<ContainerDispatcher>::do_store_ts(const ts_vector_t & tsv, bool overwrite_on_write, bool cache_on_write) {
+template < class CD >
+inline void server<CD>::do_store_ts(const ts_vector_t & tsv, bool overwrite_on_write, bool cache_on_write) {
     if(tsv.size()==0) return;
     // 1. filter out all shyft://<container>/<ts-path> elements
     //    and route these to the internal storage controller (threaded)
@@ -454,10 +469,10 @@ inline void server<ContainerDispatcher>::do_store_ts(const ts_vector_t & tsv, bo
         auto c = extract_shyft_url_container(rts->id);
         if( c.size() > 0 ) {
             auto queries = extract_shyft_url_query_parameters(rts->id);
-            auto container_query_it = queries.find(ContainerDispatcher::container_query);
+            auto container_query_it = queries.find(CD::container_query);
             if ( ! queries.empty() && container_query_it != queries.end() ) {
                 auto container_query = container_query_it->second;
-                filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+                filter_shyft_url_parsed_queries(queries, CD::remove_queries);
                 internal(c, container_query).save(
                     extract_shyft_url_path(rts->id),  // path
                     rts->core_ts(),      // ts to save
@@ -465,7 +480,7 @@ inline void server<ContainerDispatcher>::do_store_ts(const ts_vector_t & tsv, bo
                     queries              // query key/values from url
                 );
             } else {
-                filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+                filter_shyft_url_parsed_queries(queries, CD::remove_queries);
                 internal(c).save(
                     extract_shyft_url_path(rts->id),  // path
                     rts->core_ts(),      // ts to save
@@ -474,6 +489,8 @@ inline void server<ContainerDispatcher>::do_store_ts(const ts_vector_t & tsv, bo
                 );
             }
             if ( cache_on_write ) { // ok, this ends up in a copy, and lock for each item(can be optimized if many)
+                if(overwrite_on_write)
+                    ts_cache.remove(rts->id);//invalidate previous defs. if any
                 ts_cache.add(rts->id, apoint_ts(rts->rep));
             }
         } else {
@@ -486,19 +503,19 @@ inline void server<ContainerDispatcher>::do_store_ts(const ts_vector_t & tsv, bo
     if(store_ts_cb && other.size()) {
         if(other.size()==tsv.size()) { //avoid copy/move if possible
             store_ts_cb(tsv);
-            if (cache_on_write) do_cache_update_on_write(tsv);
+            if (cache_on_write) do_cache_update_on_write(tsv,overwrite_on_write);
         } else { // have to do a copy to new vector
             ts_vector_t r;
             for(auto i:other) r.push_back(tsv[i]);
             store_ts_cb(r);
-            if (cache_on_write) do_cache_update_on_write(r);
+            if (cache_on_write) do_cache_update_on_write(r,overwrite_on_write);
         }
     }
 }
 
 
-template < class ContainerDispatcher >
-inline void server<ContainerDispatcher>::do_merge_store_ts(const ts_vector_t& tsv, bool cache_on_write) {
+template < class CD >
+inline void server<CD>::do_merge_store_ts(const ts_vector_t& tsv, bool cache_on_write) {
     if ( tsv.size() == 0 )
         return;
 
@@ -549,8 +566,8 @@ inline void server<ContainerDispatcher>::do_merge_store_ts(const ts_vector_t& ts
 }
 
 
-template < class ContainerDispatcher >
-inline ts_vector_t server<ContainerDispatcher>::do_read(const id_vector_t & ts_ids, utcperiod p, bool use_ts_cached_read, bool update_ts_cache) {
+template < class CD >
+inline ts_vector_t server<CD>::do_read(const id_vector_t & ts_ids, utcperiod p, bool use_ts_cached_read, bool update_ts_cache) {
     if( ts_ids.size() == 0 )
         return ts_vector_t{};
 
@@ -578,14 +595,14 @@ inline ts_vector_t server<ContainerDispatcher>::do_read(const id_vector_t & ts_i
                 if ( c.size() > 0 ) {
                     // check for queries in shyft:// url's
                     auto queries = extract_shyft_url_query_parameters(ts_ids[i]);
-                    auto container_query_it = queries.find(ContainerDispatcher::container_query);
+                    auto container_query_it = queries.find(CD::container_query);
                     if ( ! queries.empty() && container_query_it != queries.end() ) {
                         auto container_query = container_query_it->second;
-                        filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+                        filter_shyft_url_parsed_queries(queries, CD::remove_queries);
                         results[i] = apoint_ts(make_shared<gpoint_ts>(internal(c, container_query).read(
                             extract_shyft_url_path(ts_ids[i]), p, queries)));
                     } else {
-                        filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
+                        filter_shyft_url_parsed_queries(queries, CD::remove_queries);
                         results[i] = apoint_ts(make_shared<gpoint_ts>(internal(c).read(
                             extract_shyft_url_path(ts_ids[i]), p, queries)));
                     }
@@ -633,8 +650,8 @@ inline ts_vector_t server<ContainerDispatcher>::do_read(const id_vector_t & ts_i
 }
 
 
-template < class ContainerDispatcher >
-inline void server<ContainerDispatcher>::do_bind_ts(utcperiod bind_period, ts_vector_t& atsv, bool use_ts_cached_read, bool update_ts_cache) {
+template < class CD >
+inline void server<CD>::do_bind_ts(utcperiod bind_period, ts_vector_t& atsv, bool use_ts_cached_read, bool update_ts_cache) {
 
     using shyft::time_series::dd::ts_bind_info;
 
@@ -674,23 +691,23 @@ inline void server<ContainerDispatcher>::do_bind_ts(utcperiod bind_period, ts_ve
 }
 
 
-template < class ContainerDispatcher >
-inline ts_vector_t server<ContainerDispatcher>::do_evaluate_ts_vector(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache) {
+template < class CD >
+inline ts_vector_t server<CD>::do_evaluate_ts_vector(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache) {
     do_bind_ts(bind_period, atsv, use_ts_cached_read, update_ts_cache);
     return ts_vector_t{ shyft::time_series::dd::deflate_ts_vector<apoint_ts>(atsv) };
 }
 
 
-template < class ContainerDispatcher >
-inline ts_vector_t server<ContainerDispatcher>::do_evaluate_percentiles(utcperiod bind_period, ts_vector_t& atsv, gta_t const&ta, std::vector<int64_t> const& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
+template < class CD >
+inline ts_vector_t server<CD>::do_evaluate_percentiles(utcperiod bind_period, ts_vector_t& atsv, gta_t const&ta, std::vector<int64_t> const& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
     do_bind_ts(bind_period, atsv,use_ts_cached_read,update_ts_cache);
     std::vector<int64_t> p_spec;for(const auto p:percentile_spec) p_spec.push_back(int(p));// convert
     return percentiles(atsv, ta, p_spec);// we can assume the result is trivial to serialize
 }
 
 
-template < class ContainerDispatcher >
-inline void server<ContainerDispatcher>::do_remove_ts(const std::string & ts_url) {
+template < class CD >
+inline void server<CD>::do_remove_ts(const std::string & ts_url) {
     if ( ! can_remove ) {
         throw std::runtime_error("dtss::server: server does not support removing");
     }
@@ -700,23 +717,25 @@ inline void server<ContainerDispatcher>::do_remove_ts(const std::string & ts_url
     if ( pattern.size() > 0 ) {
         // assume it is a shyft url -> look for query flags
         auto queries = extract_shyft_url_query_parameters(ts_url);
-        auto container_query_it = queries.find(ContainerDispatcher::container_query);
+        auto container_query_it = queries.find(CD::container_query);
+        auto shyft_ts_url = extract_shyft_url_path(ts_url);
         if ( ! queries.empty() && container_query_it != queries.end() ) {
             auto container_query = container_query_it->second;
-            filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
-            internal(pattern, container_query).remove(extract_shyft_url_path(ts_url), queries);
+            filter_shyft_url_parsed_queries(queries, CD::remove_queries);
+            internal(pattern, container_query).remove(shyft_ts_url, queries);
         } else {
-            filter_shyft_url_parsed_queries(queries, ContainerDispatcher::remove_queries);
-            internal(pattern).remove(extract_shyft_url_path(ts_url), queries);
+            filter_shyft_url_parsed_queries(queries, CD::remove_queries);
+            internal(pattern).remove(shyft_ts_url, queries);
         }
+        ts_cache.remove(shyft_ts_url);// remove it from cache as well!
     } else {
         throw std::runtime_error("dtss::server: server does not allow removing for non shyft-url type data");
     }
 }
 
 
-template < class ContainerDispatcher >
-inline void server<ContainerDispatcher>::on_connect(
+template < class CD >
+inline void server<CD>::on_connect(
     std::istream & in,
     std::ostream & out,
     const std::string & foreign_ip,

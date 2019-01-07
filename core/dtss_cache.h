@@ -494,21 +494,22 @@ namespace shyft {
                 internal_add(id, ts);
             }
 
-            /** \brief add a vector of time-series to cache
+            /** @brief add a vector of time-series to cache
              *
              * Ensures size of ids and tss are equal, then iterate over the pairs
              * and add/replace those items to cache in the ascending index order.
              *
-             * \param ids a vector of valid time-series identifiers
-             * \param tss a vector with time-series corresponding by position to ids
-             *
+             * @param ids a vector of valid time-series identifiers
+             * @param tss a vector with time-series corresponding by position to ids
+             * @param replace if true, then flush cache, and replace
              */
             template<typename TSV>
-            void add(const vector<string>& ids, const TSV& tss) {
+            void add(const vector<string>& ids, const TSV& tss, bool replace=false) {
                 if (ids.size()!=tss.size())
                     throw runtime_error("attempt to add mismatched size for ts-ids and ts to cache");
                 lock_guard<mutex> guard(mx);
                 for (size_t i = 0; i<ids.size(); ++i) {
+                    if(replace) c.remove_item(ids[i]);
                     internal_add(ids[i], tss[i]);
                 }
             }

@@ -358,13 +358,10 @@ TEST_CASE("dlib_server_basics") {
 
         // set up the server object we have made
         our_server.set_listening_ip("127.0.0.1");
-        int port_no = 20000;
-        our_server.set_listening_port(port_no);
-        our_server.start_async();
-        //while(our_server.is_running()&& our_server.get_listening_port()==0) //because dlib do not guarantee that listening port is set
-        //    std::this_thread::sleep_for(std::chrono::milliseconds(3)); // upon return, so we have to wait until it's done
-
-        //int port_no=our_server.get_listening_port();
+        //int port_no = 20000;
+        //our_server.set_listening_port(port_no);
+        int port_no = our_server.start_server();
+        dlog<<dlib::LINFO<<"Serving connection @"<<port_no;
         {
             string host_port = string("localhost:") + to_string(port_no);
             dlog << dlib::LINFO << "sending an expression ts to " << host_port ;
@@ -409,6 +406,95 @@ TEST_CASE("dlib_server_basics") {
     dlog << dlib::LINFO << "done";
 }
 
+TEST_CASE("dlib_server_cache_update") {
+    //
+    // This test is the the very special case that custom-made reader-callbacks returns back
+    // time-series with different resolution etc. if the time-series is not found (instead of fail/exception)
+    // This was failing in those cases where the next sequent cached write operation ended up in
+    // a cache merge, with incompatible time-series.
+    // This should however work, given that the user passes the overwrite flag, meaning replace
+    // the whole time-series. The cache should then be replaced for those items.
+    //
+    // this test was constructed so that the initial case reported was failing, 
+    // then fix added, and now working ok.
+    //
+    using namespace shyft::dtss;
+    try {
+        // Tell the server to begin accepting connections.
+        calendar utc;
+        auto t = utc.time(2016, 1, 1);
+        auto dt = deltahours(1);
+        auto dt24 = deltahours(24);
+        int n = 240;
+        int n24 = n / 24;
+        time_axis::fixed_dt ta(t, dt, n);
+        gta_t ta24(t, dt24, n24);
+        bool return_nan_24 = true;
+        map<string,ts_vector_t::value_type> memory_store;
+
+        read_call_back_t cb = [ta,ta24, &return_nan_24](id_vector_t ts_ids, core::utcperiod p)
+            ->ts_vector_t {
+            ts_vector_t r; r.reserve(ts_ids.size());
+            double fv = 1.0;
+            auto dt=return_nan_24?deltahours(24):deltahours(1);
+            gta_t rta{p.start,dt,static_cast<size_t>(1u+p.timespan()/dt)};
+            for (size_t i = 0; i < ts_ids.size(); ++i){
+                if(return_nan_24) r.emplace_back(rta,shyft::nan);
+                else r.emplace_back(rta, fv += 1.0);
+            }
+            return r;
+        };
+        find_call_back_t fcb = [&memory_store](std::string search_expression)
+            ->ts_info_vector_t {
+            ts_info_vector_t r;
+            std::regex re(search_expression);
+            auto match_end = std::sregex_iterator();
+            for (auto const&kv : memory_store) {
+                string tsn{kv.first};
+                if (std::sregex_iterator(tsn.begin(), tsn.end(), re)!= match_end) {
+                    ts_info tsi; tsi.name = tsn;
+                    r.push_back(tsi);
+                }
+            }
+            return r;
+        };
+        store_call_back_t scb=[&memory_store](const ts_vector_t& tsv)->void {
+            for(auto const& ts:tsv) 
+                memory_store[ts.id()]=ts;
+        };
+        
+        server<standard_dtss_dispatcher> our_server(cb,fcb,scb);
+        our_server.set_listening_ip("127.0.0.1");
+        our_server.set_auto_cache(true);// special for this case
+        int port_no = our_server.start_server();
+        {
+            string host_port = string("localhost:") + to_string(port_no);
+            std::vector<apoint_ts> tsl;
+            std::vector<apoint_ts> tsv_store;
+            for (size_t kb = 4;kb < 16;kb += 2) {
+                auto ts_url=string("netcdf://group/path/ts") + std::to_string(kb);
+                tsl.push_back(mk_expression(t, dt, kb * 1000)*apoint_ts(ts_url));
+                tsv_store.push_back(apoint_ts(ts_url,apoint_ts(ta,double(kb),shyft::time_series::POINT_AVERAGE_VALUE)));
+            }
+            client dtss(host_port);
+            auto p_r=ta.period(0);
+            p_r.start -= deltahours(24);// subtract 1 day so that we read slighly before, next write will cause merge(not replace)
+            auto ts_b = dtss.evaluate(tsl, p_r,true,false);
+            dtss.store_ts(tsv_store, true, true); // store these time-series, cache on store
+            FAST_CHECK_EQ(memory_store.size(),tsv_store.size());
+            return_nan_24=false;// return other values, not nans
+            dtss.evaluate(tsl, ta.period(0),true,false);
+            FAST_REQUIRE_UNARY(our_server.is_running());
+            dtss.close();
+            our_server.clear();
+        }
+    } catch (exception& e) {
+        cout << e.what() << endl;
+        CHECK_MESSAGE(false,"The server throw exception, test failed");
+    }
+}
+
+
 TEST_CASE("dlib_multi_server_basics") {
     dlog.set_level(dlib::LALL);
     dlib::set_all_logging_output_streams(std::cout);
@@ -436,14 +522,13 @@ TEST_CASE("dlib_multi_server_basics") {
         size_t n_servers=2;
         vector<unique_ptr<server<standard_dtss_dispatcher>>> servers;
         vector<string> host_ports;
-        int base_port=21000;
         for(size_t i=0;i<n_servers;++i) {
             auto srv = make_unique<server<standard_dtss_dispatcher>>(rcb);
             srv->set_listening_ip("127.0.0.1");
-            srv->set_listening_port(base_port +i);
-            srv->start_async();
+            //srv->set_listening_port(base_port +i);
+            int port_no=srv->start_server();
             servers.emplace_back(move(srv));
-            host_ports.push_back(string("localhost:") + to_string(base_port + i));
+            host_ports.push_back(string("localhost:") + to_string(port_no));
         }
         {
             dlog << dlib::LINFO << "sending permutation of an expression sizes/vectors ts to "<<n_servers<< " hosts" ;
@@ -514,9 +599,7 @@ TEST_CASE("dlib_server_performance") {
 
         // set up the server object we have made
         our_server.set_listening_ip("127.0.0.1");
-        int port_no = 20000;
-        our_server.set_listening_port(port_no);
-        our_server.start_async();
+        int port_no = our_server.start_server();
         size_t n_threads = 1;
 
         vector<future<void>> clients;
@@ -591,16 +674,13 @@ TEST_CASE("dtss_store") { /*
     int n = 24 * 365 * 2;//24*365*5;
 
     // make dtss server
-    auto tmpdir = fs::temp_directory_path()/"shyft.c.test";
+    auto tmpdir = fs::temp_directory_path()/("shyft.c.test"+std::to_string(std::hash<std::thread::id>()(std::this_thread::get_id())));
     server<standard_dtss_dispatcher> our_server{};
     string tc{"tc"};
     our_server.add_container(tc,tmpdir.string());
     our_server.set_listening_ip("127.0.0.1");
-    int port_no = 20000;
+    int port_no=our_server.start_server();
     string host_port = string("localhost:") + to_string(port_no);
-
-    our_server.set_listening_port(port_no);
-    our_server.start_async();
     // make corresponding client that we will use for the test.
     client dtss(host_port);
     SUBCASE("save_find_read") {
@@ -1055,13 +1135,11 @@ TEST_CASE("dtss_server_query_to_containers") {
     using test_server_t = shyft::dtss::server<query_test_dtss_dispatcher>;
     using queries_t = std::map<std::string, std::string>;
 
-    const int port = 40336;
     const std::string container{"container"};
 
     test_server_t srv{};
-    srv.set_listening_port(port);
     srv.add_container(container, "foo/bar/00");  // same as "first"
-    srv.start_async();
+    const int port =srv.start_server();
 
     shyft::dtss::client cli{ std::string{"localhost:"} + std::to_string(port) };
 
@@ -1240,13 +1318,10 @@ TEST_CASE("dtss_server_with_multiple_containers") {
     using test_server_t = shyft::dtss::server<multicontainer_test_dtss_dispatcher>;
     using queries_t = std::map<std::string, std::string>;
 
-    const int port = 40336;
-
     test_server_t srv{};
-    srv.set_listening_port(port);
     srv.add_container("container", "foo/bar/first", "first");
     srv.add_container("container", "foo/bar/second", "second");
-    srv.start_async();
+    const int port=srv.start_server();
 
     shyft::dtss::client cli{ std::string{"localhost:"} + std::to_string(port) };
 
