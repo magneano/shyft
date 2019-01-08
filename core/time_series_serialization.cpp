@@ -645,6 +645,7 @@ x_serialize_implement(shyft::time_series::dd::krls_interpolation_ts);
 
 x_serialize_implement(shyft::time_series::dd::ats_vector);
 x_serialize_implement(shyft::time_series::dd::qac_ts);
+x_serialize_implement(shyft::time_series::dd::qac_parameter);
 x_serialize_implement(shyft::time_series::dd::inside_ts);
 x_serialize_implement(shyft::time_series::dd::decode_ts);
 
@@ -722,6 +723,7 @@ x_arch(shyft::time_series::dd::apoint_ts);
 x_arch(shyft::time_series::dd::krls_interpolation_ts);
 x_arch(shyft::time_series::dd::ats_vector);
 x_arch(shyft::time_series::dd::qac_ts);
+x_arch(shyft::time_series::dd::qac_parameter);
 x_arch(shyft::time_series::dd::inside_ts);
 x_arch(shyft::time_series::dd::decode_ts);
 
