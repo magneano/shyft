@@ -1402,7 +1402,7 @@ namespace shyft {
 
             utctimespan repeat_timespan{ utctimespan::zero() };
             double repeat_tolerance{1e-2};
-            std::vector<double> repeat_allowed{};
+            std::vector<double> allowed_repeating{};
 
             // ----- linear interpolation correction
 
@@ -1524,7 +1524,7 @@ namespace shyft {
                 return (
                     max_scan_timespan == o.max_scan_timespan
                     && nan_equal(min_x, o.min_x, abs_e) && nan_equal(max_x, o.max_x, abs_e)
-                    && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e) && repeat_allowed == o.repeat_allowed
+                    && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e) && allowed_repeating == o.allowed_repeating
                     && nan_equal(constant_filler, o.constant_filler, abs_e)
                 );
             }

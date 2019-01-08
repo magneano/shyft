@@ -1328,7 +1328,14 @@ namespace shyft{
 
                 // after the first value
                 if ( i > 0u ) {
-                    if ( ::fabs(previous_value - value) <= this->p.repeat_tolerance ) {
+                    if (
+                            std::abs(previous_value - value) <= this->p.repeat_tolerance
+                            && ! std::count_if(
+                                this->p.allowed_repeating.cbegin(), this->p.allowed_repeating.cend(), [&value, this](double v) -> bool {
+                                    return std::abs(v - value) <= this->p.repeat_tolerance;
+                                }
+                            ) > 0
+                    ) {
                         // value close to previous
                         if ( repeat_counter == 0u ) {
                             repeat_counter = 1u;
