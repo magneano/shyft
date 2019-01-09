@@ -98,6 +98,7 @@ namespace shyft {
             //struct state {}; // No state variables for this method
 
             struct response {
+                /// TODO: here should be only K, L and net
                 double dir_radiation = 0.0; // direct beam
                 double dif_radiation = 0.0; // diffuse
                 double ref_radiation = 0.0; // reflected
@@ -257,10 +258,12 @@ namespace shyft {
                  * \param rhumidity, [persent] -- relative humidity
                  * \param ss_temp, [K] -- surface temperature
                  * response.lw_radiation W/m^2 */
+                 /// TODO https://www.hydrol-earth-syst-sci.net/17/1331/2013/hess-17-1331-2013-supplement.pdf
+                 // TODO discuss the option to have different formulations here.
                 void lw_radiation(R &response, double temperature, double rhumidity){
                     double Lin = 2.7*actual_vp(temperature,rhumidity)+0.245*temperature-45.14;
                     double ss_temp = min(temperature-2.5,273.16);
-                    double epsilon_ss = 0.95;//water
+                    double epsilon_ss = 0.95;//water TODO: as parameter
                     double Lout = epsilon_ss*sigma*pow(ss_temp,4)+(1-epsilon_ss)*Lin;
                     response.lw_radiation = (Lin-Lout)*MJm2d2Wm2;
                     return;
@@ -278,10 +281,6 @@ namespace shyft {
                 double ra_ = 0.0; // extraterrestrial solar radiation for inclined surface[W/m2]
                 double rahor_ = 0.0; // extraterrestrial solar radiation for horizontal surfaces
 
-//                const double gsc = 1367; // W/m2 -- solar constant
-//                const double Pa2kPa = 0.001; // Pa to kPa
-//                const double deg2rad = pi / 180; // degrees to radians
-//                const double rad2deg = 180 / pi; // rad to deg
                 calendar utc;
                 double doy_; // day of the yearI
                 double lt_; // local time

@@ -7,7 +7,7 @@ set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_tes
     region_model_test.cpp routing_test.cpp runner.cpp sceua_test.cpp serialization_test.cpp skaugen_test.cpp time_axis_test.cpp 
     time_series_average_test.cpp time_series_fixup_test.cpp time_series_test.cpp utctime_utilities_test.cpp hbv_physical_snow_test.cpp
     pt_hps_k_test.cpp test_ice_packing.cpp dtss_stress_test.cpp dtss_mutex_test.cpp time_series_decode_test.cpp time_series_derivative_test.cpp
-    dtss_db_test.cpp dtss_url_test.cpp dtss_krls_pred_db_test.cpp radiation_test.cpp radiation_ts_test.cpp
+    dtss_db_test.cpp dtss_url_test.cpp dtss_krls_pred_db_test.cpp radiation_test.cpp radiation_ts_test.cpp evapotranspiration_test.cpp
 )
 
 set(target "test_shyft")
@@ -71,4 +71,5 @@ set(target "test_shyft")
     add_test(dtss_krls_pred_db ${target} -nv --test_suite=dtss_krls_pred_db)
     add_test(radiation_test ${target} -nv --test_suite=radiation)
     add_test(radiation_ts_test ${target} -nv --test_suite=radiation_ts)
+    add_test(evapotranspiration_test ${target} -nv --test_suite=evapotranspiration)
 
