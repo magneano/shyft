@@ -119,7 +119,7 @@ namespace shyft { namespace time_series { namespace dd {
         o_index<ice_packing_ts>,
         o_index<ice_packing_recession_ts>,
         o_index<krls_interpolation_ts>,
-        o_index<qac_ts>,
+        o_index<qac_ts<qac_min_max_parameter>>,
         o_index<inside_ts>,
         o_index<decode_ts>,
         o_index<derivative_ts>
@@ -299,14 +299,20 @@ namespace shyft { namespace time_series { namespace dd {
         };
         template<> struct _type<krls_interpolation_ts> { using rep_t = srep::skrls_interpolation_ts; };
 
-        struct sqac_ts {
-            using ts_t = qac_ts;
+        struct sqac_min_max_ts_fill_ts {
+            using ts_t = qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>;
             a_index ts;
-            a_index cts;
-            qac_parameter p;
-            bool operator==(const sqac_ts& o) const { return ts == o.ts && cts == o.cts && p.equal(o.p, 1e-10); } //
+            qac_ts_fill_parameters fp; 
+            qac_min_max_parameter qap;
+            bool operator==(const sqac_min_max_ts_fill_ts & o) const {
+                return ts == o.ts && fp.equal(o.fp, 1e-10) && qap.equal(o.qap, 1e-10);
+            }
+            x_serialize_decl();// needed because of fp (when type is qac_ts_fill_parameters)
+
         };
-        template<> struct _type<qac_ts> { using rep_t = srep::sqac_ts; };
+        template<> struct _type<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>> {
+            using rep_t = srep::sqac_min_max_ts_fill_ts;
+        };
         
         struct sinside_ts {
             using ts_t = inside_ts;
@@ -711,7 +717,7 @@ namespace shyft { namespace time_series { namespace dd {
     /**convinient macro to use for all know types, use as parameter-pack to ts_exp_rep, etc.*/
 #define all_srep_types  srep::sbinop_op_ts, srep::sbinop_ts_scalar, srep::sbin_op_scalar_ts, srep::sabs_ts, srep::saverage_ts, srep::sintegral_ts, srep::saccumulate_ts, \
             srep::stime_shift_ts, srep::speriodic_ts, srep::sconvolve_w_ts, srep::sextend_ts, srep::srating_curve_ts, srep::sice_packing_ts, srep::sice_packing_recession_ts, \
-            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts
+            srep::skrls_interpolation_ts, srep::sqac_min_max_ts_fill_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts
 
     typedef ts_expression<all_srep_types> compressed_ts_expression;
     typedef ts_expression_compressor<all_srep_types> expression_compressor;
@@ -727,7 +733,6 @@ x_serialize_binary(shyft::time_series::dd::srep::sbin_op_scalar_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sabs_ts);
 x_serialize_binary(shyft::time_series::dd::srep::stime_shift_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sextend_ts);
-x_serialize_binary(shyft::time_series::dd::srep::sqac_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sinside_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sdecode_ts);
 
@@ -741,6 +746,7 @@ x_serialize_export_key(shyft::time_series::dd::srep::srating_curve_ts);
 x_serialize_export_key(shyft::time_series::dd::srep::sice_packing_ts);
 x_serialize_export_key(shyft::time_series::dd::srep::sice_packing_recession_ts);
 x_serialize_export_key(shyft::time_series::dd::srep::skrls_interpolation_ts);
+x_serialize_export_key(shyft::time_series::dd::srep::sqac_min_max_ts_fill_ts);
 
 // annoying.. (could we just say binary serializable for all o_index<T>)
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::abin_op_ts>);
@@ -761,7 +767,9 @@ x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ratin
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ice_packing_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ice_packing_recession_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::krls_interpolation_ts>);
-x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::qac_ts>);
+// need aliases to work around the non-variadic macros used by boost serialize
+using qac_ts_min_max_ts_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_ts_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
+x_serialize_binary(shyft::time_series::dd::o_index<qac_ts_min_max_ts_fill_alias>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::inside_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::decode_ts>);
 x_serialize_binary(boost::blank);

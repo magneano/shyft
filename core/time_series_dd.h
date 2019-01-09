@@ -1379,186 +1379,193 @@ namespace shyft {
             return fabs(a-b) <= abs_e;
         }
 
-        struct qac_ts;  // forward declare to use as argument for quality control
+        // ================================================================================
 
-        /** \brief quality and correction parameters
+        // /** \brief quality and correction parameters
+        //  *
+        //  *  Controls how we consider the quality of the time-series,
+        //  *  and in what condition to give up to put in a correction value.
+        //  *
+        //  */
+        // struct qac_parameter {
+        //     bool nan_qa_enabled{false};        ///< Whether NaN QA is enabled.
+        //     bool infinity_qa_enabled{false};   ///< Whether +/- inf QA is enabled.
+        //     bool min_max_qa_enabled{false};    ///< Wheher min/max value QA is enabled.
+        //     bool repeating_qa_enabled{false};  ///< Whether repeating value QA is enabled.
+        // 
+        //     // ----- min/max qa
+        // 
+        //     double min_x{shyft::nan};    ///< Minimum allowed value, inclusive.
+        //     double max_x{shyft::nan};    ///< Maximum allowed value, inclusive.
+        // 
+        //     // ----- repeating values qa
+        // 
+        //     utctimespan repeat_timespan{ utctimespan::zero() };
+        //     double repeat_tolerance{1e-2};
+        //     std::vector<double> allowed_repeating{};
+        // 
+        //     // ----- linear interpolation correction
+        // 
+        //     utctimespan max_scan_timespan{max_utctime};  ///< Max timespan to scan for next/previous valid values during infill.
+        // 
+        //     // ----- constant filling correction
+        // 
+        //     double constant_filler{shyft::nan};
+        // 
+        //     // ----------
+        // 
+        //     qac_parameter()=default;
+        // 
+        //     // ----------
+        // 
+        //     static qac_parameter create_min_max_no_fill_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x) {
+        //         return qac_parameter{
+        //             nan_qa, infinite_qa, true, false,  // qa modes
+        //             min_x, max_x,                      // min/max parameters
+        //             utctimespan::zero(), 0., { },      // repeat parameters
+        //             utctime::zero(),                   // linear_interpolation parameters
+        //             shyft::nan                         // constant filling parameters
+        //         };
+        //     }
+        //     static qac_parameter create_min_max_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x, utctimespan scan_span) {
+        //         return qac_parameter{
+        //             nan_qa, infinite_qa, true, false,  // qa modes
+        //             min_x, max_x,                      // min/max parameters
+        //             utctimespan::zero(), 0., { },      // repeat parameters
+        //             scan_span,                         // linear_interpolation parameters
+        //             shyft::nan                         // constant filling parameters
+        //         };
+        //     }
+        //     static qac_parameter create_min_max_constant_fill_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x, double constant_filler) {
+        //         return qac_parameter{
+        //             nan_qa, infinite_qa, true, false,  // qa modes
+        //             min_x, max_x,                      // min/max parameters
+        //             utctimespan::zero(), 0., { },      // repeat parameters
+        //             utctime::zero(),                   // linear_interpolation parameters
+        //             constant_filler                    // constant filling parameters
+        //         };
+        //     }
+        // 
+        //     static qac_parameter create_repeating_no_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, const std::vector<double> & allowed_repeating) {
+        //         return qac_parameter{
+        //             nan_qa, infinite_qa, false, true,            // qa modes
+        //             shyft::nan, shyft::nan,                      // min/max parameters
+        //             repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
+        //             utctime::zero(),                             // linear_interpolation parameters
+        //             shyft::nan                                   // constant filling parameters
+        //         };
+        //     }
+        //     static qac_parameter create_repeating_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, utctimespan scan_span, const std::vector<double> & allowed_repeating) {
+        //         return qac_parameter{
+        //             nan_qa, infinite_qa, false, true,            // qa modes
+        //             shyft::nan, shyft::nan,                      // min/max parameters
+        //             repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
+        //             scan_span,                                   // linear_interpolation parameters
+        //             shyft::nan                                   // constant filling parameters
+        //         };
+        //     }
+        //     static qac_parameter create_repeating_constant_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, double constant_filler, const std::vector<double> & allowed_repeating) {
+        //         return qac_parameter{
+        //             nan_qa, infinite_qa, false, true,            // qa modes
+        //             shyft::nan, shyft::nan,                      // min/max parameters
+        //             repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
+        //             utctime::zero(),                             // linear_interpolation parameters
+        //             constant_filler                              // constant filling parameters
+        //         };
+        //     }
+        // 
+        //     // ----------
+        // 
+        //     /* Return true is the parameter block is set up with valid linear interpolation parameters. **/
+        //     bool can_do_linear_interpolation() const noexcept {
+        //         return this->max_scan_timespan.count() > 0;
+        //     }
+        // 
+        //     /** Check QA fo a value using the set config. */
+        //     bool is_ok_quality(std::size_t i, double x, const qac_ts & ts) const noexcept {
+        //         bool ok = true;
+        // 
+        //         if ( this->nan_qa_enabled )
+        //             ok &= ( ! ::isnan(x));
+        // 
+        //         if ( ok && this->infinity_qa_enabled )
+        //             ok &= ( ! ::isinf(x));
+        // 
+        //         if ( ok && this->min_max_qa_enabled )
+        //             ok &= this->is_ok_min_max(x);
+        // 
+        //         if ( ok && this->repeating_qa_enabled )
+        //             ok &= this->is_ok_repeating(i, ts);
+        // 
+        //         return ok;
+        //     }
+        // 
+        //     /** Check a value using the min/max QA config. */
+        //     bool is_ok_min_max(double x) const noexcept {
+        //         if ( ::isnan(x) ) {
+        //             return false;
+        //         }
+        // 
+        //         if ( ::isfinite(min_x) && x < min_x ) {
+        //             return false;
+        //         }
+        //         if ( ::isfinite(max_x) && x > max_x ) {
+        //             return false;
+        //         }
+        // 
+        //         return true;
+        //     }
+        // 
+        //     /** Check for repetitions around a index */
+        //     bool is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept;
+        // 
+        //     /** Is the parameter block equal to another parameter block, within a tolerance. */
+        //     bool equal(const qac_parameter& o, double abs_e=1e-9) const {
+        //         return (
+        //             max_scan_timespan == o.max_scan_timespan
+        //             && nan_equal(min_x, o.min_x, abs_e) && nan_equal(max_x, o.max_x, abs_e)
+        //             && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e) && allowed_repeating == o.allowed_repeating
+        //             && nan_equal(constant_filler, o.constant_filler, abs_e)
+        //         );
+        //     }
+        // 
+        //     x_serialize_decl();
+        // };
+
+        /** \brief The qac_ts is used for doing quality and correction to a ts.
          *
-         *  Controls how we consider the quality of the time-series,
-         *  and in what condition to give up to put in a correction value.
+         * Given a source ts, apply qac criteria, and replace flagged values with
+         * corrections as specified by the parameters, or the optional supplied replacement ts.
          *
          */
-        struct qac_parameter {
-            bool nan_qa_enabled{false};        ///< Whether NaN QA is enabled.
-            bool infinity_qa_enabled{false};   ///< Whether +/- inf QA is enabled.
-            bool min_max_qa_enabled{false};    ///< Wheher min/max value QA is enabled.
-            bool repeating_qa_enabled{false};  ///< Whether repeating value QA is enabled.
-
-            // ----- min/max qa
-
-            double min_x{shyft::nan};    ///< Minimum allowed value, inclusive.
-            double max_x{shyft::nan};    ///< Maximum allowed value, inclusive.
-
-            // ----- repeating values qa
-
-            utctimespan repeat_timespan{ utctimespan::zero() };
-            double repeat_tolerance{1e-2};
-            std::vector<double> allowed_repeating{};
-
-            // ----- linear interpolation correction
-
-            utctimespan max_scan_timespan{max_utctime};  ///< Max timespan to scan for next/previous valid values during infill.
-
-            // ----- constant filling correction
-
-            double constant_filler{shyft::nan};
-
-            // ----------
-
-            qac_parameter()=default;
-
-            // ----------
-
-            static qac_parameter create_min_max_no_fill_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x) {
-                return qac_parameter{
-                    nan_qa, infinite_qa, true, false,  // qa modes
-                    min_x, max_x,                      // min/max parameters
-                    utctimespan::zero(), 0., { },      // repeat parameters
-                    utctime::zero(),                   // linear_interpolation parameters
-                    shyft::nan                         // constant filling parameters
-                };
-            }
-            static qac_parameter create_min_max_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x, utctimespan scan_span) {
-                return qac_parameter{
-                    nan_qa, infinite_qa, true, false,  // qa modes
-                    min_x, max_x,                      // min/max parameters
-                    utctimespan::zero(), 0., { },      // repeat parameters
-                    scan_span,                         // linear_interpolation parameters
-                    shyft::nan                         // constant filling parameters
-                };
-            }
-            static qac_parameter create_min_max_constant_fill_parameters(bool nan_qa, bool infinite_qa, double min_x, double max_x, double constant_filler) {
-                return qac_parameter{
-                    nan_qa, infinite_qa, true, false,  // qa modes
-                    min_x, max_x,                      // min/max parameters
-                    utctimespan::zero(), 0., { },      // repeat parameters
-                    utctime::zero(),                   // linear_interpolation parameters
-                    constant_filler                    // constant filling parameters
-                };
-            }
-
-            static qac_parameter create_repeating_no_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, const std::vector<double> & allowed_repeating) {
-                return qac_parameter{
-                    nan_qa, infinite_qa, false, true,            // qa modes
-                    shyft::nan, shyft::nan,                      // min/max parameters
-                    repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
-                    utctime::zero(),                             // linear_interpolation parameters
-                    shyft::nan                                   // constant filling parameters
-                };
-            }
-            static qac_parameter create_repeating_linear_interpolation_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, utctimespan scan_span, const std::vector<double> & allowed_repeating) {
-                return qac_parameter{
-                    nan_qa, infinite_qa, false, true,            // qa modes
-                    shyft::nan, shyft::nan,                      // min/max parameters
-                    repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
-                    scan_span,                                   // linear_interpolation parameters
-                    shyft::nan                                   // constant filling parameters
-                };
-            }
-            static qac_parameter create_repeating_constant_fill_parameters(bool nan_qa, bool infinite_qa, utctimespan repeat_span, double repeat_tol, double constant_filler, const std::vector<double> & allowed_repeating) {
-                return qac_parameter{
-                    nan_qa, infinite_qa, false, true,            // qa modes
-                    shyft::nan, shyft::nan,                      // min/max parameters
-                    repeat_span, repeat_tol, allowed_repeating,  // repeat parameters
-                    utctime::zero(),                             // linear_interpolation parameters
-                    constant_filler                              // constant filling parameters
-                };
-            }
-
-            // ----------
-
-            /* Return true is the parameter block is set up with valid linear interpolation parameters. **/
-            bool can_do_linear_interpolation() const noexcept {
-                return this->max_scan_timespan.count() > 0;
-            }
-
-            /** Check QA fo a value using the set config. */
-            bool is_ok_quality(std::size_t i, double x, const qac_ts & ts) const noexcept {
-                bool ok = true;
-
-                if ( this->nan_qa_enabled )
-                    ok &= ( ! ::isnan(x));
-
-                if ( ok && this->infinity_qa_enabled )
-                    ok &= ( ! ::isinf(x));
-
-                if ( ok && this->min_max_qa_enabled )
-                    ok &= this->is_ok_min_max(x);
-
-                if ( ok && this->repeating_qa_enabled )
-                    ok &= this->is_ok_repeating(i, ts);
-
-                return ok;
-            }
-
-            /** Check a value using the min/max QA config. */
-            bool is_ok_min_max(double x) const noexcept {
-                if ( ::isnan(x) ) {
-                    return false;
-                }
-
-                if ( ::isfinite(min_x) && x < min_x ) {
-                    return false;
-                }
-                if ( ::isfinite(max_x) && x > max_x ) {
-                    return false;
-                }
-
-                return true;
-            }
-
-            /** Check for repetitions around a index */
-            bool is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept;
-
-            /** Is the parameter block equal to another parameter block, within a tolerance. */
-            bool equal(const qac_parameter& o, double abs_e=1e-9) const {
-                return (
-                    max_scan_timespan == o.max_scan_timespan
-                    && nan_equal(min_x, o.min_x, abs_e) && nan_equal(max_x, o.max_x, abs_e)
-                    && repeat_timespan == o.repeat_timespan && nan_equal(repeat_tolerance, o.repeat_tolerance, abs_e) && allowed_repeating == o.allowed_repeating
-                    && nan_equal(constant_filler, o.constant_filler, abs_e)
-                );
-            }
-
-            x_serialize_decl();
-        };
-
-        /** \brief The qac_ts is used for doing quality and correction to a ts using min-max criteria
-         *
-         * Given a source ts, apply qac criteria, and replace nan's with
-         * correction values as specified by the parameters, or the
-         * optional supplied replacement ts.
-         *
-         */
-        struct qac_ts:ipoint_ts {
+        template < typename FillingParameters, typename ... QaParameters >
+        struct qac_ts : ipoint_ts {
             
-            friend struct qac_parameter;
-            
-            shared_ptr<ipoint_ts> ts;///< the source ts
-            shared_ptr<ipoint_ts> cts;///< optional ts with replacement values
-            qac_parameter p;///< the parameters that control how the qac is done
+            using filling_param = FillingParameters;
+            using qa_param_tuple = std::tuple<QaParameters...>;
 
-            // useful constructors
+            std::shared_ptr<ipoint_ts> ts;  ///< the source ts
 
-            qac_ts(const apoint_ts& ats):ts(ats.ts) {}
-            qac_ts(apoint_ts&& ats):ts(move(ats.ts)) {}
-            //qac_ts(const shared_ptr<ipoint_ts> &ts ):ts(ts){}
+            filling_param fp;     ///< the parameters that control the infill where qa failed values
+            qa_param_tuple qaps;  ///< the parameters that control how the qa is done
 
-            qac_ts(const apoint_ts& ats, const qac_parameter& qp,const apoint_ts& cts):ts(ats.ts),cts(cts.ts),p(qp) {}
-            qac_ts(const apoint_ts& ats, const qac_parameter& qp):ts(ats.ts),p(qp) {}
-            //qac_ts(const shared_ptr<ipoint_ts>& ats, const qac_parameter& qp,const shared_ptr<ipoint_ts>& cts):ts(ats),cts(cts),p(qp) {}
+            // constructors
+            qac_ts(const apoint_ts & ats) : ts{ ats.ts } { }
+            qac_ts(apoint_ts && ats) : ts{ std::forward(ats.ts) } { }
+            // -----
+            qac_ts(const apoint_ts & ats, const filling_param & fp,
+                   const QaParameters & ... qap)
+                : ts(ats.ts)f p{ fp}, qaps{ qap... } { }
 
             // std copy ct and assign
-            qac_ts()=default;
+            qac_ts() = default;
+            ~qac_ts() = default;
+            // -----
+            qac_ts(const qac_ts &) = default;
+            qac_ts(qac_ts &&) = default;
+            // -----
+            qac_ts & operator=(const qac_ts &) = default;
+            qac_ts & operator=(qac_ts &&) = default;
 
             // implement ipoint_ts contract, these methods just forward to source ts
             virtual ts_point_fx point_interpretation() const {return ts->point_interpretation();}
@@ -1576,12 +1583,12 @@ namespace shyft {
 
             // methods for binding and symbolic ts
             virtual bool needs_bind() const {
-                return ts->needs_bind() || (cts && cts->needs_bind());
+                return ts->needs_bind() /* || (cts && cts->needs_bind()) */;
             }
             virtual void do_bind() {
                 ts->do_bind();
-                if(cts)
-                    cts->do_bind();
+                // if(cts)
+                //     cts->do_bind();
             }
 
             x_serialize_decl();
@@ -1596,9 +1603,60 @@ namespace shyft {
             void _scan_repeating_values(const std::vector<double> & data) const;
         };
 
-        inline bool qac_parameter::is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept {
-            return ts._repeating_cache[i] == 0;
-        }
+        // inline bool qac_parameter::is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept {
+        //     return ts._repeating_cache[i] == 0;
+        // }
+
+        struct qac_linear_interpolation_fill_parameters {
+
+            utctimespan max_scan_timespan{max_utctime};  ///< Max timespan to scan for next/previous valid values during infill.
+
+
+            /** Is the parameter block equal to another parameter block, within a tolerance. */
+            bool equal(const qac_linear_interpolation_fill_parameters & other, double abs_e=1e-9) const {
+                return max_scan_timespan == other.max_scan_timespan;
+            }
+        };
+
+        struct qac_ts_fill_parameters {
+
+            utctimespan max_scan_timespan{max_utctime};  ///< Max timespan to scan for next/previous valid values during infill.
+            shared_ptr<ipoint_ts> cts;                   ///< TS with replacement values.
+
+            /** Is the parameter block equal to another parameter block, within a tolerance. */
+            bool equal(const qac_ts_fill_parameters & other, double abs_e=1e-9) const {
+                return max_scan_timespan == other.max_scan_timespan;
+            }
+        };
+
+        struct qac_min_max_parameter {
+
+            double min_value{shyft::nan};    ///< Minimum allowed value, inclusive.
+            double max_value{shyft::nan};    ///< Maximum allowed value, inclusive.
+
+
+            /** Check QA fo a value using the set config. */
+            bool is_ok_quality(double value) const noexcept {
+                if ( ::isnan(value) ) {
+                    return false;
+                } else if ( ::isfinite(min_value) && value < min_value ) {
+                    return false;
+                } else if ( ::isfinite(max_value) && value > max_value ) {
+                    return false;
+                }
+                
+                return true;
+            }
+
+            /** Is the parameter block equal to another parameter block, within a tolerance. */
+            bool equal(const qac_min_max_parameter & other, double abs_e=1e-9) const {
+                return (
+                    nan_equal(min_value, other.min_value, abs_e) && nan_equal(max_value, other.max_value, abs_e)
+                );
+            }
+        };
+
+        // ================================================================================
 
         /** \brief inside ts function parameters
          *
@@ -2273,8 +2331,12 @@ x_serialize_export_key(shyft::time_series::dd::krls_interpolation_ts);
 x_serialize_export_key_nt(shyft::time_series::dd::apoint_ts);
 x_serialize_export_key(shyft::time_series::dd::ats_vector);
 x_serialize_export_key(shyft::time_series::dd::abs_ts);
-x_serialize_export_key(shyft::time_series::dd::qac_ts);
-x_serialize_export_key(shyft::time_series::dd::qac_parameter);
+// need aliases to work around the non-variadic macros used by boost serialize
+using qac_ts_min_max_ts_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_ts_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
+using qac_ts_min_max_linear_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_linear_interpolation_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
+x_serialize_export_key(qac_ts_min_max_ts_fill_alias);
+x_serialize_export_key(qac_ts_min_max_linear_fill_alias);
+// x_serialize_export_key(shyft::time_series::dd::qac_parameter);
 x_serialize_export_key(shyft::time_series::dd::inside_ts);
 x_serialize_export_key(shyft::time_series::dd::decode_ts);
 x_serialize_binary(shyft::time_series::dd::inside_parameter);

@@ -642,9 +642,11 @@ namespace shyft{
                 find_ts_bind_info(dynamic_cast<const rating_curve_ts*>(its.get())->ts.level_ts.ts, r);
             } else if (dynamic_cast<const krls_interpolation_ts*>(its.get())) {
                 find_ts_bind_info(dynamic_cast<const krls_interpolation_ts*>(its.get())->ts.ts, r);
-            } else if (dynamic_cast<const qac_ts*>(its.get())) {
-                find_ts_bind_info(dynamic_cast<const qac_ts*>(its.get())->ts, r);
-                find_ts_bind_info(dynamic_cast<const qac_ts*>(its.get())->cts, r);
+            } else if (dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())) {
+                find_ts_bind_info(dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())->ts, r);
+                find_ts_bind_info(dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())->fp.cts, r);
+            } else if (dynamic_cast<const qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>*>(its.get())) {
+                find_ts_bind_info(dynamic_cast<const qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>*>(its.get())->ts, r);
             } else if (dynamic_cast<const inside_ts*>(its.get())) {
                 find_ts_bind_info(dynamic_cast<const inside_ts*>(its.get())->ts, r);
             }
@@ -934,15 +936,15 @@ namespace shyft{
         }
 
         apoint_ts apoint_ts::min_max_check_linear_fill(double min_x, double max_x, utctimespan max_dt) const {
-            return apoint_ts(make_shared<qac_ts>(*this, qac_parameter::create_min_max_linear_interpolation_parameters(
-                /* nan_qa */ true, /* infinity_qa */ true, min_x, max_x, max_dt
-            )));
+            return apoint_ts(make_shared<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>>(*this,
+                qac_linear_interpolation_fill_parameters{ max_dt },
+                qac_min_max_parameter{ min_x, max_x }));
         }
 
         apoint_ts apoint_ts::min_max_check_ts_fill(double min_x, double max_x, utctimespan max_dt, const apoint_ts& cts) const {
-            return apoint_ts(make_shared<qac_ts>(*this,qac_parameter::create_min_max_linear_interpolation_parameters(
-                /* nan_qa */ true, /* infinity_qa */ true, min_x, max_x, max_dt
-            ), cts));
+            return apoint_ts(make_shared<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>>(*this,
+                qac_ts_fill_parameters{ max_dt, cts.ts },
+                qac_min_max_parameter{min_x, max_x }));
         }
 
         apoint_ts apoint_ts::inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const {
@@ -1310,7 +1312,9 @@ namespace shyft{
 
         // ================================================================================
 
-        void qac_ts::_scan_repeating_values(const std::vector<double> & data) const {
+        // TODO this should perhaps be moved out of qac_ts if possible
+        template < typename FillingParameters, typename ... QaParameters >
+        void qac_ts<FillingParameters, QaParameters...>::_scan_repeating_values(const std::vector<double> & data) const {
             const std::size_t data_size = this->ts->size();
 
             // ready cache vector
@@ -1377,7 +1381,8 @@ namespace shyft{
 
         // ----------------------------------------
 
-        double qac_ts:: _fill_value(size_t i) const {
+        template < typename FillingParameters, typename ... QaParameters >
+        double qac_ts<FillingParameters, QaParameters...>:: _fill_value(size_t i) const {
             // use a correction value ts if available
             if ( cts ) {
                 return cts->value_at(ts->time(i)); // we do not check this value, assume ok!
@@ -1390,10 +1395,12 @@ namespace shyft{
             }
             
         }
-        double qac_ts::_fill_constant() const {
+        template < typename FillingParameters, typename ... QaParameters >
+        double qac_ts<FillingParameters, QaParameters...>::_fill_constant() const {
             return this->p.constant_filler;
         }
-        double qac_ts::_fill_linear_interpolation(std::size_t i) const {
+        template < typename FillingParameters, typename ... QaParameters >
+        double qac_ts<FillingParameters,QaParameters...>::_fill_linear_interpolation(std::size_t i) const {
             const auto t = ts->time(i);
             const std::size_t n = ts->size();
 
@@ -1441,7 +1448,8 @@ namespace shyft{
         // ----------------------------------------
 
 
-        double qac_ts::value(size_t i) const {
+        template < typename FillingParameters, typename ... QaParameters >
+        double qac_ts<FillingParameters, QaParameters...>::value(size_t i) const {
 
             // construct repeating values cache if neccessary
             if ( this->p.repeating_qa_enabled ) {
@@ -1459,7 +1467,8 @@ namespace shyft{
             // try to fill in replacement value
             return _fill_value(i);
         }
-        double qac_ts::value_at(utctime t) const {
+        template < typename FillingParameters, typename ... QaParameters >
+        double qac_ts<FillingParameters, QaParameters...>::value_at(utctime t) const {
             size_t i = index_of(t);
 
             // time in ts span?
@@ -1498,7 +1507,8 @@ namespace shyft{
 
             return a * to_seconds(t) + b; // otherwise linear interpolation
         }
-        vector<double> qac_ts::values() const {
+        template < typename FillingParameters, typename ... QaParameters >
+        vector<double> qac_ts<FillingParameters, QaParameters...>::values() const {
             auto r=ts->values();
 
             // construct repeating values cache if neccessary
