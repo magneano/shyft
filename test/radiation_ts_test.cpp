@@ -123,6 +123,8 @@ namespace shyft::core::radiation_model{
             size_t i_end = n_steps > 0 ? start_step + n_steps : time_axis.size();
             for (size_t i = i_begin; i < i_end; ++i) {
                 utcperiod period = time_axis.period(i);
+//                utctimespan delta = time_axis.delta();
+//                std::cout<< to_seconds(delta)  <<"  ===== "<<std::endl;
                 utctime t = time_axis.time(i);
                 double temp = temp_accessor.value(i);
                 double rel_hum = rel_hum_accessor.value(i);

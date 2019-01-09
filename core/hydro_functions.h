@@ -35,7 +35,11 @@ namespace shyft::core {
 		const double Pa2kPa = 0.001;
         const double deg2rad = pi / 180; // degrees to radians
         const double rad2deg = 180 / pi; // rad to deg
-        const double MJm2d2Wm2 = 0.086400;// MJ/m^2day to W/m^2
+        const double MJm2d2Wm2 = 0.086400;// MJ/m^2/day to W/m^2
+        const double MJm2h2Wm2 = 0.0036; // MJ/m^2/hour to W/m^2
+        const double lambda = 2.45; // latent heat of vaporization, [MJ/kg]
+        const double inverse_lambda = 0.408; // inverse lambda, [kg/MJ]
+        const double rhow = 1000; // water density, [kg/m^3]
 
 		/** \brief computes standard atmospheric pressure
          * \param height, [m] -- elevation of the point
