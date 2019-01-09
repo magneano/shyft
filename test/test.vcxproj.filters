@@ -54,6 +54,9 @@
     <ClCompile Include="time_axis_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
+    <ClCompile Include="time_series_use_time_axis_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
     <ClCompile Include="api_test.cpp">
       <Filter>usecases</Filter>
     </ClCompile>

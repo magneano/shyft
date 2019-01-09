@@ -148,6 +148,7 @@ namespace shyft {
         struct inside_parameter; // fwd
         struct bit_decoder;//fwd
         struct derivative_ts; // fwd api
+        struct use_time_axis_from_ts; // fwd api
 		/** \brief Enumerates fill policies for time-axis extension.
 		 */
 		enum extend_ts_fill_policy {
@@ -306,6 +307,7 @@ namespace shyft {
             apoint_ts slice(int i0, int n) const;
 
             apoint_ts merge_points(const apoint_ts& o);
+            apoint_ts use_time_axis_from(const apoint_ts&o) const;
             //-- in case the underlying ipoint_ts is a gpoint_ts (concrete points)
             //   we would like these to be working (exception if it's not possible,i.e. an expression)
             point get(size_t i) const {return point(time(i),value(i));}
@@ -747,7 +749,73 @@ namespace shyft {
             x_serialize_decl();
 
         };
+        
+       /** @brief use_time_axis_from_ts evaluate ts a on time_axis of b
+         *
+         * r = a.use_time_axis_from(b)
+         * The resulting time-series r have the values of a(t) over the time-axis provided by b.
+         * as if
+         *  r(t) = a(t) for all t, and t is in range of the b.time-axis
+         * or
+         *  r.time_axis = b.time_axis
+         *  r.value(t) = a.value(t)
+         *
+         * \note If the ts, a or b,  given at constructor time is an unbound ts or expression,
+         *       then .do_bind() needs to be called before any call to
+         *       value or time-axis function calls.
+         *
+         */
+        struct use_time_axis_from_ts : ipoint_ts {
 
+            apoint_ts lhs;
+            apoint_ts rhs;
+            gta_t ta;
+            ts_point_fx fx_policy = POINT_AVERAGE_VALUE;  // how f(t) are mapped to t
+            bool bound = false;
+
+            ts_point_fx point_interpretation() const {return fx_policy;}
+            void set_point_interpretation(ts_point_fx x) {fx_policy = x;}
+
+            void local_do_bind() {
+                if (!bound) {
+                    fx_policy = lhs.point_interpretation();
+                    ta = rhs.time_axis();
+                    bound = true;
+                }
+            }
+
+            use_time_axis_from_ts() = default;
+            use_time_axis_from_ts(const apoint_ts & lhs, const apoint_ts & rhs)
+                : lhs{ lhs }, rhs{ rhs }{
+                if (!needs_bind())
+					local_do_bind();
+            }
+
+            void bind_check() const {
+                if (!bound)
+                    throw runtime_error("attempting to use unbound timeseries, context fx_time_axis_ts");
+            }
+            //-- ipoint_ts interface
+            virtual utcperiod total_period() const { return time_axis().total_period();}
+            const gta_t& time_axis() const { bind_check(); return ta;}
+            size_t index_of(utctime t) const {return time_axis().index_of(t);};
+            size_t size() const { return time_axis().size();};
+            utctime time(size_t i) const { return time_axis().time(i);}; 
+            double value_at(utctime t) const;
+            double value(size_t i) const;
+            std::vector<double> values() const;
+
+            bool needs_bind() const { return lhs.needs_bind() || rhs.needs_bind();}
+            virtual void do_bind() {
+                lhs.do_bind();
+                rhs.do_bind();
+				local_do_bind();
+            }
+
+            x_serialize_decl();
+
+        };
+        
         /** \brief abs_ts as  abs(ts)
         *
         * The time-axis as source, values are abs of source
@@ -2020,6 +2088,9 @@ namespace shyft {
             ats_vector time_shift(utctimespan delta_t) const {
                 ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.time_shift(delta_t)); return r;
             }
+            ats_vector use_time_axis_from(const apoint_ts&o) const {
+                ats_vector r;r.reserve(size());for(auto const &ts:*this) r.push_back(ts.use_time_axis_from(o)); return r;
+            }
             ats_vector min(double x) const {
                 ats_vector r;r.reserve(size());for (auto const &ts : *this) r.push_back(ts.min(x)); return r;
             }
@@ -2138,6 +2209,8 @@ x_serialize_export_key(shyft::time_series::dd::abs_ts);
 x_serialize_export_key(shyft::time_series::dd::qac_ts);
 x_serialize_export_key(shyft::time_series::dd::inside_ts);
 x_serialize_export_key(shyft::time_series::dd::decode_ts);
+x_serialize_export_key(shyft::time_series::dd::use_time_axis_from_ts);
+
 x_serialize_binary(shyft::time_series::dd::qac_parameter);
 x_serialize_binary(shyft::time_series::dd::inside_parameter);
 x_serialize_binary(shyft::time_series::dd::bit_decoder);

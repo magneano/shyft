@@ -444,8 +444,8 @@ __all__ = [] + \
          'KalmanBiasPredictor_update_with_forecast',
          'np_array',
          'nice_ta_string',
-         'StrGeoCellData',
-         'ConcatData'] + \
+         'StrGeoCellData'
+         ] + \
         ['ABS_DIFF',
          'ALLOW_ANY_MISSING',
          'ALLOW_INITIAL_MISSING',
@@ -643,7 +643,6 @@ __all__ = [] + \
          # 'exit',
          'extend_fill_policy',
          'extend_split_policy',
-         'get_ipython',
          'glacier_melt_step',
          'ice_packing_temperature_policy',
          'idw_precipitation',

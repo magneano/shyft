@@ -187,12 +187,13 @@ TEST_SUITE("dtss") {
 TEST_CASE("dtss_stress") {
     using namespace dtss_stress;
     config c;
-    auto tmpdir = fs::temp_directory_path()/"shyft.stress";
+    auto tmpdir = fs::temp_directory_path()/(string("shyft.stress.")+to_string(std::hash<std::thread::id>()(std::this_thread::get_id())));
     dtss::server<dtss::standard_dtss_dispatcher> srv{};
     srv.add_container(c.container,tmpdir.string());
     srv.set_listening_ip(c.host);
     srv.set_listening_port(c.port);
     srv.set_graceful_close_timeout(10);//just 10 ms ?
+    srv.set_cache_size(50);
     srv.start_async();
     bool rr=srv.is_running();
     FAST_REQUIRE_EQ(rr,true);

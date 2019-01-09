@@ -68,6 +68,7 @@ namespace expose {
 	static string nice_str(const shared_ptr<time_series::dd::periodic_ts>&b) { return "periodic_ts("+nice_str(b->ts.ta) + ")"; }
 	static string nice_str(const shared_ptr<time_series::dd::convolve_w_ts>&b) { return "convolve_w_ts(" + nice_str(b->ts_impl.ts) + ",..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::extend_ts>&b) { return "extend_ts(" + nice_str(b->lhs)+","+nice_str(b->rhs)+",..)"; }
+	static string nice_str(const shared_ptr<time_series::dd::use_time_axis_from_ts>&b) { return "(" + nice_str(b->lhs)+".use_time_axis_from("+nice_str(b->rhs)+",..))"; }
     static string nice_str(const shared_ptr<time_series::dd::rating_curve_ts>&b) { return "rating_curve_ts(" + nice_str(b->ts.level_ts) + ",..)"; }
     static string nice_str(const shared_ptr<time_series::dd::ice_packing_ts>&b) { return "ice_packing_ts(" + nice_str(b->ts.temp_ts) + ",..)"; }
     static string nice_str(const shared_ptr<time_series::dd::ice_packing_recession_ts>&b) { return "ice_packing_recession_ts(" + nice_str(b->flow_ts) + "," + nice_str(b->ice_packing_ts) + ",..)"; }
@@ -100,7 +101,7 @@ namespace expose {
 		if (const auto& b = dynamic_pointer_cast<time_series::dd::qac_ts>(ats.ts)) return nice_str(b);
         if (const auto& b = dynamic_pointer_cast<time_series::dd::inside_ts>(ats.ts)) return nice_str(b);
         if (const auto& b = dynamic_pointer_cast<time_series::dd::decode_ts>(ats.ts)) return nice_str(b);
-
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::use_time_axis_from_ts>(ats.ts)) return nice_str(b);
 		return "not_yet_stringified_ts";
 	}
     static string ts_stringify(const apoint_ts&ats) { return nice_str(ats); }
@@ -258,6 +259,14 @@ namespace expose {
                 doc_parameter("delta_t","int","number of seconds to time-shift, positive values moves forward")
 				doc_returns("tsv","TsVector",	"a new time-series, that appears as time-shifted version of self")
 			)
+            .def("use_time_axis_from",&ats_vector::use_time_axis_from,(py::arg("self"),py::arg("other")),
+                doc_intro("Create a new ts-vector applying .use_time_axis_from on each member")
+                doc_see_also("TimeSeries.use_time_axis_from")
+                doc_intro("")
+				doc_parameters()
+                doc_parameter("other","TimeSeries","time-series that provides the wanted time-axis")
+				doc_returns("tsv","TsVector",	"time-series vector, where each element have time-axis from other")
+			) 
             .def("extend_ts", &ats_vector::extend_ts, (py::arg("ts"), py::arg("split_policy") = extend_ts_split_policy::EPS_LHS_LAST, py::arg("fill_policy") = extend_ts_fill_policy::EPF_NAN, py::arg("split_at") = utctime(seconds(0)), py::arg("fill_value") = shyft::nan),
                 doc_intro("create a new ats_vector where all time-series are extended by ts")
                 doc_parameters()
@@ -842,6 +851,18 @@ namespace expose {
                 doc_parameter("delta_t","int","number of seconds to time-shift, positive values moves forward")
 				doc_returns("ts","TimeSeries",	"a new time-series, that appears as time-shifted version of self")
 			)
+            .def("use_time_axis_from",&apoint_ts::use_time_axis_from,(py::arg("self"),py::arg("other")),
+                doc_intro("Create a new ts that have the same values as self, but filtered to the time-axis points from")
+                doc_intro("from the other supplied time-series.")
+                doc_intro("This function migth be useful for making new time-series, that exactly matches")
+                doc_intro("the time-axis of another series.")
+                doc_intro("Values of the resulting time-series is like like: ")
+                doc_intro(" [self(t) for t in other.time_axis.time_points[:-1]")
+                doc_intro("")
+				doc_parameters()
+                doc_parameter("other","TimeSeries","time-series that provides the wanted time-axis")
+				doc_returns("ts","TimeSeries",	"a new time-series, that appears as time-shifted version of self")
+			) 
             .def("convolve_w", &apoint_ts::convolve_w, (py::arg("self"),py::arg("weights"), py::arg("policy")),
                 doc_intro("create a new ts that is the convolved ts with the given weights list")
                 doc_parameters()

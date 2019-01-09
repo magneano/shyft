@@ -198,6 +198,10 @@ TEST_CASE("test_serialization") {
     auto aexpr2 = serialize_loop(aexpr);
     TS_ASSERT(is_equal(aexpr,aexpr2));
 
+    auto a_use_ta= agts.use_time_axis_from(apoint_ts(tag,1.0));
+    auto a_use_ta2= serialize_loop(a_use_ta);
+    TS_ASSERT(is_equal(a_use_ta,a_use_ta2));
+    
 
     // verify vector stuff.
     vector<apoint_ts> tsv;

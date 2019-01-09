@@ -148,6 +148,9 @@
 		<Unit filename="max_abs_average_accessor_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_use_time_axis_test.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>
 		<Unit filename="merge_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>

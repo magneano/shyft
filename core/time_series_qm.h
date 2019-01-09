@@ -292,8 +292,8 @@ namespace shyft {
         *      indicated by time_axis, and interpolated after
         *      interpolation_start.
         **/
-        template <class tsa_t, class tsv_t, class ta_t>
-        tsv_t quantile_mapping(tsv_t const &pri_tsv, tsv_t const &fc_tsv,
+        template <class tsa_t,class rtsv_t, class tsv_t, class ta_t>
+        rtsv_t quantile_mapping(tsv_t const &pri_tsv, tsv_t const &fc_tsv,
                 vector<vector<int>> const &pri_idx_v,
                 vector<vector<int>> const &fc_idx_v,
                 vector<double> const &fc_weights,
@@ -317,7 +317,7 @@ namespace shyft {
 
             auto wvo_fc = wvo_accessor<tsa_t>(fc_idx_v, fc_weights, fc_accessor_vec);
 
-            tsv_t output;
+            rtsv_t output;
             output.reserve(pri_tsv.size());
             for (size_t i = 0; i<pri_tsv.size(); ++i) {
                 output.emplace_back(time_axis, nan, time_series::POINT_AVERAGE_VALUE);
@@ -359,10 +359,11 @@ namespace shyft {
          * \param ta_hist the time-axis  that should be appended
          * \param r the result vector where the result should be .emplace_back constructed into
          */
-         template <class ta_t,class ts_t>
-         void merge_qm_result( const ts_t &historical_ts, const ts_t& qm,const ta_t &ta, const ta_t&ta_hist,vector<ts_t>&r) {
+         template <class ta_t,class ts_t,class rts_t=ts_t>
+         void merge_qm_result( const ts_t &historical_ts, const rts_t& qm,const ta_t &ta, const ta_t&ta_hist,vector<ts_t>&r) {
                 vector<double> v(ta.size(),nan);
-                auto b=begin(qm.values());
+                auto qm_v{qm.values()};
+                auto b=begin(qm_v);
 				const auto p_fx = historical_ts.point_interpretation();
                 std::copy(b,b+qm.size(),begin(v));
 				vector<double> hv = p_fx==time_series::POINT_AVERAGE_VALUE?
@@ -421,8 +422,8 @@ namespace shyft {
             auto qm_time_axis = time_axis.slice(0,qm_n_steps); // +1, ->include time-step we end into
             auto historical_indices_handle = async(launch::async, quantile_index<tsa_t, tsv_t, ta_t>, historical_data, qm_time_axis);
             auto forecast_indices = quantile_index<tsa_t>(forecasts_unpacked, qm_time_axis);
-
-            auto qm_tsv=quantile_mapping<tsa_t>(
+            using rtsv_t=vector<time_series::point_ts<ta_t>>;
+            auto qm_tsv=quantile_mapping<tsa_t,rtsv_t>(
                             historical_data,
                             forecasts_unpacked,
                             historical_indices_handle.get(),
@@ -433,8 +434,13 @@ namespace shyft {
                             interpolation_end,
                             interpolated_quantiles
                     );
-            if(qm_time_axis==time_axis) // early exit, zero copy if possible
-                return qm_tsv;
+            if(qm_time_axis==time_axis) {// early exit, zero copy if possible
+                tsv_t r;r.reserve(qm_tsv.size());
+                for(auto &qm:qm_tsv) {
+                    r.emplace_back(qm.ta,move(qm.v),time_series::POINT_AVERAGE_VALUE);
+                }
+                return r;
+            }
 
             tsv_t r;
             r.reserve(historical_data.size());

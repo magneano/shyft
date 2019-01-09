@@ -6,6 +6,7 @@ See file COPYING for more details **/
 #include "time_series_merge.h"
 #include "time_series_qm.h"
 #include "time_series_point_merge.h"
+#include "time_series_average.h"
 
 namespace shyft{
     namespace time_series {
@@ -38,6 +39,9 @@ namespace shyft{
             const TA& ta;
             const std::vector<double>& v;
             ts_src(const TA& ta,const std::vector<double>&v):ta{ta},v{v} {}
+            size_t index_of(const utctime t) const {return ta.index_of(t);}
+            utctime time(size_t i) const {return ta.time(i);}
+            utcperiod total_period() const {return ta.total_period();}
             point get(size_t i ) const {return point{ta.time(i),v[i]};}
             size_t size() const {return v.size();}
         };
@@ -225,26 +229,18 @@ namespace shyft{
 		* Help creating implementation of interval type of results (average/integral value)
 		* at highest possible speed
 		*/
-		template < class FX, class TA, class TS, class ATA >
-		static std::vector<double> make_interval(FX&&fx, const TA &ta, const TS& ts, const ATA& avg_ta) {
+		template < bool avg, class TA, class TS, class ATA >
+		static std::vector<double> make_interval( const TA &ta, const TS& ts, const ATA& avg_ta) {
 			auto pfx = ts->point_interpretation();
 			const bool linear_interpretation = pfx == ts_point_fx::POINT_INSTANT_VALUE;
 			const vector<double>* src_v{ terminal_values(ts) };//fetch terminal value
 			if (src_v) {// if values are already in place, use reference
 				const ts_src<TA> rts{ ta,*src_v };
-				std::vector<double> r; r.reserve(avg_ta.size());
-				size_t ix_hint = ta.index_of(avg_ta.time(0));
-				for (size_t i = 0; i < avg_ta.size(); ++i)
-					r.emplace_back(fx(rts, avg_ta.period(i), ix_hint, linear_interpretation));
-				return r;
+                return linear_interpretation?accumulate_linear(avg_ta,rts,avg):accumulate_stair_case(avg_ta,rts,avg);
 			} else {
 				auto tsv{ ts->values() };// pull out values from underlying expression.
 				const ts_src<TA> rts{ ta,tsv };// note that ->values() deflates any underlying expression, this could be sub optimal in some cases.
-				std::vector<double> r; r.reserve(avg_ta.size());
-				size_t ix_hint = ta.index_of(avg_ta.time(0));
-				for (size_t i = 0; i < avg_ta.size(); ++i)
-					r.emplace_back(fx(rts, avg_ta.period(i), ix_hint, linear_interpretation));
-				return r;
+                return linear_interpretation?accumulate_linear(avg_ta,rts,avg):accumulate_stair_case(avg_ta,rts,avg);
 			}
 		}
 
@@ -259,26 +255,20 @@ namespace shyft{
 				return ts->values(); // elide trivial average_ts cases
 			}
 			switch (ts->time_axis().gt) { // pull out the real&fast time-axis before doing computations here:
-			case time_axis::generic_dt::FIXED:    return make_interval(average_value<ts_src<time_axis::fixed_dt>>, ts->time_axis().f, ts, ta);
-			case time_axis::generic_dt::CALENDAR: return make_interval(average_value<ts_src<time_axis::calendar_dt>>, ts->time_axis().c, ts, ta);
-			case time_axis::generic_dt::POINT:    return make_interval(average_value<ts_src<time_axis::point_dt>>, ts->time_axis().p, ts, ta);
+			case time_axis::generic_dt::FIXED:    return make_interval<true>(ts->time_axis().f, ts, ta);
+			case time_axis::generic_dt::CALENDAR: return make_interval<true>(ts->time_axis().c, ts, ta);
+			case time_axis::generic_dt::POINT:    return make_interval<true>(ts->time_axis().p, ts, ta);
 			}
-			return make_interval(average_value<ts_src<time_axis::generic_dt>>, ts->time_axis(), ts, ta);
-		}
-
-		template<class S>
-		inline double integral_value(const S& source, const utcperiod&p, size_t& last_idx, bool linear) {
-			utctimespan tsum{ 0 };
-			return accumulate_value<S>(source, p, last_idx, tsum, linear);
+			return make_interval<true>(ts->time_axis(), ts, ta);
 		}
 
 		std::vector<double> integral_ts::values() const {
 			switch (ts->time_axis().gt) { // pull out the real&fast time-axis before doing computations here:
-			case time_axis::generic_dt::FIXED:    return make_interval(integral_value<ts_src<time_axis::fixed_dt>>, ts->time_axis().f, ts, ta);
-			case time_axis::generic_dt::CALENDAR: return make_interval(integral_value<ts_src<time_axis::calendar_dt>>, ts->time_axis().c, ts, ta);
-			case time_axis::generic_dt::POINT:    return make_interval(integral_value<ts_src<time_axis::point_dt>>, ts->time_axis().p, ts, ta);
+			case time_axis::generic_dt::FIXED:    return make_interval<false>(ts->time_axis().f, ts, ta);
+			case time_axis::generic_dt::CALENDAR: return make_interval<false>(ts->time_axis().c, ts, ta);
+			case time_axis::generic_dt::POINT:    return make_interval<false>(ts->time_axis().p, ts, ta);
 			}
-			return make_interval(integral_value<ts_src<time_axis::generic_dt>>, ts->time_axis(), ts, ta);
+			return make_interval<false>(ts->time_axis(), ts, ta);
 		}
 		/** helpers */
 		static inline utctimespan fixed_timestep(const time_axis::fixed_dt& ta) {
@@ -630,6 +620,10 @@ namespace shyft{
 				find_ts_bind_info(dynamic_cast<const abs_ts*>(its.get())->ts, r);
 			} else if (dynamic_cast<const extend_ts*>(its.get())) {
 				auto ext = dynamic_cast<const extend_ts*>(its.get());
+				find_ts_bind_info(ext->lhs.ts, r);
+				find_ts_bind_info(ext->rhs.ts, r);
+            } else if (dynamic_cast<const use_time_axis_from_ts*>(its.get())) {
+				auto ext = dynamic_cast<const use_time_axis_from_ts*>(its.get());
 				find_ts_bind_info(ext->lhs.ts, r);
 				find_ts_bind_info(ext->rhs.ts, r);
             } else if (dynamic_cast<const ice_packing_ts*>(its.get())) {
@@ -1303,6 +1297,41 @@ namespace shyft{
 			}
 			return value_at(time_axis().time(i));
 		}
+		
+		//--
+        // fx_time_axis_ts impl
+        //
+        vector<double> use_time_axis_from_ts::values() const {
+			bind_check();
+            if(lhs.time_axis()==ta) { // optimize away trivial case
+                return lhs.values();
+            } else {
+                vector<double> r;r.reserve(ta.size());
+                for(size_t i=0;i<ta.size();++i)
+                    r.push_back(lhs.ts->value_at(ta.time(i)));
+                return r;
+            }
+		}
+
+		double use_time_axis_from_ts::value_at(utctime t) const {
+			//bind_check();  // done in time_axis()
+			if (!time_axis().total_period().contains(t)) {
+				return nan;// time-axis is from rhs, so we need this check.
+			}
+			return lhs.ts->value_at(t);//sih: could be wrong if lhs is linear, and there are several points in between.. hmm!
+		}
+
+		double use_time_axis_from_ts::value(size_t i) const {
+			if (i == std::string::npos || i >= time_axis().size()) {
+				return nan;
+			}
+			return value_at(time_axis().time(i));
+		}
+		
+		apoint_ts apoint_ts::use_time_axis_from(const apoint_ts&o) const {
+            return apoint_ts{make_shared<use_time_axis_from_ts>(*this,o)};
+        }
+        
         double qac_ts:: _fill_value(size_t i) const {
 			auto t = ts->time(i);
 			if (cts) // use a correction value ts if available
