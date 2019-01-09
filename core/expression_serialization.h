@@ -122,7 +122,8 @@ namespace shyft { namespace time_series { namespace dd {
         o_index<qac_ts>,
         o_index<inside_ts>,
         o_index<decode_ts>,
-        o_index<derivative_ts>
+        o_index<derivative_ts>,
+        o_index<use_time_axis_from_ts>
     >;
 
     namespace srep {
@@ -257,6 +258,17 @@ namespace shyft { namespace time_series { namespace dd {
         };
         template<> struct _type<extend_ts> { using rep_t = srep::sextend_ts; };
 
+        struct suse_time_axis_from_ts {
+            using ts_t = use_time_axis_from_ts;
+            a_index lhs;
+            a_index rhs;
+            bool operator==(const suse_time_axis_from_ts& o) const {
+                return lhs == o.lhs && rhs == o.rhs;
+            }
+        };
+        template<> struct _type<use_time_axis_from_ts> { using rep_t = srep::suse_time_axis_from_ts; };
+
+        
         struct srating_curve_ts {
             using ts_t = rating_curve_ts;
             a_index ts;
@@ -433,6 +445,9 @@ namespace shyft { namespace time_series { namespace dd {
             } else if (auto ts = dynamic_cast<extend_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<extend_ts>{ expr.append(srep::_type<extend_ts>::rep_t{ convert(ts->lhs),convert(ts->rhs),ts->ets_split_p,ts->split_at,ts->ets_fill_p,ts->fill_value }) };
+            } else if (auto ts = dynamic_cast<use_time_axis_from_ts*>(ats.ts.get())) {
+                _m_find_ts_map(ts);
+                return m[ts] = o_index<use_time_axis_from_ts>{ expr.append(srep::_type<use_time_axis_from_ts>::rep_t{ convert(ts->lhs),convert(ts->rhs)}) };
             } else if (auto ts = dynamic_cast<rating_curve_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<rating_curve_ts>{ expr.append(srep::_type<rating_curve_ts>::rep_t{ convert(ts->ts.level_ts),ts->ts.rc_param }) };
@@ -605,6 +620,13 @@ namespace shyft { namespace time_series { namespace dd {
             return make_shared<extend_ts>(lhs, rhs, rx.ets_split_p, rx.ets_fill_p, rx.split_at, rx.fill_value);
         }
 
+        shared_ptr<use_time_axis_from_ts> make(o_index<use_time_axis_from_ts> i) {
+            const auto& rx = expr.at(i);
+            apoint_ts lhs{ boost::apply_visitor(*this,rx.lhs) };
+            apoint_ts rhs{ boost::apply_visitor(*this,rx.rhs) };
+            return make_shared<use_time_axis_from_ts>(lhs, rhs);
+        }
+
         shared_ptr<rating_curve_ts> make(o_index<rating_curve_ts> i) {
             const auto& rx = expr.at(i);
             apoint_ts lts{ boost::apply_visitor(*this,rx.ts) };
@@ -711,7 +733,7 @@ namespace shyft { namespace time_series { namespace dd {
     /**convinient macro to use for all know types, use as parameter-pack to ts_exp_rep, etc.*/
 #define all_srep_types  srep::sbinop_op_ts, srep::sbinop_ts_scalar, srep::sbin_op_scalar_ts, srep::sabs_ts, srep::saverage_ts, srep::sintegral_ts, srep::saccumulate_ts, \
             srep::stime_shift_ts, srep::speriodic_ts, srep::sconvolve_w_ts, srep::sextend_ts, srep::srating_curve_ts, srep::sice_packing_ts, srep::sice_packing_recession_ts, \
-            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts
+            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts,srep::suse_time_axis_from_ts
 
     typedef ts_expression<all_srep_types> compressed_ts_expression;
     typedef ts_expression_compressor<all_srep_types> expression_compressor;
@@ -727,6 +749,7 @@ x_serialize_binary(shyft::time_series::dd::srep::sbin_op_scalar_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sabs_ts);
 x_serialize_binary(shyft::time_series::dd::srep::stime_shift_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sextend_ts);
+x_serialize_binary(shyft::time_series::dd::srep::suse_time_axis_from_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sqac_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sinside_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sdecode_ts);
@@ -757,6 +780,7 @@ x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::time_
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::periodic_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::convolve_w_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::extend_ts>);
+x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::use_time_axis_from_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::rating_curve_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ice_packing_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ice_packing_recession_ts>);

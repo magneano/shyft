@@ -472,6 +472,18 @@ void shyft::time_series::dd::extend_ts::serialize(Archive & ar, const unsigned i
 }
 
 template<class Archive>
+void shyft::time_series::dd::use_time_axis_from_ts::serialize(Archive & ar, const unsigned int version) {
+	ar
+		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))
+		& core_nvp("lhs", lhs)
+		& core_nvp("rhs", rhs)
+		& core_nvp("ta", ta)
+		& core_nvp("fx_policy", fx_policy)
+		& core_nvp("bound", bound)
+		;
+}
+
+template<class Archive>
 void shyft::time_series::dd::abin_op_ts::serialize(Archive & ar, const unsigned int version) {
 	ar
 		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))
@@ -616,6 +628,7 @@ x_serialize_implement(shyft::time_series::ice_packing_ts<shyft::time_series::dd:
 x_serialize_implement(shyft::time_series::dd::ice_packing_recession_parameters);
 x_serialize_implement(shyft::time_series::dd::ice_packing_recession_ts);
 x_serialize_implement(shyft::time_series::dd::extend_ts);
+x_serialize_implement(shyft::time_series::dd::use_time_axis_from_ts);
 x_serialize_implement(shyft::time_series::dd::abin_op_scalar_ts);
 x_serialize_implement(shyft::time_series::dd::abin_op_ts);
 x_serialize_implement(shyft::time_series::dd::abin_op_ts_scalar);
@@ -694,6 +707,7 @@ x_arch(shyft::time_series::ice_packing_ts<shyft::time_series::dd::apoint_ts>);
 x_arch(shyft::time_series::dd::ice_packing_recession_parameters);
 x_arch(shyft::time_series::dd::ice_packing_recession_ts);
 x_arch(shyft::time_series::dd::extend_ts);
+x_arch(shyft::time_series::dd::use_time_axis_from_ts);
 x_arch(shyft::time_series::dd::abin_op_scalar_ts);
 x_arch(shyft::time_series::dd::abin_op_ts);
 x_arch(shyft::time_series::dd::abin_op_ts_scalar);

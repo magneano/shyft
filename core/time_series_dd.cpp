@@ -622,6 +622,10 @@ namespace shyft{
 				auto ext = dynamic_cast<const extend_ts*>(its.get());
 				find_ts_bind_info(ext->lhs.ts, r);
 				find_ts_bind_info(ext->rhs.ts, r);
+            } else if (dynamic_cast<const use_time_axis_from_ts*>(its.get())) {
+				auto ext = dynamic_cast<const use_time_axis_from_ts*>(its.get());
+				find_ts_bind_info(ext->lhs.ts, r);
+				find_ts_bind_info(ext->rhs.ts, r);
             } else if (dynamic_cast<const ice_packing_ts*>(its.get())) {
                 find_ts_bind_info(dynamic_cast<const ice_packing_ts*>(its.get())->ts.temp_ts.ts, r);
             } else if (dynamic_cast<const ice_packing_recession_ts*>(its.get())) {
@@ -1293,6 +1297,41 @@ namespace shyft{
 			}
 			return value_at(time_axis().time(i));
 		}
+		
+		//--
+        // fx_time_axis_ts impl
+        //
+        vector<double> use_time_axis_from_ts::values() const {
+			bind_check();
+            if(lhs.time_axis()==ta) { // optimize away trivial case
+                return lhs.values();
+            } else {
+                vector<double> r;r.reserve(ta.size());
+                for(size_t i=0;i<ta.size();++i)
+                    r.push_back(lhs.ts->value_at(ta.time(i)));
+                return r;
+            }
+		}
+
+		double use_time_axis_from_ts::value_at(utctime t) const {
+			//bind_check();  // done in time_axis()
+			if (!time_axis().total_period().contains(t)) {
+				return nan;// time-axis is from rhs, so we need this check.
+			}
+			return lhs.ts->value_at(t);//sih: could be wrong if lhs is linear, and there are several points in between.. hmm!
+		}
+
+		double use_time_axis_from_ts::value(size_t i) const {
+			if (i == std::string::npos || i >= time_axis().size()) {
+				return nan;
+			}
+			return value_at(time_axis().time(i));
+		}
+		
+		apoint_ts apoint_ts::use_time_axis_from(const apoint_ts&o) const {
+            return apoint_ts{make_shared<use_time_axis_from_ts>(*this,o)};
+        }
+        
         double qac_ts:: _fill_value(size_t i) const {
 			auto t = ts->time(i);
 			if (cts) // use a correction value ts if available

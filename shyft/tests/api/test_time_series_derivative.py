@@ -1,19 +1,16 @@
-from shyft.api import TimeSeries,TimeAxis,Calendar,UtcPeriod,TsVector,DoubleVector,POINT_AVERAGE_VALUE,POINT_INSTANT_VALUE
-
-#import numpy as np
+from shyft.api import TimeSeries, TimeAxis, Calendar, UtcPeriod, TsVector, DoubleVector, POINT_AVERAGE_VALUE, POINT_INSTANT_VALUE
 import math
-#from numpy.testing import assert_array_almost_equal
 import unittest
 
 
 class TimeSeriesDerivative(unittest.TestCase):
 
     def test_linear(self):
-        ta = TimeAxis(0,10,6)
-        tsv=DoubleVector([1, 1, 2, 3, -1.0, 5.0])
+        ta = TimeAxis(0, 10, 6)
+        tsv = DoubleVector([1, 1, 2, 3, -1.0, 5.0])
         f = TimeSeries(ta, tsv, POINT_INSTANT_VALUE)
         d_f = f.derivative()
-        self.assertEqual(len(f),len(d_f))
+        self.assertEqual(len(f), len(d_f))
         self.assertAlmostEqual(d_f.value(0), 0.0)
         self.assertAlmostEqual(d_f.value(1), 0.1)
         self.assertAlmostEqual(d_f.value(2), 0.1)
@@ -33,13 +30,13 @@ class TimeSeriesDerivative(unittest.TestCase):
         self.assertFalse(math.isfinite(v[5]))
 
     def test_linear_vector(self):
-        ta = TimeAxis(0,10,6)
-        tsv=DoubleVector([1, 1, 2, 3, -1.0, 5.0])
+        ta = TimeAxis(0, 10, 6)
+        tsv = DoubleVector([1, 1, 2, 3, -1.0, 5.0])
         fv = TsVector([TimeSeries(ta, tsv, POINT_INSTANT_VALUE)])
         d_fv = fv.derivative()
-        f=fv[0]
-        d_f=d_fv[0]
-        self.assertEqual(len(f),len(d_f))
+        f = fv[0]
+        d_f = d_fv[0]
+        self.assertEqual(len(f), len(d_f))
         self.assertAlmostEqual(d_f.value(0), 0.0)
         self.assertAlmostEqual(d_f.value(1), 0.1)
         self.assertAlmostEqual(d_f.value(2), 0.1)
