@@ -128,9 +128,8 @@ namespace shyft::core::radiation_model{
                 utctime t = time_axis.time(i);
                 double temp = temp_accessor.value(i);
                 double rel_hum = rel_hum_accessor.value(i);
-                arma::vec surface_normal({0.0,0.0,1.0});
 
-                sw_radiation.net_radiation(response.rad, geo_cell_data.mid_point().x, t, surface_normal, temp, rel_hum, geo_cell_data.mid_point().z);//
+                sw_radiation.net_radiation(response.rad, geo_cell_data.mid_point().x, t, 0.0, 0.0, temp, rel_hum, geo_cell_data.mid_point().z);//
 
                 //std::cout<<response.rad.psw_radiation<<"  ===== "<<std::endl;
 

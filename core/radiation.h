@@ -30,56 +30,6 @@ See file COPYING for more details **/
 #include "core/hydro_functions.h"
 //#include <proj.h>
 namespace shyft {
-//    namespace utility {
-//        namespace geometry{
-//            template <class Point>
-//            struct triangle{
-//                Point p1, p2, p3;
-//                explicit triangle(const Point& p1, const Point& p2, const Point& p3):p1(p1),p2(p2), p3(p3) {
-//                    make_triangle();
-//                }
-//
-//                Point normal = std::make_tuple(0.0,0.0,0.0);
-//                Point mid_point = std::make_tuple(0.0,0.0,0.0);
-//                double slope{0.0};
-//                double aspect{0.0};
-//                double elevation{0.0};
-//
-//            private:
-//                void make_triangle(){
-//                    // find mid-point:
-//                    double x1 = std::get<0>(p1);
-//                    double x2 = std::get<0>(p2);
-//                    double x3 = std::get<0>(p3);
-//                    double y1 = std::get<1>(p1);
-//                    double y2 = std::get<1>(p2);
-//                    double y3 = std::get<1>(p3);
-//                    double z1 = std::get<2>(p1);
-//                    double z2 = std::get<2>(p2);
-//                    double z3 = std::get<2>(p3);
-//                    double x = (x1+x2+x3)/3.0;
-//                    double y = (y1+y2+y3)/3.0;
-//                    double z = (z1+z2+z3)/3.0;
-//                    mid_point = std::make_tuple(x,y,z);
-//
-//                    //find normal vector
-//                    Point p1p2 = std::make_tuple(x2-x1,y2-y1,z2-z1);
-//                    Point p1p3 = std::make_tuple(x3-x1,y3-y1,z3-z1);
-//                    double normal_x = std::get<1>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<1>(p1p3);
-//                    double normal_y = -std::get<0>(p1p2)*std::get<2>(p1p3) - std::get<2>(p1p2)*std::get<0>(p1p3);
-//                    double normal_z = std::get<0>(p1p2)*std::get<1>(p1p3) - std::get<1>(p1p2)*std::get<0>(p1p3);
-//                    normal = std::make_tuple(normal_x,normal_y,normal_z);
-//
-//                    // slope, aspect, elevation
-//                    slope = atan2(pow(pow(normal_x,2)+pow(normal_y,2),0.5),normal_z);
-//                    aspect = atan2(normal_y, normal_x);
-//                    elevation = std::get<2>(mid_point);
-//                }
-//
-//
-//            };
-//        }
-//    }
 
     namespace core {
         // TODO use rasputin namespace
@@ -114,13 +64,6 @@ namespace shyft {
 
                 explicit calculator(const P &p) : param(p) {}
 
-                double slope() const {
-                    return slope_ * rad2deg;
-                } // horizontal slope, [deg], should be calculated from normal vector
-                double aspect() const {
-                    return aspect_ * rad2deg;
-                } // surface aspect angle, [deg], 0 -- due south, -pi/2 -- due east, pi/2 -- due west, +-pi -- due north
-
                 double latitude() const {
                     return phi_ * rad2deg;
                 }// latitude, [deg] should be available from cell?/// TODO: add PROJ4 for conversion from cartesian to wgs84
@@ -133,11 +76,10 @@ namespace shyft {
                 double sun_set() const { return omega2_24_ * rad2deg; }
 
                 /**\brief computes instantaneous net radiation, [W/m2]*/
-                template<class V>
-                void net_radiation(R &response, double latitude, utctime t, const V &surface_normal,
+                void net_radiation(R &response, double latitude, utctime t, double slope=0.0, double aspect = 0.0,
                                     double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0,
                                     double rsm = 0.0){
-                    response.sw_radiation = tsw_radiation(latitude, t, surface_normal, temperature, rhumidity, elevation,rsm);
+                    response.sw_radiation = tsw_radiation(latitude, t, slope, aspect, temperature, rhumidity, elevation,rsm);
                     response.lw_radiation = lw_radiation(temperature, rhumidity);
                     response.net_radiation = response.sw_radiation+response.lw_radiation;
 
@@ -347,29 +289,22 @@ namespace shyft {
                  * \param rhumidity, [percent]
                  * \param elevation
                  * \return */
-                template<class V>
-                double psw_radiation(double latitude, utctime t, const V &surface_normal,
+                double psw_radiation(double latitude, utctime t, double slope=0.0, double aspect = 0.0,
                                    double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0) {
                     doy_ = utc.day_of_year(t);
                     lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute / 60.0;
                     delta_ = compute_earth_declination(doy_);
                     omega_ = hour_angle(lt_); // earth hour angle
 
-                    /// TODO: consider implementation of algorithm from Dozier, J. & Frew, J. Rapid calculation of terrain parameters for radiation modeling from digital elevation data IEEE Transactions on Geoscience and Remote Sensing, 1990
-                    arma::vec normal0{0.0, 0.0, 1.0}; // normal to horizontal plane
-                    slope_ = acos(arma::norm_dot(surface_normal, normal0));
-                    //slope_ = atan2(pow(pow(surface_normal(0),2)+pow(surface_normal(1),2),0.5),surface_normal(2));
-                    //aspect_ = pi - atan2(surface_normal(1),surface_normal(0));
-                    aspect_ = atan2(surface_normal(1), surface_normal(0));
-
-
+                    slope_ = slope;
+                    aspect_ = aspect;
                     phi_ = latitude * pi / 180;
-                    compute_abc(delta_, phi_, slope_, aspect_);
+                    compute_abc(delta_, phi_, slope, aspect);
                     costt_ = costt(omega_); // eq.(14)
                     compute_abc(delta_, phi_, 0.0, 0.0);
                     costthor_ = costt(omega_);
 
-                    compute_sun_rise_set(delta_, phi_, slope_, aspect_);
+                    compute_sun_rise_set(delta_, phi_, slope, aspect);
                     if (omega_ > omega1_24_ and omega_ < omega2_24_) {
                         rahor_ = max(0.0, compute_ra(costthor_, doy_)); // eq.(1) with cos(theta)hor
                         //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
@@ -441,12 +376,11 @@ namespace shyft {
                  * \param elevation, [m]
                  * \param rsm,[W/m^2] -- measured solar radiation
                  * \return */
-                template<class V>
-                double tsw_radiation(double latitude, utctime t, const V &surface_normal,
+                double tsw_radiation(double latitude, utctime t, double slope = 0.0, double aspect = 0.0,
                                    double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0,
                                    double rsm = 0.0) {
                     // first calculate all predicted values
-                    double tsw_rad = psw_radiation(latitude, t, surface_normal, temperature, rhumidity, elevation);
+                    double tsw_rad = psw_radiation(latitude, t, slope, aspect, temperature, rhumidity, elevation);
                     double tauswhor = rsm > 0.0 ? rsm / (rahor_ > 0.0 ? rahor_ : rsm)
                                                 : 1.0; //? not sure if we use a theoretical rahor here
                     double KBhor;

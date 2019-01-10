@@ -111,6 +111,8 @@ namespace shyft::core{
                      return param.rl/lai_a(hveg);
                  }
 
+                 /// TODO: move all to the hydro_functions???
+
                  /**\brief Latent heat of vaporization, eq. B.7; ASCE-EWRI*/
                  double vaporization_latent_heat(double temperature){
                      return 2.501 - (2.361*0.001)*temperature;

@@ -36,7 +36,7 @@ namespace expose {
                 "[mm/s] units.\n",no_init
             )
             .def(init<const parameter&>(args("param"),"create a calculator using supplied parameter"))
-            .def("net_radiation",&RadiationCalculator::net_radiation<surface_normal>,(py::arg("self"),py::arg("response"), py::arg("latitude"), py::arg("t"), py::arg("surface_normal"), py::arg("temperature"), py::arg("rhumidity"), py::arg("elevation"),  py::arg("rsm")),
+            .def("net_radiation",&RadiationCalculator::net_radiation,(py::arg("self"),py::arg("response"), py::arg("latitude"), py::arg("t"), py::arg("slope"), py::arg("aspect"), py::arg("temperature"), py::arg("rhumidity"), py::arg("elevation"),  py::arg("rsm")),
                      doc_intro("calculates net radiation, updating response")
             )
             ;
