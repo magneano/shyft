@@ -44,13 +44,13 @@ namespace shyft::core {
 		/** \brief computes standard atmospheric pressure
          * \param height, [m] -- elevation of the point
          * \return p, [kPa] -- atmospheric pressure */
-		inline double atm_pressure(double height){ // height < 11000
+		inline double atm_pressure(double height, double T0 = 288.15){ // height < 11000
 			const double p0 = 101325.0; //[Pa]standard sea level pressure
 			const double L = 0.0065; //[K/m] temperature lapse rate
 			const double g = 9.80665; //[m/s2] earth-surface gravitational acceleration
 			const double R0 = 8.31447;//[J/mol/K] Universal gas constant
 			const double M = 0.0289644; //[kg/mol] molar mass of dry air
-			const double T0 = 288.15; // [K] sea level standard temperature
+			//const double T0 = 288.15; // [K] sea level standard temperature
 			return p0*pow((1 - L*height/T0),(g*M/R0/L))*Pa2kPa;
 		}
 		/**\brief computes actual vapor pressure from dewpoint temperature
