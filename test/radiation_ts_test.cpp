@@ -130,7 +130,7 @@ namespace shyft::core::radiation_model{
                 double rel_hum = rel_hum_accessor.value(i);
                 arma::vec surface_normal({0.0,0.0,1.0});
 
-                sw_radiation.psw_radiation(response.rad, geo_cell_data.mid_point().x, t, surface_normal, temp, rel_hum, geo_cell_data.mid_point().z);//
+                sw_radiation.net_radiation(response.rad, geo_cell_data.mid_point().x, t, surface_normal, temp, rel_hum, geo_cell_data.mid_point().z);//
 
                 //std::cout<<response.rad.psw_radiation<<"  ===== "<<std::endl;
 
@@ -171,7 +171,7 @@ namespace shyft::core::radiation_model{
             *
             */
             void collect(size_t idx, const response_t& response) {
-                rad_output.set(idx, response.rad.psw_radiation);
+                rad_output.set(idx, response.rad.sw_radiation);
             }
             void set_end_response(const response_t& r) { end_reponse = r; }
         };

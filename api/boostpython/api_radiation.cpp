@@ -20,11 +20,9 @@ namespace expose {
             ;
 
         class_<response>("RadiationResponse")
-            .def_readwrite("dir_radiation",&response::dir_radiation)
-            .def_readwrite("dif_radiation",&response::dif_radiation)
-            .def_readwrite("ref_radiation",&response::ref_radiation)
-            .def_readwrite("psw_radiation",&response::psw_radiation)
-            .def_readwrite("tsw_radiation",&response::tsw_radiation)
+            .def_readwrite("sw_radiation",&response::sw_radiation)
+            .def_readwrite("lw_radiation",&response::lw_radiation)
+            .def_readwrite("net_radiation",&response::net_radiation)
             ;
 
         typedef calculator<parameter,response> RadiationCalculator;
@@ -38,11 +36,8 @@ namespace expose {
                 "[mm/s] units.\n",no_init
             )
             .def(init<const parameter&>(args("param"),"create a calculator using supplied parameter"))
-            .def("psw_radiation",&RadiationCalculator::psw_radiation<surface_normal>,(py::arg("self"),py::arg("response"), py::arg("latitude"), py::arg("t"), py::arg("surface_normal"), py::arg("temperature"), py::arg("rhumidity"), py::arg("elevation")),
-                 doc_intro("calculates predicted short-wave radiation, updating response")
-            )
-            .def("tsw_radiation",&RadiationCalculator::tsw_radiation<surface_normal>,(py::arg("self"),py::arg("response"), py::arg("latitude"), py::arg("t"), py::arg("surface_normal"), py::arg("temperature"), py::arg("rhumidity"), py::arg("elevation"),  py::arg("rsm")),
-                     doc_intro("calculates predicted short-wave radiation, updating response")
+            .def("net_radiation",&RadiationCalculator::net_radiation<surface_normal>,(py::arg("self"),py::arg("response"), py::arg("latitude"), py::arg("t"), py::arg("surface_normal"), py::arg("temperature"), py::arg("rhumidity"), py::arg("elevation"),  py::arg("rsm")),
+                     doc_intro("calculates net radiation, updating response")
             )
             ;
     }

@@ -99,13 +99,13 @@ namespace shyft {
 
             struct response {
                 /// TODO: here should be only K, L and net
-                double dir_radiation = 0.0; // direct beam
-                double dif_radiation = 0.0; // diffuse
-                double ref_radiation = 0.0; // reflected
-                double psw_radiation = 0.0; // predicted clear sky solar radiation for inclined surface [W/m2]
-                double tsw_radiation = 0.0; // translated  solar radiation on a sloping surface based on measured horizontal radiation [W/m^2]
+//                double dir_radiation = 0.0; // direct beam
+//                double dif_radiation = 0.0; // diffuse
+//                double ref_radiation = 0.0; // reflected
+//                double psw_radiation = 0.0; // predicted clear sky solar radiation for inclined surface [W/m2]
+                double sw_radiation = 0.0; // translated  solar radiation on a sloping surface based on measured horizontal radiation [W/m^2]
                 double lw_radiation = 0.0; // long-wave radiation [W/m^2]
-                double net_radiation = tsw_radiation+lw_radiation; // net radiation
+                double net_radiation = 0.0; // net radiation
             };
 
             template<class P, class R>
@@ -132,142 +132,17 @@ namespace shyft {
 
                 double sun_set() const { return omega2_24_ * rad2deg; }
 
-                /** \brief computes instantaneous predicted short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
-                 * ref.: Allen, R. G.; Trezza, R. & Tasumi, M. Analytical integrated functions for daily solar radiation on slopes Agricultural and Forest Meteorology, 2006, 139, 55-73
-                 * \param latitude, [deg]
-                 * \param utctime,
-                 * \param surface_normal
-                 * \param temperature, [degC]
-                 * \param rhumidity, [percent]
-                 * \param elevation
-                 * \return */
+                /**\brief computes instantaneous net radiation, [W/m2]*/
                 template<class V>
-                void psw_radiation(R &response, double latitude, utctime t, const V &surface_normal,
-                                   double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0) {
-                    doy_ = utc.day_of_year(t);
-                    lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute / 60.0;
-                    delta_ = compute_earth_declination(doy_);
-                    omega_ = hour_angle(lt_); // earth hour angle
+                void net_radiation(R &response, double latitude, utctime t, const V &surface_normal,
+                                    double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0,
+                                    double rsm = 0.0){
+                    response.sw_radiation = tsw_radiation(latitude, t, surface_normal, temperature, rhumidity, elevation,rsm);
+                    response.lw_radiation = lw_radiation(temperature, rhumidity);
+                    response.net_radiation = response.sw_radiation+response.lw_radiation;
 
-                    /// TODO: consider implementation of algorithm from Dozier, J. & Frew, J. Rapid calculation of terrain parameters for radiation modeling from digital elevation data IEEE Transactions on Geoscience and Remote Sensing, 1990
-                    arma::vec normal0{0.0, 0.0, 1.0}; // normal to horizontal plane
-                    slope_ = acos(arma::norm_dot(surface_normal, normal0));
-                    //slope_ = atan2(pow(pow(surface_normal(0),2)+pow(surface_normal(1),2),0.5),surface_normal(2));
-                    //aspect_ = pi - atan2(surface_normal(1),surface_normal(0));
-                    aspect_ = atan2(surface_normal(1), surface_normal(0));
-
-
-                    phi_ = latitude * pi / 180;
-                    compute_abc(delta_, phi_, slope_, aspect_);
-                    costt_ = costt(omega_); // eq.(14)
-                    compute_abc(delta_, phi_, 0.0, 0.0);
-                    costthor_ = costt(omega_);
-
-                    compute_sun_rise_set(delta_, phi_, slope_, aspect_);
-                    if (omega_ > omega1_24_ and omega_ < omega2_24_) {
-                        rahor_ = max(0.0, compute_ra(costthor_, doy_)); // eq.(1) with cos(theta)hor
-                        //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
-                        ra_ = max(0.0, compute_ra(costt_, doy_)); // eq.(1)
-                    } else {
-                        ra_ = 0.0;
-                        rahor_ = 0.0;
-                    };
-
-                    double W; //equivalent depth of precipitable water in the atmosphere[mm]
-                    eatm_ = atm_pressure(
-                            elevation); // [kPa] atmospheric pressure as a function of elevation ///TODO: get elevation from cell.midpoint().z
-                    ea_ = actual_vp(temperature, rhumidity); //[kPa] actual vapor pressure
-                    W = 0.14 * ea_ * eatm_ + 2.1; // eq.(18)
-
-                    double Kbo;
-                    double sin_beta, sin_betahor;
-                    sin_betahor = abs(
-                            costthor_); // eq.(20) equal to (4), cos_tthor = sin_betahor /// TODO: check if cos_tt = sin_beta is true for inclined surface
-                    sin_beta = abs(costt_);
-                    // clearness index for direct beam radiation
-
-                    Kbo = min(1.0, max(-0.4, 0.98 * exp(-0.00146 * eatm_ / param.turbidity / sin_beta -
-                                                        0.075 * pow((W / sin_beta), 0.4)))); // eq.(17)
-                    double Kbohor = min(1.0, max(-0.4, 0.98 * exp(-0.00146 * eatm_ / param.turbidity / sin_betahor -
-                                                                  0.075 * pow((W / sin_betahor), 0.4)))); // eq.(17)
-
-                    double Kdo; // transmissivity of diffuse radiation, eq.(19)a,b,c
-                    if (Kbo >= 0.15) { Kdo = 0.35 - 0.36 * Kbo; }
-                    else if (Kbo < 0.15 and Kbo > 0.065) { Kdo = 0.18 + 0.82 * Kbo; }
-                    else { Kdo = 0.10 + 2.08 * Kbo; }
-
-                    double Kdohor;
-                    if (Kbohor >= 0.15) { Kdohor = 0.35 - 0.36 * Kbohor; }
-                    else if (Kbohor < 0.15 and Kbohor > 0.065) { Kdohor = 0.18 + 0.82 * Kbohor; }
-                    else { Kdohor = 0.10 + 2.08 * Kbohor; }
-
-                    double fi_ = fi();//eq.(32)
-
-                    // fb_ = min(5.0,Kbo/Kbohor*ra_/(rahor_>0.0?rahor_:max(0.00001,ra_)));//eq.(34)
-                    fb_ = ra_ / (rahor_ > 0.0 ? rahor_ : max(0.00001, ra_));//eq.(34)
-
-                    double fia_ = fia(Kbohor, Kdohor); //eq.(33)
-
-                    if (omega1_24_ > omega2_24_) {
-                        omega1_24_ = omega2_24_;
-                        ra_ = 0.0;
-                    }//slope is always shaded
-                    //if ((omega_ > omega2_24b_) and (omega_<omega1_24b_) and (omega1_24_<omega2_24b_) and (omega1_24b_<omega2_24_)){ra_ = 0.0;}
-                    // rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
-                    response.dir_radiation = Kbo * ra_;
-                    response.dif_radiation = fia_ * Kdo * rahor_;
-                    response.ref_radiation = param.albedo * (1 - fi_) * (Kbo + Kdo) * rahor_;
-                    response.psw_radiation = response.dir_radiation + response.dif_radiation +
-                                             response.ref_radiation; // clear sky solar radiation for inclined surface [W/m2]
-                    response.tsw_radiation = response.psw_radiation; // if no measurements -- than we use predicted value
-                    return;
                 }
 
-                /**\brief translates measured solar radiation from horizontal surfaces to slopes
-                 * ref.: Allen, R. G.; Trezza, R. & Tasumi, M. Analytical integrated functions for daily solar radiation on slopes Agricultural and Forest Meteorology, 2006, 139, 55-73
-                 * \param latitude, [deg]
-                 * \param utctime,
-                 * \param surface_normal
-                 * \param temperature, [degC]
-                 * \param rhumidity, [percent]
-                 * \param elevation, [m]
-                 * \param rsm,[W/m^2] -- measured solar radiation
-                 * \return */
-                template<class V>
-                void tsw_radiation(R &response, double latitude, utctime t, const V &surface_normal,
-                                   double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0,
-                                   double rsm = 0.0) {
-                    // first calculate all predicted values
-                    psw_radiation(response, latitude, t, surface_normal, temperature, rhumidity, elevation);
-                    double tauswhor = rsm > 0.0 ? rsm / (rahor_ > 0.0 ? rahor_ : rsm)
-                                                : 1.0; //? not sure if we use a theoretical rahor here
-                    double KBhor;
-                    if (tauswhor >= 0.42) { KBhor = 1.56 * tauswhor - 0.55; }
-                    else if (tauswhor > 0.175 and tauswhor < 0.42) {
-                        KBhor = 0.022 - 0.280 * tauswhor + 0.828 * tauswhor * tauswhor + 0.765 * pow(tauswhor, 3);
-                    }
-                    else { KBhor = 0.016 * tauswhor; }
-                    double KDhor = tauswhor - KBhor;
-                    response.tsw_radiation = rsm * (fb_ * KBhor / tauswhor + fia(KBhor, KDhor) * KDhor / tauswhor +
-                                                    param.albedo * (1 - fi()));
-                    return;
-                }
-                /**\brief clear-sky longwave raditiation
-                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.261
-                 * \param temperature, [K] -- air temperature
-                 * \param rhumidity, [persent] -- relative humidity
-                 * \param ss_temp, [K] -- surface temperature
-                 * response.lw_radiation W/m^2 */
-                 /// TODO https://www.hydrol-earth-syst-sci.net/17/1331/2013/hess-17-1331-2013-supplement.pdf
-                 // TODO discuss the option to have different formulations here.
-                void lw_radiation(R &response, double temperature, double rhumidity){
-                    double Lin = 2.7*actual_vp(temperature,rhumidity)+0.245*temperature-45.14;
-                    double ss_temp = min(temperature-2.5,273.16);
-                    double epsilon_ss = 0.95;//water TODO: as parameter
-                    double Lout = epsilon_ss*sigma*pow(ss_temp,4)+(1-epsilon_ss)*Lin;
-                    response.lw_radiation = (Lin-Lout)*MJm2d2Wm2;
-                    return;
-                }
 
             private:
                 double delta_;
@@ -460,6 +335,146 @@ namespace shyft {
                 double costt24(double omega1, double omega2) {
                     //return -a_*(omega2-omega1) + b_ * (sin(omega2)-sin(omega1))+c_*(cos(omega2)-cos(omega1));
                     return 2 * (-a_ * (omega2) + b_ * (sin(omega2)) + c_ * (cos(omega2) - 1));
+                }
+
+
+                /** \brief computes instantaneous predicted short-wave clear-sky radiation (direct, diffuse, reflected) for inclined surfaces
+                 * ref.: Allen, R. G.; Trezza, R. & Tasumi, M. Analytical integrated functions for daily solar radiation on slopes Agricultural and Forest Meteorology, 2006, 139, 55-73
+                 * \param latitude, [deg]
+                 * \param utctime,
+                 * \param surface_normal
+                 * \param temperature, [degC]
+                 * \param rhumidity, [percent]
+                 * \param elevation
+                 * \return */
+                template<class V>
+                double psw_radiation(double latitude, utctime t, const V &surface_normal,
+                                   double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0) {
+                    doy_ = utc.day_of_year(t);
+                    lt_ = utc.calendar_units(t).hour + utc.calendar_units(t).minute / 60.0;
+                    delta_ = compute_earth_declination(doy_);
+                    omega_ = hour_angle(lt_); // earth hour angle
+
+                    /// TODO: consider implementation of algorithm from Dozier, J. & Frew, J. Rapid calculation of terrain parameters for radiation modeling from digital elevation data IEEE Transactions on Geoscience and Remote Sensing, 1990
+                    arma::vec normal0{0.0, 0.0, 1.0}; // normal to horizontal plane
+                    slope_ = acos(arma::norm_dot(surface_normal, normal0));
+                    //slope_ = atan2(pow(pow(surface_normal(0),2)+pow(surface_normal(1),2),0.5),surface_normal(2));
+                    //aspect_ = pi - atan2(surface_normal(1),surface_normal(0));
+                    aspect_ = atan2(surface_normal(1), surface_normal(0));
+
+
+                    phi_ = latitude * pi / 180;
+                    compute_abc(delta_, phi_, slope_, aspect_);
+                    costt_ = costt(omega_); // eq.(14)
+                    compute_abc(delta_, phi_, 0.0, 0.0);
+                    costthor_ = costt(omega_);
+
+                    compute_sun_rise_set(delta_, phi_, slope_, aspect_);
+                    if (omega_ > omega1_24_ and omega_ < omega2_24_) {
+                        rahor_ = max(0.0, compute_ra(costthor_, doy_)); // eq.(1) with cos(theta)hor
+                        //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
+                        ra_ = max(0.0, compute_ra(costt_, doy_)); // eq.(1)
+                    } else {
+                        ra_ = 0.0;
+                        rahor_ = 0.0;
+                    };
+
+                    double W; //equivalent depth of precipitable water in the atmosphere[mm]
+                    eatm_ = atm_pressure(
+                            elevation); // [kPa] atmospheric pressure as a function of elevation ///TODO: get elevation from cell.midpoint().z
+                    ea_ = actual_vp(temperature, rhumidity); //[kPa] actual vapor pressure
+                    W = 0.14 * ea_ * eatm_ + 2.1; // eq.(18)
+
+                    double Kbo;
+                    double sin_beta, sin_betahor;
+                    sin_betahor = abs(
+                            costthor_); // eq.(20) equal to (4), cos_tthor = sin_betahor /// TODO: check if cos_tt = sin_beta is true for inclined surface
+                    sin_beta = abs(costt_);
+                    // clearness index for direct beam radiation
+
+                    Kbo = min(1.0, max(-0.4, 0.98 * exp(-0.00146 * eatm_ / param.turbidity / sin_beta -
+                                                        0.075 * pow((W / sin_beta), 0.4)))); // eq.(17)
+                    double Kbohor = min(1.0, max(-0.4, 0.98 * exp(-0.00146 * eatm_ / param.turbidity / sin_betahor -
+                                                                  0.075 * pow((W / sin_betahor), 0.4)))); // eq.(17)
+
+                    double Kdo; // transmissivity of diffuse radiation, eq.(19)a,b,c
+                    if (Kbo >= 0.15) { Kdo = 0.35 - 0.36 * Kbo; }
+                    else if (Kbo < 0.15 and Kbo > 0.065) { Kdo = 0.18 + 0.82 * Kbo; }
+                    else { Kdo = 0.10 + 2.08 * Kbo; }
+
+                    double Kdohor;
+                    if (Kbohor >= 0.15) { Kdohor = 0.35 - 0.36 * Kbohor; }
+                    else if (Kbohor < 0.15 and Kbohor > 0.065) { Kdohor = 0.18 + 0.82 * Kbohor; }
+                    else { Kdohor = 0.10 + 2.08 * Kbohor; }
+
+                    double fi_ = fi();//eq.(32)
+
+                    // fb_ = min(5.0,Kbo/Kbohor*ra_/(rahor_>0.0?rahor_:max(0.00001,ra_)));//eq.(34)
+                    fb_ = ra_ / (rahor_ > 0.0 ? rahor_ : max(0.00001, ra_));//eq.(34)
+
+                    double fia_ = fia(Kbohor, Kdohor); //eq.(33)
+
+                    if (omega1_24_ > omega2_24_) {
+                        omega1_24_ = omega2_24_;
+                        ra_ = 0.0;
+                    }//slope is always shaded
+                    //if ((omega_ > omega2_24b_) and (omega_<omega1_24b_) and (omega1_24_<omega2_24b_) and (omega1_24b_<omega2_24_)){ra_ = 0.0;}
+                    // rso_ = max(0.0,Kbo*ra_ + (fia_*Kdo + param.albedo*(1-fi_)*(Kbo+Kdo))*rahor_); // eq.(37)     direct beam + diffuse + reflected, only positive values accepted
+//                    response.dir_radiation = Kbo * ra_;
+//                    response.dif_radiation = fia_ * Kdo * rahor_;
+//                    response.ref_radiation = param.albedo * (1 - fi_) * (Kbo + Kdo) * rahor_;
+//                    response.psw_radiation = response.dir_radiation + response.dif_radiation +
+//                                             response.ref_radiation; // clear sky solar radiation for inclined surface [W/m2]
+                    double dir_radiation = Kbo * ra_;
+                    double dif_radiation = fia_ * Kdo * rahor_;
+                    double ref_radiation = param.albedo * (1 - fi_) * (Kbo + Kdo) * rahor_;
+                    return dir_radiation + dif_radiation + ref_radiation; // predicted clear sky solar radiation for inclined surface [W/m2]
+                }
+
+                /**\brief translates measured solar radiation from horizontal surfaces to slopes
+                 * ref.: Allen, R. G.; Trezza, R. & Tasumi, M. Analytical integrated functions for daily solar radiation on slopes Agricultural and Forest Meteorology, 2006, 139, 55-73
+                 * \param latitude, [deg]
+                 * \param utctime,
+                 * \param surface_normal
+                 * \param temperature, [degC]
+                 * \param rhumidity, [percent]
+                 * \param elevation, [m]
+                 * \param rsm,[W/m^2] -- measured solar radiation
+                 * \return */
+                template<class V>
+                double tsw_radiation(double latitude, utctime t, const V &surface_normal,
+                                   double temperature = 0.0, double rhumidity = 40.0, double elevation = 0.0,
+                                   double rsm = 0.0) {
+                    // first calculate all predicted values
+                    double tsw_rad = psw_radiation(latitude, t, surface_normal, temperature, rhumidity, elevation);
+                    double tauswhor = rsm > 0.0 ? rsm / (rahor_ > 0.0 ? rahor_ : rsm)
+                                                : 1.0; //? not sure if we use a theoretical rahor here
+                    double KBhor;
+                    if (tauswhor >= 0.42) { KBhor = 1.56 * tauswhor - 0.55; }
+                    else if (tauswhor > 0.175 and tauswhor < 0.42) {
+                        KBhor = 0.022 - 0.280 * tauswhor + 0.828 * tauswhor * tauswhor + 0.765 * pow(tauswhor, 3);
+                    }
+                    else { KBhor = 0.016 * tauswhor; }
+                    double KDhor = tauswhor - KBhor;
+                    if (rsm>0.0)
+                        tsw_rad = rsm * (fb_ * KBhor / tauswhor + fia(KBhor, KDhor) * KDhor / tauswhor +
+                                                    param.albedo * (1 - fi()));
+                    return tsw_rad;
+                }
+                /**\brief clear-sky longwave raditiation
+                 * ref.: Lawrence Dingman Physical Hydrology, Third Edition, 2015, p.261
+                 * \param temperature, [K] -- air temperature
+                 * \param rhumidity, [persent] -- relative humidity
+                 * \param ss_temp, [K] -- surface temperature
+                 * response.lw_radiation W/m^2 */
+                /// TODO https://www.hydrol-earth-syst-sci.net/17/1331/2013/hess-17-1331-2013-supplement.pdf
+                // TODO discuss the option to have different formulations here.
+                double lw_radiation(double temperature, double rhumidity){
+                    double Lin = 2.7*actual_vp(temperature,rhumidity)+0.245*temperature-45.14;
+                    double ss_temp = min(temperature-2.5,273.16);
+                    double epsilon_ss = 0.95;//water TODO: as parameter
+                    double Lout = epsilon_ss*sigma*pow(ss_temp,4)+(1-epsilon_ss)*Lin;
+                    return (Lin-Lout)*MJm2d2Wm2;
                 }
             };
 
