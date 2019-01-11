@@ -146,14 +146,27 @@ namespace shyft {
                     double sin_omega1 = min(1.0, max(-1.0, (a_ * c_ - b_ * pow(sqrt_bca, 0.5)) / bbcc));//eq.(13a)
                     double omega1 = asin(sin_omega1);
                     omega1_24_ = omega1;
+//                    std::cout<<omega1_24_<<std::endl;
                     double costt_omega1 = costt(omega1);
-                    if ((costt_sunrise <= costt_omega1) and (costt_omega1 < 0.001)) { omega1_24_ = omega1; }
+                    if ((costt_sunrise <= costt_omega1) and (costt_omega1 < 0.001)) {
+                        omega1_24_ = omega1;
+//                        std::cout<<"if1: "<<omega1_24_<<std::endl;
+                    }
                     else {
                         omega1 = -pi - omega1;
-                        if (costt(omega1) > 0.001) { omega1_24_ = -omega_s; }
+                        if (costt(omega1) > 0.001) {
+                            omega1_24_ = -omega_s;
+//                            std::cout<<"if2: "<<omega1_24_<<std::endl;
+                        }
                         else {
-                            if (omega1 <= -omega_s) { omega1_24_ = -omega_s; }
-                            else { omega1_24_ = -omega1; }
+                            if (omega1 <= -omega_s) {
+                                omega1_24_ = -omega_s;
+//                                std::cout<<"if3: "<<omega1_24_<<std::endl;
+                            }
+                            else {
+                                omega1_24_ = omega1;
+                                //std::cout<<"if4: "<<omega1_24_<<std::endl;
+                            }
                         }
                     }
                     if (omega1_24_ < -omega_s) { omega1_24_ = -omega_s; }
@@ -300,6 +313,9 @@ namespace shyft {
                     costthor_ = costt(omega_);
 
                     compute_sun_rise_set(delta_, phi_, slope, aspect);
+//                    std::cout<<"omega "<<omega_<<std::endl;
+//                    std::cout<<"omega1_24_ "<<omega1_24_<<std::endl;
+//                    std::cout<<"omega2_24_ "<<omega2_24_<<std::endl;
                     if (omega_ > omega1_24_ and omega_ < omega2_24_) {
                         rahor_ = max(0.0, compute_ra(costthor_, doy_)); // eq.(1) with cos(theta)hor
                         //ra_ = min(rahor_,max(0.0,compute_ra(costt_,doy_))); // eq.(1)
@@ -308,6 +324,8 @@ namespace shyft {
                         ra_ = 0.0;
                         rahor_ = 0.0;
                     };
+//                    std::cout<<"ra:"<<ra_<<std::endl;
+//                    std::cout<<"rahor:"<<rahor_<<std::endl;
 
                     double W; //equivalent depth of precipitable water in the atmosphere[mm]
                     eatm_ = atm_pressure(
@@ -358,6 +376,9 @@ namespace shyft {
                     double dir_radiation = Kbo * ra_;
                     double dif_radiation = fia_ * Kdo * rahor_;
                     double ref_radiation = param.albedo * (1 - fi_) * (Kbo + Kdo) * rahor_;
+//                    std::cout<<"dir: "<<dir_radiation<<std::endl;
+//                    std::cout<<"dif: "<<dif_radiation<<std::endl;
+//                    std::cout<<"ref: "<<ref_radiation<<std::endl;
                     return dir_radiation + dif_radiation + ref_radiation; // predicted clear sky solar radiation for inclined surface [W/m2]
                 }
 
@@ -376,6 +397,7 @@ namespace shyft {
                                    double rsm = 0.0) {
                     // first calculate all predicted values
                     double tsw_rad = psw_radiation(latitude, t, slope, aspect, temperature, rhumidity, elevation);
+//                    std::cout<<"tsw: "<<tsw_rad<<std::endl;
                     double tauswhor = rsm > 0.0 ? rsm / (rahor_ > 0.0 ? rahor_ : rsm)
                                                 : 1.0; //? not sure if we use a theoretical rahor here
                     double KBhor;
@@ -388,6 +410,7 @@ namespace shyft {
                     if (rsm>0.0)
                         tsw_rad = rsm * (fb_ * KBhor / tauswhor + fia(KBhor, KDhor) * KDhor / tauswhor +
                                                     param.albedo * (1 - fi()));
+//                    std::cout<<"tsw: "<<tsw_rad<<std::endl;
                     return tsw_rad;
                 }
                 /**\brief clear-sky longwave raditiation

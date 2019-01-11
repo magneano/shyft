@@ -28,7 +28,7 @@ namespace shyft::core{
                  double lai = 2.0; //leaf area index, defaulted value taken from MORECS-metoff 1981 model for grass
                  double hveg = 0.15; // vegetation height, [m] (grass from MORECS)
                  double rl = 50.0; // effective stomatal resistance, [s/m] (calculated for grass from MORECS data)
-                 parameter(double hveg=0.1, double lai = 0.1,double rl=0.1) : hveg(hveg), lai(lai), rl(rl) {}
+                 parameter(double hveg=0.12, double lai = 2.0,double rl=50.0) : hveg(hveg), lai(lai), rl(rl) {}
              };
              struct response {
                  double et_ref = 0.0; // reference evapotranspiration [mm/h]
@@ -51,8 +51,9 @@ namespace shyft::core{
                  * \param rhumidity [-] -- relative humidity
                  * \param elevation [m]
                  * \param height_ws [m] -- wind speed measurement height
-                 * \param windspeed [m/s at height_ws]*/
-                 void reference_evapotranspiration_asce(R& response, double net_radiation, double temperature, double rhumidity, double elevation=0.1, double height_ws=2.0, double windspeed=0.1){
+                 * \param windspeed [m/s at height_ws]
+                 * \param height_t [m] -- height of humidity,temperature measuerements*/
+                 void reference_evapotranspiration_asce(R& response, double net_radiation, double temperature, double rhumidity, double elevation=0.1, double height_ws=2.0, double windspeed=0.1, double height_t=2.0){
 
                      double pressure = atm_pressure(elevation, 293.15);// recommended value for T0 during growing season is 20 gradC, see eq. B.8
                      double lambda_rho = vaporization_latent_heat(temperature)*rho_w;
@@ -70,7 +71,7 @@ namespace shyft::core{
                      double sat_vp = svp(temperature);
 //                     std::cout<<"sat_vp: "<<sat_vp<<std::endl;
                      double nominator = delta * (net_radiation + soil_heat_flux(net_radiation)) +
-                             ktime*density_air(pressure, temperature, avp)*cp/resistance_aerodynamic(height_ws,windspeed)*(svp(temperature)-avp);
+                             ktime*density_air(pressure, temperature, avp)*cp/resistance_aerodynamic(height_ws,windspeed, height_t)*(svp(temperature)-avp);
 //                     std::cout<<"nominator: "<<nominator<<std::endl;
                      double denominator = delta + gamma_pm(pressure, temperature)*(1+resistance_surface(param.hveg)/resistance_aerodynamic(height_ws,windspeed));
 //                     std::cout<<"denominator: "<<denominator<<std::endl;
@@ -243,7 +244,11 @@ TEST_SUITE("evapotranspiration") {
         rad_p.turbidity = 1.0;
         radiation::calculator<radiation::parameter,radiation::response> rad(rad_p);
         calendar utc_cal;
-        double lat = 44.0;
+        // Greeley, Colorado weather station
+        double lat = 40.41;
+        double elevation = 1462.4;
+        double ht = 1.68;
+        double hws = 3.0;
         utctime t;
         // checking for horizontal surface Eugene, OR, p.64, fig.1b
         arma::vec surface_normal({0.0,0.0,1.0});
@@ -251,9 +256,9 @@ TEST_SUITE("evapotranspiration") {
         double aspect = 0.0;
         utctime ta;
 
-        ta = utc_cal.time(1970, 06, 21, 00, 00, 0, 0);
+        ta = utc_cal.time(2000, 06, 2, 00, 00, 0, 0);
         //rad.psw_radiation(r, lat, ta, surface_normal, 20.0, 50.0, 150.0);
-        rad.net_radiation(rad_r, lat, ta, slope, aspect, 20.0, 50.0, 150.0);
+
 
 
 
@@ -263,16 +268,34 @@ TEST_SUITE("evapotranspiration") {
         evapotranspiration::penman_monteith::calculator<evapotranspiration::penman_monteith::parameter,evapotranspiration::penman_monteith::response> pm_calculator(pm_p);
         trapezoidal_average av_et_ref;
         av_et_ref.initialize(pm_r.et_ref, 0.0);
+        // ref.: ASCE=EWRI Appendix C: Example Calculation of ET
+        double temperature[23] = {16.5, 15.4, 15.5, 13.5, 13.2, 16.2, 20.0, 22.9, 26.4, 28.2, 29.8, 30.9, 31.8, 32.5, 32.9, 32.4, 30.2, 30.6, 28.3, 25.9, 23.9, 20.1, 19.9};
+        double vap_pressure[23] = {1.26, 1.34, 1.31, 1.26, 1.24, 1.31, 1.36, 1.39, 1.25, 1.17, 1.03, 1.02, 0.98, 0.87, 0.86, 0.93, 1.14, 1.27, 1.27, 1.17, 1.20, 1.10, 1.05};
+        double windspeed[23] = {0.5, 1.0, 0.68, 0.69, 0.29, 1.24, 1.28, 0.88, 0.72, 1.52, 1.97, 2.07, 2.76, 2.990, 3.10, 2.77, 3.41, 2.78, 2.95, 3.27, 2.86, 2.7, 2.0};
+        double svp[23];
+        double rhumidity[23];
+        for (int i=0;i<23;i++){
+            svp[i] = hydro_functions::svp(temperature[i]);
+            //std::cout<<"svp: "<<svp[i]<<std::endl; // matched
+            rhumidity[i] = svp[i]*100/vap_pressure[i];
+        }
+
+        rad.net_radiation(rad_r, lat, ta, slope, aspect, temperature[0], rhumidity[0], elevation);
         for (int h = 1; h < 24; ++h) {
-            t = utc_cal.time(1970, 06, 21, h, 00, 0, 0); // June
-            rad.net_radiation(rad_r, lat, t, slope,aspect, 20.0, 50.0, 150.0);
-            pm_calculator.reference_evapotranspiration_asce(pm_r,rad_r.net_radiation,20.0,50.0,150.0);
+            t = utc_cal.time(2000, 06, 2, h, 00, 0, 0); // June
+            rad.net_radiation(rad_r, lat, t, slope,aspect, temperature[h-1], rhumidity[h-1], elevation);
+            std::cout<<"lw: "<<rad_r.lw_radiation<<std::endl;
+            std::cout<<"sw: "<<rad_r.sw_radiation<<std::endl;
+            std::cout<<"net: "<<rad_r.net_radiation<<std::endl;
+            std::cout<<"-----------------"<<std::endl;
+            pm_calculator.reference_evapotranspiration_asce(pm_r,rad_r.net_radiation*0.0036,temperature[h-1], rhumidity[h-1],elevation, hws, windspeed[h-1],ht);
             std::cout<<"et_ref: "<<pm_r.et_ref<<std::endl;
+            std::cout<<"-----------------"<<std::endl;
             av_et_ref.add(pm_r.et_ref, h);
 
         }
         std::cout << "et_ref_soh_av: " << av_et_ref.result() << std::endl;
-        FAST_CHECK_EQ(av_et_ref.result(), doctest::Approx(110.0).epsilon(0.05));
+        FAST_CHECK_EQ(av_et_ref.result(), doctest::Approx(0.4).epsilon(0.005));
 
     }
 
