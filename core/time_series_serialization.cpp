@@ -519,36 +519,16 @@ void shyft::time_series::dd::abs_ts::serialize(Archive & ar, const unsigned int 
 }
 
 template < typename FillingParameters, typename ... QaParameters >
-template<class Archive>
+template < class Archive >
 void shyft::time_series::dd::qac_ts<FillingParameters, QaParameters...>::serialize(Archive & ar, const unsigned int version) {
 	ar
 		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))
-		& core_nvp("ts", ts)
+        & core_nvp("ts", ts)
+		& core_nvp("fill_ts", fill_ts)
         & core_nvp("fp", fp)
         & core_nvp("qaps", qaps)
 		;
 }
-
-// template<class Archive>
-// void shyft::time_series::dd::qac_parameter::serialize(Archive & ar, const unsigned int version) {
-//     ar
-//         & core_nvp("nan_qa_enabled", nan_qa_enabled)
-//         & core_nvp("infinity_qa_enabled", infinity_qa_enabled)
-//         & core_nvp("min_max_qa_enabled", min_max_qa_enabled)
-//         & core_nvp("repeating_qa_enabled", repeating_qa_enabled)
-// 
-//         & core_nvp("min_x", min_x)
-//         & core_nvp("max_x", max_x)
-//         
-//         & core_nvp("repeat_timespan", repeat_timespan)
-//         & core_nvp("repeat_tolerance", repeat_tolerance)
-//         & core_nvp("allowed_repeating", allowed_repeating)
-// 
-//         & core_nvp("max_scan_timespan", max_scan_timespan)
-//         
-//         & core_nvp("constant_filler", constant_filler)
-//         ;
-// }
 
 template<class Archive>
 void shyft::time_series::dd::inside_ts::serialize(Archive & ar, const unsigned int version) {
@@ -645,10 +625,12 @@ x_serialize_implement(shyft::time_series::dd::apoint_ts);
 x_serialize_implement(shyft::time_series::dd::krls_interpolation_ts);
 
 x_serialize_implement(shyft::time_series::dd::ats_vector);
+
 using qac_ts_min_max_ts_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_ts_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
 using qac_ts_min_max_linear_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_linear_interpolation_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
 x_serialize_implement(qac_ts_min_max_ts_fill_alias);
 x_serialize_implement(qac_ts_min_max_linear_fill_alias);
+
 // x_serialize_implement(shyft::time_series::dd::qac_parameter);
 x_serialize_implement(shyft::time_series::dd::inside_ts);
 x_serialize_implement(shyft::time_series::dd::decode_ts);
@@ -726,8 +708,10 @@ x_arch(shyft::time_series::dd::abin_op_ts_scalar);
 x_arch(shyft::time_series::dd::apoint_ts);
 x_arch(shyft::time_series::dd::krls_interpolation_ts);
 x_arch(shyft::time_series::dd::ats_vector);
+
 x_arch(qac_ts_min_max_ts_fill_alias);
 x_arch(qac_ts_min_max_linear_fill_alias);
+
 // x_arch(shyft::time_series::dd::qac_parameter);
 x_arch(shyft::time_series::dd::inside_ts);
 x_arch(shyft::time_series::dd::decode_ts);

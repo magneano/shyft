@@ -119,7 +119,8 @@ namespace shyft { namespace time_series { namespace dd {
         o_index<ice_packing_ts>,
         o_index<ice_packing_recession_ts>,
         o_index<krls_interpolation_ts>,
-        o_index<qac_ts<qac_min_max_parameter>>,
+        o_index<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>>,
+        o_index<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>>,
         o_index<inside_ts>,
         o_index<decode_ts>,
         o_index<derivative_ts>
@@ -302,16 +303,30 @@ namespace shyft { namespace time_series { namespace dd {
         struct sqac_min_max_ts_fill_ts {
             using ts_t = qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>;
             a_index ts;
-            qac_ts_fill_parameters fp; 
+            a_index fill_ts;
+            qac_ts_fill_parameters fp;
             qac_min_max_parameter qap;
             bool operator==(const sqac_min_max_ts_fill_ts & o) const {
-                return ts == o.ts && fp.equal(o.fp, 1e-10) && qap.equal(o.qap, 1e-10);
+                return ts == o.ts && fill_ts == o.fill_ts && fp.equal(o.fp, 1e-10) && qap.equal(o.qap, 1e-10);
             }
             x_serialize_decl();// needed because of fp (when type is qac_ts_fill_parameters)
-
         };
         template<> struct _type<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>> {
             using rep_t = srep::sqac_min_max_ts_fill_ts;
+        };
+
+        struct sqac_min_max_linear_fill_ts {
+            using ts_t = qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>;
+            a_index ts;
+            a_index fill_ts;
+            qac_linear_interpolation_fill_parameters fp;
+            qac_min_max_parameter qap;
+            bool operator==(const sqac_min_max_linear_fill_ts & o) const {
+                return ts == o.ts && fill_ts == o.fill_ts && fp.equal(o.fp, 1e-10) && qap.equal(o.qap, 1e-10);
+            }
+        };
+        template<> struct _type<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>> {
+            using rep_t = srep::sqac_min_max_linear_fill_ts;
         };
         
         struct sinside_ts {
@@ -451,9 +466,16 @@ namespace shyft { namespace time_series { namespace dd {
             } else if (auto ts = dynamic_cast<krls_interpolation_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<krls_interpolation_ts>{ expr.append(srep::_type<krls_interpolation_ts>::rep_t{ convert(ts->ts),ts->predictor }) };
-            } else  if (auto ts = dynamic_cast<qac_ts*>(ats.ts.get())) {
-                _m_find_ts_map(ts); // NOTICE that qac_ts is so far the only ts that keeps optional time-series,
-                return m[ts] = o_index<qac_ts>{ expr.append(srep::_type<qac_ts>::rep_t{ convert(apoint_ts(ts->ts)),convert(apoint_ts(ts->cts)), ts->p }) };
+            } else if (auto ts = dynamic_cast<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter> *>(ats.ts.get())) {
+                _m_find_ts_map(ts);
+                return m[ts] = o_index<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>>{
+                    expr.append(srep::_type<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>>::rep_t{
+                        convert(apoint_ts(ts->ts)), convert(apoint_ts(ts->fill_ts)), ts->fp, std::get<0>(ts->qaps) }) };
+            } else if (auto ts = dynamic_cast<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter> *>(ats.ts.get())) {
+                _m_find_ts_map(ts);
+                return m[ts] = o_index<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>>{
+                    expr.append(srep::_type<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>>::rep_t{
+                        convert(apoint_ts(ts->ts)), convert(apoint_ts(ts->fill_ts)), ts->fp, std::get<0>(ts->qaps) }) };
             } else  if (auto ts = dynamic_cast<inside_ts*>(ats.ts.get())) {
                 _m_find_ts_map(ts);
                 return m[ts] = o_index<inside_ts>{ expr.append(srep::_type<inside_ts>::rep_t{ convert(apoint_ts(ts->ts)), ts->p }) };
@@ -636,14 +658,18 @@ namespace shyft { namespace time_series { namespace dd {
             return make_shared<krls_interpolation_ts>(move(src_ts), rx.predictor);
         }
 
-        shared_ptr<qac_ts> make(o_index<qac_ts> i) {
+        shared_ptr<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>> make(o_index<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>> i) {
             const auto& rx = expr.at(i);
-            apoint_ts src_ts{ boost::apply_visitor(*this,rx.ts) };
-            apoint_ts cts;
-            if (rx.cts.which() != 0) { // NOTICE could be nil/null ptr.
-                cts = apoint_ts(boost::apply_visitor(*this, rx.cts));
-            }
-            return make_shared<qac_ts>(src_ts, rx.p, cts);
+            apoint_ts src_ts{ boost::apply_visitor(*this, rx.ts) };
+            apoint_ts fill_ts{ boost::apply_visitor(*this, rx.fill_ts) };
+            return make_shared<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter> >(src_ts, rx.fp, rx.qap, fill_ts);
+        }
+
+        shared_ptr<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>> make(o_index<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>> i) {
+            const auto& rx = expr.at(i);
+            apoint_ts src_ts{ boost::apply_visitor(*this, rx.ts) };
+            apoint_ts fill_ts{ boost::apply_visitor(*this, rx.fill_ts) };
+            return make_shared<qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter> >(src_ts, rx.fp, rx.qap, fill_ts);
         }
         
         shared_ptr<inside_ts> make(o_index<inside_ts> i) {
@@ -658,12 +684,13 @@ namespace shyft { namespace time_series { namespace dd {
             return make_shared<decode_ts>(src_ts, rx.p);
         }
 
-    public: // required for the visitor callbacks
-            /** generic callback called by visitor for any type
-            * performs lookup in the table, then if missing
-            * forward the construction to the corresponding make (typespecific)... method
-            * that returns a shared_ptr to the constructed object.
-            */
+    public:
+        // required for the visitor callbacks
+        /** generic callback called by visitor for any type
+         * performs lookup in the table, then if missing
+         * forward the construction to the corresponding make (typespecific)... method
+         * that returns a shared_ptr to the constructed object.
+         */
         template<class T>
         return_type operator()(o_index<T> i) {
             auto &V = get<vector<shared_ptr<T>>>(ts_type_map);
@@ -717,7 +744,7 @@ namespace shyft { namespace time_series { namespace dd {
     /**convinient macro to use for all know types, use as parameter-pack to ts_exp_rep, etc.*/
 #define all_srep_types  srep::sbinop_op_ts, srep::sbinop_ts_scalar, srep::sbin_op_scalar_ts, srep::sabs_ts, srep::saverage_ts, srep::sintegral_ts, srep::saccumulate_ts, \
             srep::stime_shift_ts, srep::speriodic_ts, srep::sconvolve_w_ts, srep::sextend_ts, srep::srating_curve_ts, srep::sice_packing_ts, srep::sice_packing_recession_ts, \
-            srep::skrls_interpolation_ts, srep::sqac_min_max_ts_fill_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts
+            srep::skrls_interpolation_ts, srep::sqac_min_max_ts_fill_ts, srep::sqac_min_max_linear_fill_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts
 
     typedef ts_expression<all_srep_types> compressed_ts_expression;
     typedef ts_expression_compressor<all_srep_types> expression_compressor;
@@ -735,6 +762,7 @@ x_serialize_binary(shyft::time_series::dd::srep::stime_shift_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sextend_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sinside_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sdecode_ts);
+x_serialize_binary(shyft::time_series::dd::srep::sqac_min_max_linear_fill_ts);
 
 
 x_serialize_export_key(shyft::time_series::dd::srep::saverage_ts);
@@ -769,7 +797,9 @@ x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::ice_p
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::krls_interpolation_ts>);
 // need aliases to work around the non-variadic macros used by boost serialize
 using qac_ts_min_max_ts_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_ts_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
+using qac_ts_min_max_linear_fill_alias = shyft::time_series::dd::qac_ts<shyft::time_series::dd::qac_linear_interpolation_fill_parameters, shyft::time_series::dd::qac_min_max_parameter>;
 x_serialize_binary(shyft::time_series::dd::o_index<qac_ts_min_max_ts_fill_alias>);
+x_serialize_binary(shyft::time_series::dd::o_index<qac_ts_min_max_linear_fill_alias>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::inside_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::decode_ts>);
 x_serialize_binary(boost::blank);

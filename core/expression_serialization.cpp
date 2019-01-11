@@ -114,6 +114,9 @@ void shyft::time_series::dd::srep::sice_packing_recession_ts::serialize(Archive 
 template<class Archive>
 void shyft::time_series::dd::srep::skrls_interpolation_ts::serialize(Archive &ar, const unsigned /*version*/) { ar & ts & predictor; }
 
+template<class Archive>
+void shyft::time_series::dd::srep::sqac_min_max_ts_fill_ts::serialize(Archive &ar, const unsigned /*version*/) { ar & ts & fill_ts & fp & qap; }
+
 x_serialize_implement(shyft::time_series::dd::srep::saverage_ts);
 x_serialize_implement(shyft::time_series::dd::srep::sintegral_ts);
 x_serialize_implement(shyft::time_series::dd::srep::sderivative_ts);
@@ -124,6 +127,7 @@ x_serialize_implement(shyft::time_series::dd::srep::srating_curve_ts);
 x_serialize_implement(shyft::time_series::dd::srep::sice_packing_ts);
 x_serialize_implement(shyft::time_series::dd::srep::sice_packing_recession_ts);
 x_serialize_implement(shyft::time_series::dd::srep::skrls_interpolation_ts);
+x_serialize_implement(shyft::time_series::dd::srep::sqac_min_max_ts_fill_ts);
 x_serialize_implement(shyft::time_series::dd::compressed_ts_expression);
 
 using shyft::core::core_oarchive;
@@ -140,3 +144,4 @@ x_serialize_archive(shyft::time_series::dd::srep::srating_curve_ts, core_oarchiv
 x_serialize_archive(shyft::time_series::dd::srep::sice_packing_ts, core_oarchive, core_iarchive);
 x_serialize_archive(shyft::time_series::dd::srep::sice_packing_recession_ts, core_oarchive, core_iarchive);
 x_serialize_archive(shyft::time_series::dd::srep::skrls_interpolation_ts, core_oarchive, core_iarchive);
+x_serialize_archive(shyft::time_series::dd::srep::sqac_min_max_ts_fill_ts, core_oarchive, core_iarchive);

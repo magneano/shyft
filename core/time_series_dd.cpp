@@ -644,7 +644,7 @@ namespace shyft{
                 find_ts_bind_info(dynamic_cast<const krls_interpolation_ts*>(its.get())->ts.ts, r);
             } else if (dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())) {
                 find_ts_bind_info(dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())->ts, r);
-                find_ts_bind_info(dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())->fp.cts, r);
+                find_ts_bind_info(dynamic_cast<const qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>*>(its.get())->fill_ts, r);
             } else if (dynamic_cast<const qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>*>(its.get())) {
                 find_ts_bind_info(dynamic_cast<const qac_ts<qac_linear_interpolation_fill_parameters, qac_min_max_parameter>*>(its.get())->ts, r);
             } else if (dynamic_cast<const inside_ts*>(its.get())) {
@@ -941,10 +941,11 @@ namespace shyft{
                 qac_min_max_parameter{ min_x, max_x }));
         }
 
-        apoint_ts apoint_ts::min_max_check_ts_fill(double min_x, double max_x, utctimespan max_dt, const apoint_ts& cts) const {
+        apoint_ts apoint_ts::min_max_check_ts_fill(double min_x, double max_x, utctimespan max_dt, const apoint_ts & fill_ts) const {
             return apoint_ts(make_shared<qac_ts<qac_ts_fill_parameters, qac_min_max_parameter>>(*this,
-                qac_ts_fill_parameters{ max_dt, cts.ts },
-                qac_min_max_parameter{min_x, max_x }));
+                qac_ts_fill_parameters{ max_dt },
+                qac_min_max_parameter{min_x, max_x },
+                fill_ts));
         }
 
         apoint_ts apoint_ts::inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const {
@@ -1312,138 +1313,142 @@ namespace shyft{
 
         // ================================================================================
 
-        // TODO this should perhaps be moved out of qac_ts if possible
-        template < typename FillingParameters, typename ... QaParameters >
-        void qac_ts<FillingParameters, QaParameters...>::_scan_repeating_values(const std::vector<double> & data) const {
-            const std::size_t data_size = this->ts->size();
-
-            // ready cache vector
-            this->_repeating_cache.clear();
-            this->_repeating_cache.reserve(data_size);
-
-            // scan data
-            double previous_value{};
-            std::size_t repeat_counter{ 0u };
-            std::size_t repeat_start_i{ 0u };
-            for ( std::size_t i = 0u; i < data_size; ++i ) {
-                this->_repeating_cache.emplace_back(0);
-
-                double value = data[i];
-
-                // after the first value
-                if ( i > 0u ) {
-                    if (
-                            std::abs(previous_value - value) <= this->p.repeat_tolerance
-                            && ! std::count_if(
-                                this->p.allowed_repeating.cbegin(), this->p.allowed_repeating.cend(), [&value, this](double v) -> bool {
-                                    return std::abs(v - value) <= this->p.repeat_tolerance;
-                                }
-                            ) > 0
-                    ) {
-                        // value close to previous
-                        if ( repeat_counter == 0u ) {
-                            repeat_counter = 1u;
-                            repeat_start_i = i-1;
-                        }
-                        repeat_counter += 1u;
-                    } else {
-                        // value not close to previous -> check if this is a long enough repetition sequence
-                        utctime t0 = this->time(repeat_start_i);
-                        utctime t1 = this->time(i);  // not i-1 to count the full period of the last repeating value
-
-                        // long enough period?
-                        if ( repeat_counter > 0 && t1 - t0 >= this->p.repeat_timespan ) {
-                            // then replace the last few values 
-                            for ( std::size_t j = repeat_start_i; j < i; ++j ) {
-                                this->_repeating_cache[j] = 1;
-                            }
-                        }
-                        repeat_counter = 0u;
-                    }
-                }
-                previous_value = value;
-            }
-
-            // repeating at the end?
-            if ( repeat_counter > 0 ) {
-                utctime t0 = this->time(repeat_start_i);
-                utctime t1 = this->total_period().end;  // end of series
-
-                // long enough period?
-                if ( t1 - t0 >= this->p.repeat_timespan ) {
-                    // then replace the last few values 
-                    for ( std::size_t j = repeat_start_i; j < data_size; ++j ) {
-                        this->_repeating_cache[j] = 1;
-                    }
-                }
-            }
-        }
+        // // TODO this should perhaps be moved out of qac_ts if possible
+        // template < typename FillingParameters, typename ... QaParameters >
+        // void qac_ts<FillingParameters, QaParameters...>::_scan_repeating_values(const std::vector<double> & data) const {
+        //     const std::size_t data_size = this->ts->size();
+        // 
+        //     // ready cache vector
+        //     this->_repeating_cache.clear();
+        //     this->_repeating_cache.reserve(data_size);
+        // 
+        //     // scan data
+        //     double previous_value{};
+        //     std::size_t repeat_counter{ 0u };
+        //     std::size_t repeat_start_i{ 0u };
+        //     for ( std::size_t i = 0u; i < data_size; ++i ) {
+        //         this->_repeating_cache.emplace_back(0);
+        // 
+        //         double value = data[i];
+        // 
+        //         // after the first value
+        //         if ( i > 0u ) {
+        //             if (
+        //                     std::abs(previous_value - value) <= this->p.repeat_tolerance
+        //                     && ! std::count_if(
+        //                         this->p.allowed_repeating.cbegin(), this->p.allowed_repeating.cend(), [&value, this](double v) -> bool {
+        //                             return std::abs(v - value) <= this->p.repeat_tolerance;
+        //                         }
+        //                     ) > 0
+        //             ) {
+        //                 // value close to previous
+        //                 if ( repeat_counter == 0u ) {
+        //                     repeat_counter = 1u;
+        //                     repeat_start_i = i-1;
+        //                 }
+        //                 repeat_counter += 1u;
+        //             } else {
+        //                 // value not close to previous -> check if this is a long enough repetition sequence
+        //                 utctime t0 = this->time(repeat_start_i);
+        //                 utctime t1 = this->time(i);  // not i-1 to count the full period of the last repeating value
+        // 
+        //                 // long enough period?
+        //                 if ( repeat_counter > 0 && t1 - t0 >= this->p.repeat_timespan ) {
+        //                     // then replace the last few values 
+        //                     for ( std::size_t j = repeat_start_i; j < i; ++j ) {
+        //                         this->_repeating_cache[j] = 1;
+        //                     }
+        //                 }
+        //                 repeat_counter = 0u;
+        //             }
+        //         }
+        //         previous_value = value;
+        //     }
+        // 
+        //     // repeating at the end?
+        //     if ( repeat_counter > 0 ) {
+        //         utctime t0 = this->time(repeat_start_i);
+        //         utctime t1 = this->total_period().end;  // end of series
+        // 
+        //         // long enough period?
+        //         if ( t1 - t0 >= this->p.repeat_timespan ) {
+        //             // then replace the last few values 
+        //             for ( std::size_t j = repeat_start_i; j < data_size; ++j ) {
+        //                 this->_repeating_cache[j] = 1;
+        //             }
+        //         }
+        //     }
+        // }
 
         // ----------------------------------------
 
         template < typename FillingParameters, typename ... QaParameters >
-        double qac_ts<FillingParameters, QaParameters...>:: _fill_value(size_t i) const {
-            // use a correction value ts if available
-            if ( cts ) {
-                return cts->value_at(ts->time(i)); // we do not check this value, assume ok!
-            } else if ( this->p.can_do_linear_interpolation() ) {
-                // do linear interpolation between previous--next *valid* point
-                return this->_fill_linear_interpolation(i);
-            } else {
-                // fill a constant value if no other is set
-                return this->_fill_constant();
-            }
-            
+        double qac_ts<FillingParameters, QaParameters...>::_fill_value(size_t i) const {
+            return this->fp.get_value_for(this->ts->time(i), *this);  // we do not check this value, assume ok!
         }
-        template < typename FillingParameters, typename ... QaParameters >
-        double qac_ts<FillingParameters, QaParameters...>::_fill_constant() const {
-            return this->p.constant_filler;
-        }
-        template < typename FillingParameters, typename ... QaParameters >
-        double qac_ts<FillingParameters,QaParameters...>::_fill_linear_interpolation(std::size_t i) const {
-            const auto t = ts->time(i);
-            const std::size_t n = ts->size();
-
-            // is a there a previous and next point, or is the allowed interpolation span empty?
-            if ( i == 0 || i + 1 >= n || p.max_scan_timespan == utctimespan{0} ) {
-                return shyft::nan;
-            }
-
-            // find previous _valid_ point
-            std::size_t j = i;
-            while ( j-- ) {
-                utctime t0 = ts->time(j);
-
-                // point within allowed timespan?
-                if ( t - t0 > p.max_scan_timespan ) {
-                    return shyft::nan;
-                }
-                // is value at previous point valid?
-                double x0 = ts->value(j);
-                if ( p.is_ok_quality(j, x0, *this) ) {
-                    // found previous point, now scan for next point
-                    for ( std::size_t k = i + 1; k < n; ++k ) {
-                        utctime t1 = ts->time(k);
-
-                        // distance between previous and next within allowed span?
-                        if ( t1 - t0 > p.max_scan_timespan ) {
-                            return shyft::nan;
-                        }
-                        // is value at next valid?
-                        double x1 = ts->value(k);
-                        if ( p.is_ok_quality(k, x1, *this) ) {
-                            // do interpolation!
-                            const double a = (x1 - x0) / to_seconds(t1 - t0);
-                            const double b = x0 - a * to_seconds(t0);// x= a*t + b -> b= x- a*t
-                            return a * to_seconds(t) + b;
-                        }
-                    }
-                }
-            }
-
-            // failed to find a substitute value using interpolation
-            return shyft::nan;
-        }
+        // template < typename FillingParameters, typename ... QaParameters >
+        // double qac_ts<FillingParameters, QaParameters...>:: _fill_value(size_t i) const {
+        //     // use a correction value ts if available
+        //     if ( cts ) {
+        //         return cts->value_at(ts->time(i)); // we do not check this value, assume ok!
+        //     } else if ( this->p.can_do_linear_interpolation() ) {
+        //         // do linear interpolation between previous--next *valid* point
+        //         return this->_fill_linear_interpolation(i);
+        //     } else {
+        //         // fill a constant value if no other is set
+        //         return this->_fill_constant();
+        //     }
+        // 
+        // }
+        // template < typename FillingParameters, typename ... QaParameters >
+        // double qac_ts<FillingParameters, QaParameters...>::_fill_constant() const {
+        //     return this->p.constant_filler;
+        // }
+        // template < typename FillingParameters, typename ... QaParameters >
+        // double qac_ts<FillingParameters,QaParameters...>::_fill_linear_interpolation(std::size_t i) const {
+        //     const auto t = ts->time(i);
+        //     const std::size_t n = ts->size();
+        // 
+        //     // is a there a previous and next point, or is the allowed interpolation span empty?
+        //     if ( i == 0 || i + 1 >= n || p.max_scan_timespan == utctimespan{0} ) {
+        //         return shyft::nan;
+        //     }
+        // 
+        //     // find previous _valid_ point
+        //     std::size_t j = i;
+        //     while ( j-- ) {
+        //         utctime t0 = ts->time(j);
+        // 
+        //         // point within allowed timespan?
+        //         if ( t - t0 > p.max_scan_timespan ) {
+        //             return shyft::nan;
+        //         }
+        //         // is value at previous point valid?
+        //         double x0 = ts->value(j);
+        //         if ( p.is_ok_quality(j, x0, *this) ) {
+        //             // found previous point, now scan for next point
+        //             for ( std::size_t k = i + 1; k < n; ++k ) {
+        //                 utctime t1 = ts->time(k);
+        // 
+        //                 // distance between previous and next within allowed span?
+        //                 if ( t1 - t0 > p.max_scan_timespan ) {
+        //                     return shyft::nan;
+        //                 }
+        //                 // is value at next valid?
+        //                 double x1 = ts->value(k);
+        //                 if ( p.is_ok_quality(k, x1, *this) ) {
+        //                     // do interpolation!
+        //                     const double a = (x1 - x0) / to_seconds(t1 - t0);
+        //                     const double b = x0 - a * to_seconds(t0);// x= a*t + b -> b= x- a*t
+        //                     return a * to_seconds(t) + b;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // 
+        //     // failed to find a substitute value using interpolation
+        //     return shyft::nan;
+        // }
 
         // ----------------------------------------
 

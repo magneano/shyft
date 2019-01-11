@@ -1544,7 +1544,8 @@ namespace shyft {
             using filling_param = FillingParameters;
             using qa_param_tuple = std::tuple<QaParameters...>;
 
-            std::shared_ptr<ipoint_ts> ts;  ///< the source ts
+            std::shared_ptr<ipoint_ts> ts;        ///< Source TS
+            std::shared_ptr<ipoint_ts> fill_ts;   ///< Extra TS accessible to the filling routines
 
             filling_param fp;     ///< the parameters that control the infill where qa failed values
             qa_param_tuple qaps;  ///< the parameters that control how the qa is done
@@ -1554,8 +1555,13 @@ namespace shyft {
             qac_ts(apoint_ts && ats) : ts{ std::forward(ats.ts) } { }
             // -----
             qac_ts(const apoint_ts & ats, const filling_param & fp,
-                   const QaParameters & ... qap)
+                const QaParameters & ... qap)
                 : ts(ats.ts)f p{ fp}, qaps{ qap... } { }
+            // -----
+            qac_ts(const apoint_ts & ats, const filling_param & fp,
+                  const QaParameters & ... qap,
+                  const apoint_ts & fill_ts)
+                : ts(ats.ts)f p{ fp}, qaps{ qap... }, fill_ts{ fill_ts } { }
 
             // std copy ct and assign
             qac_ts() = default;
@@ -1595,12 +1601,12 @@ namespace shyft {
 
         protected:
             double _fill_value(size_t i) const;
-            double _fill_constant() const;
-            double _fill_linear_interpolation(size_t i) const;
+            // double _fill_constant() const;
+            // double _fill_linear_interpolation(size_t i) const;
 
-            mutable std::vector<int> _repeating_cache{};
+            // mutable std::vector<int> _repeating_cache{};
 
-            void _scan_repeating_values(const std::vector<double> & data) const;
+            // void _scan_repeating_values(const std::vector<double> & data) const;
         };
 
         // inline bool qac_parameter::is_ok_repeating(std::size_t i, const qac_ts & ts) const noexcept {
@@ -1616,16 +1622,25 @@ namespace shyft {
             bool equal(const qac_linear_interpolation_fill_parameters & other, double abs_e=1e-9) const {
                 return max_scan_timespan == other.max_scan_timespan;
             }
+
+            template < typename ... QAP >
+            double get_value_for(utctime t, const qac_ts<qac_linear_interpolation_fill_parameters, QAP...> & qac_ts_inst) const {
+                return 0.0;  // TODO
+            }
         };
 
         struct qac_ts_fill_parameters {
 
             utctimespan max_scan_timespan{max_utctime};  ///< Max timespan to scan for next/previous valid values during infill.
-            shared_ptr<ipoint_ts> cts;                   ///< TS with replacement values.
 
             /** Is the parameter block equal to another parameter block, within a tolerance. */
             bool equal(const qac_ts_fill_parameters & other, double abs_e=1e-9) const {
                 return max_scan_timespan == other.max_scan_timespan;
+            }
+
+            template < typename ... QAP >
+            double get_value_for(utctime t, const qac_ts<qac_ts_fill_parameters, QAP...> & qac_ts_inst) const {
+                return qac_ts_inst.fill_ts->value_at(t);
             }
         };
 
@@ -1636,7 +1651,7 @@ namespace shyft {
 
 
             /** Check QA fo a value using the set config. */
-            bool is_ok_quality(double value) const noexcept {
+            bool check_quality(double value) const noexcept {
                 if ( ::isnan(value) ) {
                     return false;
                 } else if ( ::isfinite(min_value) && value < min_value ) {
