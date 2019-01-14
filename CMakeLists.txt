@@ -17,16 +17,12 @@
 cmake_minimum_required(VERSION 3.9.0)
 project(shyft C CXX)
 
+set(python_min_required_version 3.6)
+set(boost_min_required_version 1.67)
+
 # Get the full version for Shyft
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/VERSION SHYFT_VERSION_STRING)
-
 message("Configuring for Shyft version: " ${SHYFT_VERSION_STRING})
-
-find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-endif(CCACHE_FOUND)
 
 # options
 option(BUILD_TESTING "Build test programs for SHYFT C++ core library" ON)
@@ -40,64 +36,72 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 
     # Set the possible values of build type for cmake-gui
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-        "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+   		 "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# The dependencies directory
+# The dependencies directory if set
 if(DEFINED ENV{SHYFT_DEPENDENCIES_DIR})
-  set(SHYFT_DEPENDENCIES_DIR $ENV{SHYFT_DEPENDENCIES_DIR})
+    set(SHYFT_DEPENDENCIES_DIR $ENV{SHYFT_DEPENDENCIES_DIR})
+
+    # Our code requires an absolute directory for the dependencies
+    get_filename_component(SHYFT_DEPENDENCIES ${SHYFT_DEPENDENCIES_DIR} ABSOLUTE)
+    message("Using SHYFT_DEPENDENCIES directory: " ${SHYFT_DEPENDENCIES})
+    message("You can change the above via the SHYFT_DEPENDENCIES_DIR environment variable.")
 else()
-  set(SHYFT_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/../shyft_dependencies")
+    message("Environment variable SHYFT_DEPENDENCIES_DIR not set.")
 endif()
-# Our code requires an absolute directory for the dependencies
-get_filename_component(SHYFT_DEPENDENCIES ${SHYFT_DEPENDENCIES_DIR} ABSOLUTE)
-message("SHYFT_DEPENDENCIES directory: " ${SHYFT_DEPENDENCIES})
-message("You can override the above via the $SHYFT_DEPENDENCIES_DIR environment variable.")
 
 # shyft uses boost, dlib, armadillo and doctest, and python +  numpy
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${SHYFT_DEPENDENCIES}")
+set(CMAKE_PREFIX_PATH "${SHYFT_DEPENDENCIES}" ${CMAKE_PREFIX_PATH})
 
+# Find python version (Want matching Boost::python version)
+find_package(PythonInterp ${python_min_required_version} REQUIRED)
+find_package(PythonLibs ${python_min_required_version} REQUIRED)
+set(boost_py "python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}")
+
+# Find required packages
 find_package(doctest REQUIRED)
 find_package(dlib REQUIRED)
 find_package(Armadillo REQUIRED)
-#
-get_filename_component(arma_libs  ${ARMADILLO_LIBRARIES} REALPATH CACHE)
-if(${CMAKE_VERSION} VERSION_LESS "3.10.0") 
-    # unfortunately, .travis does not have updated cmake, so find_package won't work as we need.
-    message("old cmake, using workaround for boost libraries")
-    set(boost_system_lib ${SHYFT_DEPENDENCIES}/lib/libboost_system.so)
-    set(boost_filesystem_lib ${SHYFT_DEPENDENCIES}/lib/libboost_filesystem.so)
-    set(boost_python3_lib ${SHYFT_DEPENDENCIES}/lib/libboost_python36.so)
-    set(boost_serialization_lib ${SHYFT_DEPENDENCIES}/lib/libboost_serialization.so)
-else()
-    find_package(Boost 1.67 COMPONENTS python36 serialization filesystem system REQUIRED)
-    get_property(boost_system_lib TARGET Boost::system PROPERTY IMPORTED_LOCATION_RELEASE)
-    get_property(boost_filesystem_lib TARGET Boost::filesystem PROPERTY IMPORTED_LOCATION_RELEASE)
-    get_property(boost_serialization_lib  TARGET Boost::serialization PROPERTY IMPORTED_LOCATION_RELEASE)
-    get_property(boost_python3_lib TARGET Boost::python36 PROPERTY IMPORTED_LOCATION_RELEASE)
-
-endif()
-
-set(boost_link_libraries ${boost_filesystem_lib} ${boost_serialization_lib} ${boost_system_lib})
-set(boost_py_link_libraries ${boost_python3_lib} ${boost_link_libraries})
+find_package(Boost ${boost_min_required_version} COMPONENTS ${boost_py} serialization filesystem system REQUIRED)
 
 # The compiler requirement,flags definitions and include that applies for all
 # Notice that we need MINIMIZE_SIZE to ensure g++ vs. ms c++ compat
 set(CMAKE_CXX_STANDARD 17)
-add_compile_options(-fPIC -fexceptions -pthread -Wno-deprecated-declarations)
-add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG -DBOOST_ERROR_CODE_HEADER_ONLY -DBOOST_VARIANT_MINIMIZE_SIZE -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS -DBOOST_MPL_LIMIT_LIST_SIZE=30 -DBOOST_MPL_LIMIT_VECTOR_SIZE=30")
-include_directories(${CMAKE_SOURCE_DIR} ${SHYFT_DEPENDENCIES}/include) # we could add more explicit list boost,dlib,armadillo,doctest here
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+add_compile_options(-fPIC -fexceptions -pthread -Wno-deprecated-declarations -Wno-undef)
 
+# Armadillo options
+add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG")
+
+# Boost options
+add_definitions("-DBOOST_ERROR_CODE_HEADER_ONLY -DBOOST_VARIANT_MINIMIZE_SIZE -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS -DBOOST_MPL_LIMIT_LIST_SIZE=30 -DBOOST_MPL_LIMIT_VECTOR_SIZE=30")
+
+# Include
+include_directories(${CMAKE_SOURCE_DIR} ${ARMADILLO_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
+
+# Convenience function for adding python modules
+function (add_module target_name)
+    set(options SOURCE LIB)
+    cmake_parse_arguments(ARG "" "" "${options}" ${ARGN})
+    add_library(${target_name} MODULE ${ARG_SOURCE})
+    target_link_libraries(${target_name} PRIVATE ${ARG_LIB})
+    set_target_properties(${target_name} PROPERTIES PREFIX "_")
+    set_target_properties(${target_name} PROPERTIES CXX_VISIBILITY_PRESET "hidden")
+    set_property(TARGET ${target_name} APPEND PROPERTY COMPILE_DEFINITIONS SHYFT_EXTENSION)
+endfunction()
 
 # C++ core and tests
+add_subdirectory(core)
+add_subdirectory(api)
+
 if(BUILD_TESTING)
-  enable_testing()
-  add_subdirectory(core)
-  add_subdirectory(api)
-  add_subdirectory(test)
-endif(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(test)
+endif()
 
 # Python extensions
 if(BUILD_PYTHON_EXTENSIONS)
-  add_subdirectory(api/boostpython)
-endif(BUILD_PYTHON_EXTENSIONS)
+    add_subdirectory(api/boostpython)
+endif()

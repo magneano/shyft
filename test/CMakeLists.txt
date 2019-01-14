@@ -13,7 +13,7 @@ set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_tes
 set(target "test_shyft")
     add_definitions("-D__UNIT_TEST__ -DVERBOSE=0 ")
     add_executable(${target} ${test_sources})
-    target_link_libraries(${target} shyft_core shyft_api ${boost_link_libraries} dlib::dlib ${ARMADILLO_LIBRARIES})
+    target_link_libraries(${target} shyft_core shyft_api ${Boost_LIBRARIES} dlib::dlib ${ARMADILLO_LIBRARIES})
     set_target_properties(${target} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
     set_target_properties(${target} PROPERTIES INSTALL_RPATH "$ORIGIN/../../shyft/lib")
     #install(TARGETS ${target} DESTINATION ${CMAKE_SOURCE_DIR}/bin/Release)

@@ -1,112 +1,115 @@
-import glob
 import os
+import re
+import sys
 import platform
 import shutil
 import subprocess
-from os import path
 
-import sys
-from setuptools import setup, find_packages
+from setuptools import setup, Extension, find_packages
+from setuptools.command.build_ext import build_ext
+from distutils.version import LooseVersion
 
-print('Building Shyft')
+if sys.version_info < (3, 6):
+    print("Python 3.6 or higher required, please upgrade.")
+    sys.exit(1)
 
-# VERSION should be set in a previous build step (ex: TeamCity)
-
-if path.exists('VERSION'):
+if os.path.exists('VERSION'):
     VERSION = open('VERSION').read().strip()
     # Create the version.py file
     open('shyft/version.py', 'w').write('__version__ = "%s"\n'%VERSION)
 else:
-    from shyft.version import __version__
+    from shyft.version import __version__ as VERSION
 
-    VERSION = __version__
+class CMakeExtension(Extension):
+    def __init__(self, name, sourcedir='',
+                 files=None):
+        Extension.__init__(self, name, sources=[])
+        self.files = files if files is not None else {}
+        self.sourcedir = os.path.abspath(sourcedir)
 
-ext_s = '.pyd' if 'Windows' in platform.platform() else '.so'
 
-ext_names = ['shyft/api/_api' + ext_s,
-             'shyft/api/pt_gs_k/_pt_gs_k' + ext_s,
-             'shyft/api/pt_hs_k/_pt_hs_k' + ext_s,
-             'shyft/api/pt_hps_k/_pt_hps_k' + ext_s,
-             'shyft/api/pt_ss_k/_pt_ss_k' + ext_s,
-             'shyft/api/hbv_stack/_hbv_stack' + ext_s]
-
-needs_build_ext = not all([path.exists(ext_name) for ext_name in ext_names])
-
-if needs_build_ext:
-    print('One or more extension modules needs build, attempting auto build')
-    if "Windows" in platform.platform():
-        msbuild_2017 = r'C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\Bin\amd64\MSBuild.exe' if 'MSBUILD_2017_PATH' not in os.environ else \
-        os.environ['MSBUILD_2017_PATH']
-        if path.exists(msbuild_2017):
-            msbuild = msbuild_2017
-            cmd = [msbuild, '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v141', '/p:WindowsTargetPlatformVersion=10.0.16299.0', '/m']
-        else:
-            print("Sorry, but this setup only supports ms c++ installed to standard locations")
-            print(" you can set MSBUILD_2017_PATH specific to your installation and restart.")
-            exit()
-
-        if '--rebuild' in sys.argv:
-            cmd.append('/t:Rebuild')
-            sys.argv.remove('--rebuild')
-
-        p = subprocess.Popen(cmd,
-                             universal_newlines=True,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT)
-
-        for line in iter(p.stdout.readline, ''):
-            print(line.rstrip())
-
-        p.wait()
-        if p.returncode != 0:
-            print('\nMSBuild FAILED.')
-            exit()
-
-    elif "Linux" in platform.platform():
+class CMakeBuild(build_ext):
+    def run(self):
         try:
-            # For Linux, use the cmake approach for compiling the extensions
-            print(subprocess.check_output("sh build_api_cmake.sh", shell=True))
-        except:
-            print("Problems compiling shyft, try building with the build_api.sh "
-                  "or build_api_cmake.sh (Linux only) script manually...")
-            exit()
-    else:
-        print("Only windows and Linux supported")
-        exit()
-else:
-    print('Extension modules are already built in place')
+            out = subprocess.check_output(['cmake', '--version'])
+        except OSError:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: " +
+                ", ".join(e.name for e in self.extensions))
 
-# Copy libraries needed to run Shyft
-if "Windows" in platform.platform():
-    lib_dir = os.getenv('SHYFT_DEPENDENCIES', '../shyft_dependencies')
-    boost_dll = path.join(lib_dir, 'lib', '*.dll')
-    files = glob.glob(boost_dll)
-    files = [f for f in files if '-gd-' not in path.basename(f)]
-    dest_dir = path.join(path.dirname(path.realpath(__file__)), 'shyft', 'lib')
-    if not path.isdir(dest_dir):
-        os.mkdir(dest_dir)
-    for f in files:
-        shutil.copy2(f, path.join(dest_dir, path.basename(f)))
+        if platform.system() == "Windows":
+            cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)',
+                                         out.decode()).group(1))
+            if cmake_version < '3.1.0':
+                raise RuntimeError("CMake >= 3.1.0 is required on Windows")
 
-setup(
-    name='shyft',
-    version=VERSION,
-    author='Statkraft',
-    author_email='shyft@statkraft.com',
-    url='https://github.com/statkraft/shyft',
-    description='An OpenSource hydrological toolbox',
-    license='LGPL v3',
-    packages=find_packages(),
-    package_data={'shyft': ['api/*.so', 'api/*.pyd', 'api/pt_gs_k/*.pyd', 'api/pt_gs_k/*.so', 'api/pt_hs_k/*.pyd',
-                            'api/pt_hs_k/*.so', 'api/pt_hps_k/*.so', 'api/pt_hps_k/*.pyd', 'api/pt_ss_k/*.pyd', 'api/pt_ss_k/*.so', 'api/hbv_stack/*.pyd', 'api/hbv_stack/*.so',
-                            'tests/netcdf/*', 'lib/*.dll', 'lib/*.so.*']},
-    entry_points={},
-    requires=["numpy"],
-    install_requires=["numpy"],
-    tests_require=['nose'],
-    zip_safe=False,
-    extras_require={
-        'repositories': ['netcdf4', 'shapely', 'pyyaml', 'six', 'pyproj'],
-        'notebooks': ['jupyter']
-    }
-)
+        for ext in self.extensions:
+            self.build_extension(ext)
+
+    def copy_files(self, ext):
+        build_dir = os.path.realpath(self.build_temp)
+        root_dir = os.path.dirname(os.path.realpath(__file__))
+        lib_dir = os.path.realpath(os.path.join(self.build_lib, ext.name))
+
+        for src_file, dest_file in ext.files.items():
+            src = os.path.join(build_dir, src_file)
+            dest = os.path.join(lib_dir, dest_file)
+
+            if not os.path.exists(os.path.dirname(dest)):
+                os.makedirs(os.path.dirname(dest))
+
+            print(f"copying file {src} -> {dest}")
+            shutil.copyfile(src, dest)
+
+    def build_extension(self, ext):
+        cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable]
+
+        cfg = 'Debug' if self.debug else 'Release'
+        build_args = ['--config', cfg]
+
+        if platform.system() == "Windows":
+            if sys.maxsize > 2**32:
+                cmake_args += ['-A', 'x64']
+            build_args += ['--', '/m']
+        else:
+            cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
+            build_args += ['--', '-j2']
+
+        env = os.environ.copy()
+        env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(
+            env.get('CXXFLAGS', ''),
+            self.distribution.get_version())
+        if not os.path.exists(self.build_temp):
+            os.makedirs(self.build_temp)
+        subprocess.check_call(['cmake', ext.sourcedir] + cmake_args,
+                              cwd=self.build_temp, env=env)
+        subprocess.check_call(['cmake', '--build', '.'] + build_args,
+                              cwd=self.build_temp)
+
+        self.copy_files(ext)
+        print()  # Add an empty line for cleaner output
+
+ext_s = 'pyd' if 'Windows' in platform.platform() else 'so'
+shyft_files = files={f'api/boostpython/_api.{ext_s}': f'api/_api.{ext_s}',
+                     f'api/boostpython/_hbv_stack.{ext_s}': f'api/hbv_stack/_hbv_stack.{ext_s}',
+                     f'api/boostpython/_pt_gs_k.{ext_s}': f'api/pt_gs_k/_pt_gs_k.{ext_s}',
+                     f'api/boostpython/_pt_hps_k.{ext_s}': f'api/pt_hps_k/_pt_hps_k.{ext_s}',
+                     f'api/boostpython/_pt_hs_k.{ext_s}': f'api/pt_hs_k/_pt_hs_k.{ext_s}',
+                     f'api/boostpython/_pt_ss_k.{ext_s}': f'api/pt_ss_k/_pt_ss_k.{ext_s}'}
+
+setup(name='shyft',
+      version=VERSION,
+      author='Statkraft',
+      description='An OpenSource hydrological toolbox',
+      long_description='',
+      url='https://github.com/statkraft/shyft',
+      license='LGPL v3',
+      packages=find_packages(),
+      ext_modules=[CMakeExtension('shyft', files=shyft_files)],
+      cmdclass=dict(build_ext=CMakeBuild),
+      install_requires=['numpy'],
+      tests_require=['nose'],
+      extras_require={'repositories': ['netcdf4', 'shapely', 'pyyaml', 'six', 'pyproj'],
+                      'notebooks': ['jupyter']},
+      entry_points={},
+      zip_safe=False)
