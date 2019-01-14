@@ -132,6 +132,8 @@ class WXParallelizationRepository(GeoTsRepository):
         Reads weather scenario from file. Get_timeseire_ensemble and get_forecast_ensemble returns
         ensemble of weather scenarios using parallelization.
 
+        TODO: describe requirements for netcfdf-file
+
         Parameters
         ----------
         epsg: string
