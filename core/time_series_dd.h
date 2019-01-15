@@ -149,9 +149,10 @@ namespace shyft {
         struct bit_decoder;//fwd
         struct derivative_ts; // fwd api
         struct use_time_axis_from_ts; // fwd api
+        struct qac_parameter;
 		/** \brief Enumerates fill policies for time-axis extension.
 		 */
-		enum extend_ts_fill_policy {
+		enum extend_ts_fill_policy:int8_t {
 			EPF_NAN,   /**< Fill any gap between the time-axes with NaN. */
 			EPF_LAST,  /**< At a gap, keep the last time-axis value through a gap. */
 			EPF_FILL,  /**< Fill any gap between the time-axes with a given value. */
@@ -159,7 +160,7 @@ namespace shyft {
 
 		/** \brief Enumerates split policies for time-axis extension.
 		 */
-		enum extend_ts_split_policy {
+		enum extend_ts_split_policy:int8_t {
 			EPS_LHS_LAST,   /**< Split at the last value of the lhs ts. */
 			EPS_RHS_FIRST,  /**< Split at the first value of the rhs ts. */
 			EPS_VALUE,      /**< Split at a given time-value. */
@@ -300,7 +301,9 @@ namespace shyft {
             apoint_ts min_max_check_ts_fill(double min_x,double max_x,utctimespan max_dt,const apoint_ts& cts) const;
             apoint_ts min_max_check_linear_fill(double min_x,double max_x,int64_t max_dt) const{return min_max_check_linear_fill(min_x,max_x,seconds(max_dt));};
             apoint_ts min_max_check_ts_fill(double min_x,double max_x,int64_t max_dt,const apoint_ts& cts) const {return min_max_check_ts_fill(min_x,max_x,seconds(max_dt),cts);};
-
+            apoint_ts quality_and_self_correction(qac_parameter const&p) const;
+            apoint_ts quality_and_ts_correction(qac_parameter const&p,const apoint_ts& cts) const;
+            
             apoint_ts inside(double min_v,double max_v,double nan_v,double inside_v,double outside_v) const;
             apoint_ts decode(int start_bit,int n_bits) const;
 
@@ -1447,35 +1450,315 @@ namespace shyft {
             return fabs(a-b) <= abs_e;
         }
 
-        /** \brief quality and correction parameters
+        /** @brief quality and correction parameters
          *
          *  Controls how we consider the quality of the time-series,
          *  and in what condition to give up to put in a correction value.
          *
          */
         struct qac_parameter {
-            utctimespan max_timespan{max_utctime};///< max time span to fix
-            double min_x{shyft::nan};    ///< x < min_x                 -> nan
-            double max_x{shyft::nan};    ///< x > max_x                 -> nan
+            utctimespan    max_timespan{max_utctime};///< max time span to fix
+            double         min_x{shyft::nan};    ///< if not nan, verfiy that x > min_x
+            double         max_x{shyft::nan};    ///< if not nan, verify that x < max_x
+            utctimespan    repeat_timespan{utctimespan::zero()};///< if >0 the then values are checked for repeating items
+            double         repeat_tolerance{1e-2};///< within this repeat tolerance
+            vector<double> repeat_allowed;///< except these values are allowed to repeat
+            double         constant_filler{shyft::nan};///< if not nan, use this value to correct not ok values.
+            
             qac_parameter()=default;
+            // some useful scripting constructors
+            qac_parameter(utctimespan max_timespan,double min_x,double max_x)
+            :max_timespan{max_timespan},min_x{min_x},max_x{max_x}{}
+            
+            qac_parameter(utctimespan max_timespan,double min_x,double max_x,utctimespan repeat_timespan,double repeat_tolerance,double constant_filler)
+            :max_timespan{max_timespan},min_x{min_x},max_x{max_x},repeat_timespan{repeat_timespan},repeat_tolerance{repeat_tolerance},constant_filler{constant_filler}
+            {}
+            
+            qac_parameter(utctimespan max_timespan,double min_x,double max_x,utctimespan repeat_timespan,double repeat_tolerance,double repeat_this,double constant_filler)
+            :max_timespan{max_timespan},min_x{min_x},max_x{max_x},repeat_timespan{repeat_timespan},repeat_tolerance{repeat_tolerance},repeat_allowed{repeat_this},constant_filler{constant_filler}
+            {}
+            
 
-            /** check agains min-max is set */
-            bool is_ok_quality(const double& x) const noexcept {
-                if(!isfinite(x))
-                    return false;
-                if(isfinite(min_x) && x < min_x)
-                    return false;
-                if(isfinite(max_x) && x > max_x)
-                    return false;
-                return true;
-            }
 
             bool equal(const qac_parameter& o, double abs_e=1e-9) const {
-                return max_timespan==o.max_timespan && nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e);
+                if( max_timespan==o.max_timespan && nan_equal(min_x,o.min_x,abs_e) && nan_equal(max_x,o.max_x,abs_e)
+                && repeat_timespan==o.repeat_timespan && nan_equal(repeat_tolerance,o.repeat_tolerance,abs_e)
+                && nan_equal(constant_filler,o.constant_filler,abs_e)) {
+                    if(repeat_allowed.size()==o.repeat_allowed.size()) {
+                        for(size_t i=0;i<o.repeat_allowed.size();++i) {
+                            if (!nan_equal(repeat_allowed[i],o.repeat_allowed[i],abs_e))
+                                return false;
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }
+            x_serialize_decl();
+        };
+
+        namespace qac { // for stuff needed to implement the qac, and where we like to test the details
+            
+            inline bool is_ok_quality(qac_parameter const &p, double const & x) noexcept {
+                    if(!isfinite(x))
+                        return false;
+                    if(isfinite(p.min_x) && x < p.min_x)
+                        return false;
+                    if(isfinite(p.max_x) && x > p.max_x)
+                        return false;
+                    return true;
+            }
+            
+            inline bool is_ok_quality_lower_bound(double const& min_x,double const&x) noexcept {return min_x <= x;}
+            inline bool is_ok_quality_upper_bound(double const&x,double const& max_x) noexcept {return x <= max_x;}
+            inline bool is_ok_quality_in_range(double const &min_x,double const&x, double const &max_x) noexcept {
+                return is_ok_quality_lower_bound(min_x,x) && is_ok_quality_upper_bound(x,max_x);
+            }
+            
+            
+            /** computes true if the value to the left of i'th value is a valid repeat(we pass on x to avoid lookup twice)
+             *
+             * @tparam TS a ts like pointer
+             * @param i the index of time-axis on ts, corresponding to x=ts->value(i)
+             * @param x the ts->value(i) (as pr.usual value(i) is a cost, so we pass it)
+             * @param p the qac parameters
+             */
+            template<class TS>
+            inline bool is_repeated_once(TS const& ts,size_t i,double x,qac_parameter const &p) {
+                if(i==0 || !isfinite(x))
+                    return false;
+                for(auto const &rr:p.repeat_allowed) if (::fabs(rr-x)<p.repeat_tolerance) return false;
+                return ::fabs(ts->value(i-1) - x) < p.repeat_tolerance;
+            }
+            
+            /** simple function to compute linear f(t) given two points(t0,x0)(t1,x1) */
+            inline double linear_fx(utctime t, utctime t0,double x0,utctime t1,double x1) noexcept {
+                double a = (x1 - x0)/to_seconds(t1 - t0);
+                double b = x0 - a*to_seconds(t0);// x= a*t + b -> b= x- a*t
+                return a*to_seconds(t) + b;
             }
 
-            // binary serialization, so no x_serialize_decl();
-        };
+            /** @brief find last valid repeat in a repated sequence
+             * 
+             * To be called if is_repeated_once is called, do not check p.repeat_allowed(already done)
+             * and i should be >0 (assert if not)
+             *  x is assumed to be finite.
+             * 
+             * @tparam TS ts like pointer type
+             * @param ts time-series
+             * @param i index to start from
+             * @param x the value of ts->value(i)(we pass it, so we dont try to look it up)
+             * @param p the qac parameters
+             * @returns range j = [1..i] where j is the rightmost valid repeated value .
+             */
+            template<class TS>
+            inline size_t find_last_valid_repeat(TS const& ts,size_t i,double x,qac_parameter const &p) {
+                assert(i>0);
+                size_t j=i; 
+                while(--j) { // search backward to the root of repeat
+                    double v=ts->value(j);
+                    if( !isfinite(v) || ::fabs(v - x) > p.repeat_tolerance ) {
+                        j=j+1;// root starts here.
+                        break;
+                    }
+                }
+                // beginning of repeated sequence(or 0, which is also the beginning
+                // now find the rightmost valid point in the repeated sequence
+                auto tr=ts->time(j);// where (ts->time(i)-tr) <= p.repeat_timespan
+                while( j+1<=i && (ts->time(j+1)-tr) <= p.repeat_timespan) ++j;
+                return j;
+            }
+            
+            /** find the rightmost ok value to the left of i, 
+             * 
+             * take min-max and repeated into account
+             * limit search to p.max_timespan from to
+             * 
+             * @tparam TS time-series like pointer
+             * @param ts a time-series that keep the values
+             * @param i the index, we search lhs ok value relative this
+             * @param p qac parameter
+             * @return the rightmost ok value to the left of i, range[0..i],if i is returned, not found
+             */
+            template<class TS>
+            inline size_t find_left_ok_value(TS const& ts,size_t i,qac_parameter const &p) {
+                size_t j=i; 
+                auto ti=ts->time(i);
+                while(--j) { // search backward
+                    double v=ts->value(j);
+                    if( (ti-ts->time(j)) > p.max_timespan)
+                        return i;
+                    if( qac::is_ok_quality(p,v) ) {  // ok this is a candidate
+                        // but we have to check if this candidate is in a sequence of repeated values
+                        if(!is_repeated_once(ts,j,v,p))
+                            return j;// got it !!
+                        auto l=find_last_valid_repeat(ts,j,v,p);//note that j>0 here, l in range[0..j]
+                        return (ti-ts->time(l))>p.max_timespan? i : l ;
+                    }
+                }
+                return i;
+            }
+            
+            /** returns index of first ok value to the right (skip the ones that fail range check)
+             * 
+             * @tparam TS time-series like pointer
+             * @param ts the time-series to operate on
+             * @param i the index position to start from
+             * @param x should be is used to check for repeated value (they are considered not ok)
+             * @param t0 the time-point to the left used to measure the gap that is constrained by p.max_timespan
+             * @return found index, or value equal to i if not found
+             * @note: we could use the max_timespan to terminate the search as well. .. 
+             */
+            template<class TS>
+            inline size_t find_first_ok_value_right(TS const &ts,size_t i,double x,utctime t0, qac_parameter const &p) {
+                const size_t n=ts->size();
+                for(size_t j=i+1;j<n;++j) {
+                    auto t=ts->time(j);
+                    if( (t-t0)>p.max_timespan )
+                        break;// outside time-span limit, give up!
+                    double v=ts->value(j);
+                    if(qac::is_ok_quality(p,v) && (::fabs(v-x)>=p.repeat_tolerance) )
+                        return j;// got it! found a value, that's not repeaat
+                }
+                return i;// did not find a suitable value within time-span limits.
+            }
+            
+            /** returns index of first ok value to the right (skip the ones that fail range check)
+             * 
+             * This function does not check for repeated value, so it's used for only those cases.
+             * 
+             * @tparam TS time-series like pointer
+             * @param ts the time-series to operate on
+             * @param i the index position to start from
+             * @param t0 the time-point to the left used to measure the gap that is constrained by p.max_timespan
+             * @return found index, or value equal to i if not found
+             */
+            template<class TS>
+            inline size_t find_first_ok_value_right_no_repeat(TS const &ts,size_t i,utctime t0, qac_parameter const &p) {
+                const size_t n=ts->size();
+                for(size_t j=i+1;j<n;++j) {
+                    auto t=ts->time(j);
+                    if( (t-t0)>p.max_timespan )
+                        break;// outside time-span limit, give up!
+                    double v=ts->value(j);
+                    if(qac::is_ok_quality(p,v) )
+                        return j;// got it! found a value, that's not repeaat
+                }
+                return i;// did not find a suitable value within time-span limits.
+            }
+            
+           
+            /** @returns true if x is (one of) the value(s) that are allowed to repeat */
+            inline bool legal_repeat(qac_parameter const&p,double const &x) noexcept {
+                for(auto const&rr:p.repeat_allowed) if(::fabs(x-rr)<p.repeat_tolerance) return true;
+                return false;
+            }
+            /** @returns true if a and b is equal witin repeat_tolerance */
+            inline bool repeated_value(qac_parameter const&p,double const & a,double const &b) noexcept {
+                return ::fabs(a-b) <p.repeat_tolerance;
+            }
+            
+            /** fill in fx(size_t left_idx,size_t idx) for all values that fail
+             *  in case of repeat-failure, always left_idx==string::npos,
+             *  in case of ordinary failure, left_idx== npos if no valid left side, otherwise ix to valid left-side.
+             *   constant_filler: (size_t,size_t)->double {return constant_filler;}
+             *   stair_case:      (size_t l, size_t i)->double { return (l==string::npos || (ta.time(i)-ta.time(l)>p.max_timespan))?shyft::nan:v[l];}
+             *   linear : ()->double {return shyft::nan;}
+             * @tparam TA time-axis like object, supports .time(i),.size()
+             * @tparam FX a callable(size_t lhs_idx,size_t current_idx) where idx refers to values v vector
+             * @param ta the time-axis for values in v
+             * @param v  values
+             * @param p qac-parameters that controls what is bad values
+             * @param fx a callable of type FX as described above, invoked to get the fill-in value
+             */
+            template<class TA,class FX>
+            void fill_fx_for_bad_values(TA const& ta,vector<double>&v,qac_parameter const&p,FX&&fx) {
+                assert(ta.size()==v.size());
+                size_t l=string::npos;// last ok value
+                if(p.repeat_timespan.count()) {
+                    size_t r=0;// repeat anchor
+                    for(size_t i=0;i<ta.size();++i) {
+                        const double x=v[i];
+                        if(!qac::is_ok_quality(p,x)) {
+                            v[i]=fx((l==string::npos ||r<l)? string::npos : l, i);//r<l means that l is last repeated value
+                            r=i+1;//repeat anchor at next value (if any)
+                        } else {
+                            if( r<i) {
+                                if(!repeated_value(p,x,v[r]) || legal_repeat(p,x)) {
+                                    r=i;// push repeat anchor forward
+                                    l=i;// last ok value here
+                                } else if( (ta.time(i)-ta.time(r))>p.repeat_timespan) {
+                                    v[i] = fx(string::npos,i); //failed by repetition, no left side 
+                                } else {
+                                    l=i;// last ok value here
+                                }
+                            } 
+                        }
+                    }
+                } else {
+                    for(size_t i=0;i<ta.size();++i) {
+                        if(!qac::is_ok_quality(p,v[i])) {
+                            v[i]=fx(l,i);//repeat anchor at next value (if any)
+                        } else {
+                            l=i;
+                        }
+                    }
+                }
+            }
+            
+            /** replaces all !finite values in v with fill_value */
+            inline void fill_constant_for_missing_values(vector<double>&v, double fill_value) {
+                for(auto &x:v) if(!isfinite(x))x=fill_value;
+            }
+            
+            /** replaces all !finite values in v with cts->value_at(ts->time(i)) 
+             * @tparam TS a time-series like pointer 
+             * @tparam TA a time-axis type, .size() and .time(size_t) required
+             * @param ta the time-axis of values in vector v
+             * @param v the values
+             * @param cts the ts with the corrected values to fill in
+             */
+            template<class TS,class TA>
+            inline void fill_ts_for_missing_values(TA const& ta, vector<double>&v,TS const&cts) {
+                for(size_t i=0;i<ta.size();++i) {
+                    if(!isfinite(v[i]))
+                        v[i]=cts->value_at(ta.time(i));
+                }
+            }
+         
+            /** replaces all sections of missing values with linear-interpolation
+             * @tparam TA time-axis type , .size(), .time()
+             * @param ta the time-axis for values v
+             * @param v the values to be fixed up
+             * @param p the parameters that determines the details of max_timespan
+             */
+            template<class TA>
+            inline void fill_linear_for_missing_values(TA const&ta, vector<double>&v,qac_parameter const& p) {
+                size_t l{string::npos};// keep lhs ok value if applicable
+                bool search_rhs=false;// state/mode of operandus in alg. below
+                for(size_t i=0;i<ta.size();++i) {
+                    if(!search_rhs) {// we need an ok value, then a bad value to start searching for rhs
+                        if(isfinite(v[i])) {
+                            l=i;// ok value, we remember it, and keep updated.
+                        } else {// got a bad value
+                            if(l!=string::npos) // .. and we do indeed have a good value on the left!
+                                search_rhs=true;// start search for good rhs.
+                        }
+                    } else {
+                        if(isfinite(v[i])) {//yahoo! a good value
+                            if((ta.time(i)-ta.time(l)) <= p.max_timespan) {// .. within time-span? interpolate *all* values from l+1 to i-1 
+                                double a = (v[i] - v[l])/to_seconds(ta.time(i) - ta.time(l));
+                                double b = v[l] - a*to_seconds(ta.time(l));
+                                for(size_t f=l+1;f<i;++f)
+                                    v[f]= a*to_seconds(ta.time(f)) + b;
+                            }// else have to leave those bad-values with no replacement
+                            l=i;search_rhs=false;// we switch to lhs scan, l is a good value, so we keep it.
+                        }
+                    }
+                }
+            }
+
+        }
 
         /** \brief The qac_ts is used for doing quality and correction to a ts using min-max criteria
          *
@@ -2210,7 +2493,6 @@ x_serialize_export_key(shyft::time_series::dd::qac_ts);
 x_serialize_export_key(shyft::time_series::dd::inside_ts);
 x_serialize_export_key(shyft::time_series::dd::decode_ts);
 x_serialize_export_key(shyft::time_series::dd::use_time_axis_from_ts);
-
-x_serialize_binary(shyft::time_series::dd::qac_parameter);
+x_serialize_export_key(shyft::time_series::dd::qac_parameter);
 x_serialize_binary(shyft::time_series::dd::inside_parameter);
 x_serialize_binary(shyft::time_series::dd::bit_decoder);

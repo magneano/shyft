@@ -1332,34 +1332,42 @@ namespace shyft{
             return apoint_ts{make_shared<use_time_axis_from_ts>(*this,o)};
         }
         
+        /** QAC stuff  */
+        apoint_ts apoint_ts::quality_and_self_correction(qac_parameter const&p) const {
+            return apoint_ts{make_shared<qac_ts>(*this,p)};
+        }
+        apoint_ts apoint_ts::quality_and_ts_correction(qac_parameter const&p,const apoint_ts& cts) const {
+            return apoint_ts{make_shared<qac_ts>(*this,p,cts)};
+        }
+
+
         double qac_ts:: _fill_value(size_t i) const {
 			auto t = ts->time(i);
-			if (cts) // use a correction value ts if available
-				return cts->value_at(t); // we do not check this value, assume ok!
-
-			// try linear interpolation between previous--next *valid* value
+			if (cts) // if user have made all the effort of providing a cts, use that
+				return cts->value_at(t); // we do not check this value, assume ok!(could to that, and fallback to filler/linear)
+			// try linear|stair-case interpolation between previous--next *valid* value
 			const size_t n = ts->size();
-			if (i == 0 || i + 1 >= n || p.max_timespan == utctimespan{0})
-				return shyft::nan; // lack possible previous.. next value-> nan
+            if(p.max_timespan == utctimespan{0})
+                return p.constant_filler;// interpolation is disabled, return constant_filler, whatever value that is
+			if (i == 0 || i + 1 >= n )
+				return shyft::nan; // lack possible previous.. next value-> nan, or 
 			size_t j = i;
 			while (j--) { // find previous *valid* point
 				utctime t0 = ts->time(j);
 				if (t - t0 > p.max_timespan)
 					return shyft::nan;// exceed configured max timespan,->nan
 				double x0 = ts->value(j);//
-				if (p.is_ok_quality(x0)) { // got a previous point
+				if (qac::is_ok_quality(p,x0)) { // got a previous point
 					// here we are at a point where t0,x0 is valid ,(or at the beginning)
+                    if(point_interpretation()== ts_point_fx::POINT_AVERAGE_VALUE)
+                        return x0;// OK! time-series is stair-case, and we found a previous ok value, ->keep it!
 					for (size_t k = i + 1; k < n; ++k) { // then find next ok point
 						utctime t1 = ts->time(k);
 						if (t1 - t0 > p.max_timespan)
 							return shyft::nan;// exceed configured max time span ->nan
 						double x1 = ts->value(k);//
-						if (p.is_ok_quality(x1)) { // got a next  point
-							double a = (x1 - x0) / to_seconds(t1 - t0);
-							double b = x0 - a * to_seconds(t0);// x= a*t + b -> b= x- a*t
-							double xt = a * to_seconds(t) + b;
-							return xt;
-						}
+						if (qac::is_ok_quality(p,x1))  // got a next  point
+                            return qac::linear_fx(t,t0,x0,t1,x1);
 					}
 				}
 			}
@@ -1369,10 +1377,71 @@ namespace shyft{
 		double qac_ts::value(size_t i) const {
 
 			double x = ts->value(i);
-			if (p.is_ok_quality(x))
-				return x;
-			// try to fill in replacement value
-            return _fill_value(i);
+			if (qac::is_ok_quality(p,x)){
+                if(i==0 || p.repeat_timespan.count()==0) 
+                    return x;
+                if(!qac::is_repeated_once(ts,i,x,p))
+                    return x;
+                auto l=qac::find_last_valid_repeat(ts,i,x,p);
+                if(l==i) // i is within the valid repeated sequence
+                    return x;
+                //-- value is not ok, we have to replace it if possible
+                if(cts)
+                    return cts->value_at(ts->time(i));
+                if(p.max_timespan.count()==0)
+                    return p.constant_filler;
+                // interpolate or extend based on own values
+                // l is the index/value to the left, 
+                // 
+                if(point_interpretation()==ts_point_fx::POINT_AVERAGE_VALUE)
+                    return shyft::nan;
+                
+                auto t0=ts->time(l);
+                size_t r= qac::find_first_ok_value_right(ts,i,x,t0,p);//also stretch as far as possible away from repeated 
+                if(r==i)
+                    return shyft::nan;
+                return qac::linear_fx(ts->time(i),t0,ts->value(l),ts->time(r),ts->value(r));
+            } else {
+                //-- value is not ok, we have to replace it if possible
+                if(cts)
+                    return cts->value_at(ts->time(i));
+                if(p.max_timespan.count()==0)
+                    return p.constant_filler;
+                if(i==0)
+                    return shyft::nan;// can't fix
+                const size_t n= ts->size();
+                const auto linear =point_interpretation()==ts_point_fx::POINT_INSTANT_VALUE;
+                if(linear && i+1==n)
+                    return shyft::nan;// also can't fix.
+                    
+                // hard work, replace by interpolate/extend it self:
+                // if stair case, only left is needed,
+                // but the left could be a sequence of repeated values,
+                // so we need the rightmost value of those.
+                if(p.repeat_timespan.count()==0) {
+                    return _fill_value(i);
+                } else {
+                    // left:find  last ok value in a possibly repeated sequence
+                    size_t l=qac::find_left_ok_value(ts,i,p); // take possible repeated sequence into account
+                    if(l==i)
+                        return shyft::nan;
+                    if(!linear) {
+                        double vl=ts->value(l);
+                        if(l>0) { // check that l is not a repeated value, because then we can not extend!
+                            if(qac::is_repeated_once(ts,i,vl,p))
+                                return shyft::nan;
+                        }
+                        return (ts->time(i)-ts->time(l))>p.max_timespan?shyft::nan:vl;
+                    }
+                    auto t0=ts->time(l);
+                    size_t r=qac::find_first_ok_value_right_no_repeat(ts,i,t0,p);
+                    auto t1=ts->time(r);
+                    if(r==i || (t1-t0)>p.max_timespan)
+                        return shyft::nan;
+                    return qac::linear_fx(ts->time(i),t0,ts->value(l),t1,ts->value(r));
+                }
+                
+            }
 		}
 
 		double qac_ts::value_at(utctime t) const {
@@ -1380,28 +1449,62 @@ namespace shyft{
 			if (i == string::npos)
 				return shyft::nan;
 			double x0 = value(i);
-			if (ts->point_interpretation() == ts_point_fx::POINT_AVERAGE_VALUE)
-				return x0;
-			// linear interpolation between points
 			utctime t0 = time(i);
 			if (t0 == t) // value at endpoint is exactly the point-value
 				return x0;
+			if (ts->point_interpretation() == ts_point_fx::POINT_AVERAGE_VALUE) {
+                if(p.max_timespan.count() && (t-t0)>p.max_timespan) // stretching too long ?
+                    return shyft::nan;
+				return x0;
+            }
+			// linear interpolation between points(and we are a + eps right of t0)
 			if (i + 1 >= size())
 				return shyft::nan;// no next point, ->nan
 			double x1 = value(i + 1);
 			if (!isfinite(x1))
 				return shyft::nan;//  next point is nan ->nan
 			utctime t1 = ts->time(i + 1);
-			double a = (x1 - x0) / to_seconds(t1 - t0);
-			double b = x0 - a * to_seconds(t0);
-			return a * to_seconds(t) + b; // otherwise linear interpolation
+            if(p.max_timespan.count() && ((t1-t0)>p.max_timespan)) // ! if to long linear span fail it..
+                return shyft::nan;
+			return qac::linear_fx(t,t0,x0,t1,x1); // otherwise interpolation
 		}
 
 		vector<double> qac_ts::values() const {
             auto r=ts->values();
-			for (size_t i = 0; i < r.size(); ++i) {
-                if(!p.is_ok_quality(r[i]))
-                    r[i]=_fill_value(i);
+            if(!r.size())// get rid of trivial case
+                return r;
+
+            //-- here we need speed
+            // min, max, no repeat:
+            if(p.repeat_timespan.count()==0) {// this is the old min-max algo, just speeded up
+                if(isfinite(p.min_x) && !isfinite(p.max_x)) {
+                    for(size_t i=0;i<r.size();++i) if(!qac::is_ok_quality_lower_bound(p.min_x,r[i])) r[i]=_fill_value(i);
+                } else if(isfinite(p.min_x) && isfinite(p.max_x)) {
+                    for(size_t i=0;i<r.size();++i) if(!qac::is_ok_quality_in_range(p.min_x,r[i],p.max_x)) r[i]=_fill_value(i);
+                } else if(!isfinite(p.min_x) && isfinite(p.max_x)) {
+                    for(size_t i=0;i<r.size();++i) if(!qac::is_ok_quality_upper_bound(r[i],p.max_x)) r[i]=_fill_value(i);
+                } else {// there is no checks on-going, but if the value is nan, we should fill it ..
+                    for(size_t i=0;i<r.size();++i) if(!isfinite(r[i])) r[i]=_fill_value(i);
+                }
+            } else {// new algo, with repeat logic..
+                if(point_interpretation()==ts_point_fx::POINT_AVERAGE_VALUE) { // single scan and fix
+                    if(cts) {
+                        qac::fill_fx_for_bad_values(ts->time_axis(),r,p,[this](size_t,size_t i)->double {return cts->value_at(ts->time(i));});
+                    } else if(p.max_timespan.count()==0) {
+                        qac::fill_fx_for_bad_values(ts->time_axis(),r,p,[this](size_t,size_t)->double {return p.constant_filler;});
+                    } else {
+                        qac::fill_fx_for_bad_values(ts->time_axis(),r,p,[this,&r](size_t l,size_t i)->double {return (l==string::npos || (ts->time(i)-ts->time(l)>p.max_timespan))?shyft::nan:r[l];});
+                    }
+                } else { // two-pass, scan and set nan's, then fixup linear
+                    qac::fill_fx_for_bad_values(ts->time_axis(),r,p,[](size_t,size_t)->double {return shyft::nan;});
+                    if(cts) {
+                        qac::fill_ts_for_missing_values(ts->time_axis(),r,cts);
+                    } else if(p.max_timespan.count()==0) {
+                        qac::fill_constant_for_missing_values(r,p.constant_filler);
+                    } else {
+                        qac::fill_linear_for_missing_values(ts->time_axis(),r,p);
+                    }
+                }
             }
 			return r;
 		}
@@ -1418,11 +1521,9 @@ namespace shyft{
 		}
 
 		vector<double> inside_ts::values() const {
-			const size_t n{ size() };
-			vector<double> r; r.reserve(n);
-			for (size_t i = 0; i < n; ++i)
-				r.emplace_back(value(i));
-			return r;
+			vector<double> r{ts->values()};
+            for(auto&x:r) x=p.inside_value(x);
+            return r;
 		}
 
 		double decode_ts::value(size_t i) const {
@@ -1437,13 +1538,10 @@ namespace shyft{
 		}
 
 		vector<double> decode_ts::values() const {
-			const size_t n{ size() };
-			vector<double> r; r.reserve(n);
-			for (size_t i = 0; i < n; ++i)
-				r.emplace_back(value(i));
-			return r;
-		}
+			vector<double> r{ts->values()};
+            for(auto&x:r) x=p.decode(x);
+            return r;
 		}
     }
-}
+}}
 

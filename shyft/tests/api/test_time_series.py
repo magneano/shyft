@@ -1294,7 +1294,7 @@ class TimeSeries(unittest.TestCase):
 
     def test_min_max_check_linear_fill(self):
         ta = api.TimeAxis(0, 1, 5)
-        ts_src = api.TimeSeries(ta, values=api.DoubleVector([1.0, -1.0, 2.0, float('nan'), 4.0]), point_fx=api.POINT_AVERAGE_VALUE)
+        ts_src = api.TimeSeries(ta, values=api.DoubleVector([1.0, -1.0, 2.0, float('nan'), 4.0]), point_fx=api.POINT_INSTANT_VALUE)
         ts_qac = ts_src.min_max_check_linear_fill(v_max=10.0, v_min=-10.0, dt_max=300)
         self.assertAlmostEqual(ts_qac.value(3), 3.0)
         ts_qac = ts_src.min_max_check_linear_fill(v_max=10.0, v_min=0.0, dt_max=300)
@@ -1314,6 +1314,20 @@ class TimeSeries(unittest.TestCase):
         self.assertAlmostEqual(ts_qac.value(1), 1.8)  # -1 out, replaced with linear between
         self.assertAlmostEqual(ts_qac.value(3), 2.0)
         # ref dtss test for serialization testing
+
+    def test_qac_parameter(self):
+        q=api.QacParameter()
+        self.assertIsNotNone(q)
+        ta = api.TimeAxis(0, 1, 5)
+        ts_src = api.TimeSeries(ta, values=api.DoubleVector([1.0, -1.0, 2.0, float('nan'), 4.0]), point_fx=api.POINT_AVERAGE_VALUE)
+        cts = api.TimeSeries(ta, values=api.DoubleVector([1.0, 1.8, 2.0, 2.0, 4.0]), point_fx=api.POINT_AVERAGE_VALUE)
+
+        ts_qac = ts_src.quality_and_ts_correction(api.QacParameter(api.time(300),-10.0,10.0,api.time(0),0.0),cts=cts)
+        self.assertAlmostEqual(ts_qac.value(3), 2.0)
+        ts_qac = ts_src.quality_and_ts_correction(api.QacParameter(api.time(300),0.0,10.0,api.time(0),0.0), cts=cts)
+        self.assertAlmostEqual(ts_qac.value(1), 1.8)  # -1 out, replaced with linear between
+        self.assertAlmostEqual(ts_qac.value(3), 2.0)
+
 
     def test_merge_points(self):
         a = api.TimeSeries()  # a empty at beginning, we allow that.
