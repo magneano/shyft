@@ -215,7 +215,7 @@ client::evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,boo
     if (tsv.size() == 0)
         throw std::runtime_error("evaluate requires a source ts-vector with more than 0 time-series");
     if (!p.valid())
-        throw std::runtime_error("percentiles require a valid period-specification");
+        throw std::runtime_error("evaluate require a valid period-specification");
     scoped_connect ac(*this);
     // local lambda to ensure one definition of communication with the server
     auto eval_io = [this] (srv_connection &sc,const ts_vector_t& tsv,const utcperiod& p,bool use_ts_cached_read,bool update_ts_cache) ->ts_vector_t {
