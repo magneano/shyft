@@ -68,6 +68,23 @@ class RegionModel(unittest.TestCase):
         self.assertEqual(len(vv), len(re.radiation))
         self.assertAlmostEqual(vv[0], 300.0)
 
+    def test_create_source_vector_does_not_leak(self):
+        n = 365*24*1  # 1st checkpoint memory here,
+        for i in range(10):
+            v = api.TemperatureSourceVector([
+                api.TemperatureSource(
+                    api.GeoPoint(0.0, 1.0, 2.0),
+                    api.TimeSeries(
+                        api.TimeAxis(api.time(0), api.time(3600), n),
+                        fill_value=float(x),
+                        point_fx=api.POINT_AVERAGE_VALUE)
+                )
+                for x in range(n)]
+            )
+            self.assertIsNotNone(v)
+            del v
+        pass  # 2nd mem check here, should be approx same as first checkpoint
+
     def verify_state_handler(self, model):
         cids_unspecified = api.IntVector()
         states = model.state.extract_state(cids_unspecified)
@@ -222,6 +239,7 @@ class RegionModel(unittest.TestCase):
         sum_charge = model.statistics.charge(cids)
         sum_charge_value = model.statistics.charge_value(cids, 0)
         self.assertAlmostEqual(sum_charge_value, -110.6998, places=2)
+        self.assertAlmostEqual(sum_charge.values[0], sum_charge_value, places=5)
         cell_charge = model.statistics.charge_value(api.IntVector([0, 1, 3]), 0, ix_type=api.stat_scope.cell)
         self.assertAlmostEqual(cell_charge, -16.7138, places=2)
         charge_sum_1_2_6 = model.statistics.charge(api.IntVector([1, 2, 6]), ix_type=api.stat_scope.cell).values.to_numpy().sum()
@@ -368,6 +386,7 @@ class RegionModel(unittest.TestCase):
             si = pt_gs_k.PTGSKState()
             si.kirchner.q = 40.0
             s0.append(si)
+        model.set_snow_sca_swe_collection(-1, True)
         model.set_states(s0)  # at this point the intial state of model is established as well
         model.run_cells()
         cids = api.IntVector.from_numpy([1])  # optional, we can add selective catchment_ids here
@@ -376,7 +395,20 @@ class RegionModel(unittest.TestCase):
         self.assertGreaterEqual(sum_discharge_value, 130.0)
         # verify we can construct an optimizer
         opt_model = model.create_opt_model_clone()
+        opt_model.set_snow_sca_swe_collection(-1, True)  # ensure to fill in swe/sca
         opt_model.run_cells()
+        opt_sum_discharge = opt_model.statistics.discharge(cids)
+        opt_swe = opt_model.statistics.snow_swe(cids)  # how to get out swe/sca
+        opt_swe_v = opt_model.statistics.snow_swe_value(cids, 0)
+        opt_sca = opt_model.statistics.snow_sca(cids)
+
+        for i in range(len(opt_model.time_axis)):
+            opt_sca_v = opt_model.statistics.snow_sca_value(cids, i)
+            self.assertTrue(0.0 <= opt_sca_v <= 1.0)
+
+        self.assertIsNotNone(opt_sum_discharge)
+        self.assertIsNotNone(opt_swe)
+        self.assertIsNotNone(opt_sca)
         optimizer = opt_model_type.optimizer_t(opt_model)  # notice that a model type know it's optimizer type, e.g. PTGSKOptimizer
         self.assertIsNotNone(optimizer)
         #

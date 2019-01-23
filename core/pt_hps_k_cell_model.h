@@ -44,8 +44,8 @@ namespace shyft {
                 pts_t avg_discharge; ///< Kirchner Discharge given in [m^3/s] for the timestep
                 pts_t charge_m3s; ///< = precip + glacier - act_evap - avg_discharge [m^3/s] for the timestep
                 pts_t hps_outflow;///<  snow output [mm/h] for the timestep TODO: want to have m3 s-1
-                pts_t hps_sca;
-                pts_t hps_swe;
+                pts_t snow_sca;
+                pts_t snow_swe;
                 pts_t glacier_melt;///< galcier melt output [m3/s] for the timestep
                 pts_t ae_output;///< actual evap mm/h
                 pts_t pe_output;///< actual evap mm/h
@@ -55,7 +55,7 @@ namespace shyft {
                 all_response_collector(const double destination_area) : destination_area(destination_area) {}
                 all_response_collector(const double destination_area, const timeaxis_t& time_axis)
                  : destination_area(destination_area), avg_discharge(time_axis, 0.0),charge_m3s(time_axis,0.0),
-                   hps_outflow(time_axis, 0.0), hps_sca(time_axis,0.0),hps_swe(time_axis,0.0),glacier_melt(time_axis, 0.0), ae_output(time_axis, 0.0), pe_output(time_axis, 0.0) {}
+                   hps_outflow(time_axis, 0.0), snow_sca(time_axis,0.0),snow_swe(time_axis,0.0),glacier_melt(time_axis, 0.0), ae_output(time_axis, 0.0), pe_output(time_axis, 0.0) {}
 
                 /**\brief called before run to allocate space for results */
                 void initialize(const timeaxis_t& time_axis, int start_step, int n_steps, double area) {
@@ -63,8 +63,8 @@ namespace shyft {
                     ts_init(avg_discharge, time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(charge_m3s   , time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(hps_outflow,  time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
-                    ts_init(hps_sca,      time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
-                    ts_init(hps_swe,      time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+                    ts_init(snow_sca,      time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+                    ts_init(snow_swe,      time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(glacier_melt,  time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(ae_output,     time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(pe_output,     time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
@@ -83,8 +83,8 @@ namespace shyft {
                     avg_discharge.set(idx, mmh_to_m3s(response.total_discharge,destination_area)); // wants m3/s, q_avg is given in mm/h, so compute the totals in  mm/s
                     charge_m3s.set(idx, response.charge_m3s);
                     hps_outflow.set(idx, response.hps.outflow);//mm/h ?? //TODO: current mm/h. Want m3/s, but we get mm/h from snow output
-                    hps_sca.set(idx,response.hps.sca);
-                    hps_swe.set(idx,response.hps.storage);
+                    snow_sca.set(idx,response.hps.sca);
+                    snow_swe.set(idx,response.hps.storage);
                     glacier_melt.set(idx, response.gm_melt_m3s);
                     ae_output.set(idx, response.ae.ae);
                     pe_output.set(idx, response.pt.pot_evapotranspiration);
@@ -99,23 +99,23 @@ namespace shyft {
                 pts_t charge_m3s; ///< = precip + glacier - act_evap - avg_discharge [m^3/s] for the timestep
                 response_t end_response;///<< end_response, at the end of collected
                 bool collect_snow;
-                pts_t hps_sca;
-                pts_t hps_swe;
+                pts_t snow_sca;
+                pts_t snow_swe;
 
                 discharge_collector() : destination_area(0.0),collect_snow(false) {}
                 discharge_collector(const double destination_area) : destination_area(destination_area),collect_snow(false) {}
                 discharge_collector(const double destination_area, const timeaxis_t& time_axis)
                  : destination_area(destination_area), avg_discharge(time_axis, 0.0),charge_m3s(time_axis,0.0),collect_snow(false),
-                    hps_sca(timeaxis_t(time_axis.start(),time_axis.delta(),0),0.0),
-                    hps_swe(timeaxis_t(time_axis.start(),time_axis.delta(),0),0.0) {}
+                    snow_sca(timeaxis_t(time_axis.start(),time_axis.delta(),0),0.0),
+                    snow_swe(timeaxis_t(time_axis.start(),time_axis.delta(),0),0.0) {}
 
                 void initialize(const timeaxis_t& time_axis,int start_step, int n_steps, double area) {
                     destination_area = area;
                     auto ta = collect_snow ? time_axis : timeaxis_t(time_axis.start(), time_axis.delta(), 0);
                     ts_init(avg_discharge, time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(charge_m3s, time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
-                    ts_init(hps_sca, ta, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
-                    ts_init(hps_swe, ta, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+                    ts_init(snow_sca, ta, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+                    ts_init(snow_swe, ta, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                 }
 
 
@@ -123,8 +123,8 @@ namespace shyft {
                     avg_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area)); // q_avg is given in mm, so compute the totals
                     charge_m3s.set(idx, response.charge_m3s);
                     if(collect_snow) {
-                        hps_sca.set(idx,response.hps.sca);
-                        hps_swe.set(idx,response.hps.storage);
+                        snow_sca.set(idx,response.hps.sca);
+                        snow_swe.set(idx,response.hps.storage);
                     }
                 }
 

@@ -41,7 +41,8 @@ namespace shyft {
                 // Collect responses as time series
                 pts_t avg_discharge;  ///< Kirchner Discharge given in [m^3/s] for the timestep
                 pts_t charge_m3s; ///< = precip + glacier - act_evap - avg_discharge [m^3/s] for the timestep
-                pts_t snow_total_stored_water;  ///< swe in [mm] for the cell area
+                pts_t snow_swe;  ///< swe in [mm] for the cell area
+                pts_t snow_sca; ///< snow snow covered area
                 pts_t snow_outflow;  ///< skaugen snow output [m^3/s] for the timestep
                 pts_t glacier_melt;///< [m3/s] for the timestep
                 pts_t ae_output;  ///< actual evap mm/h
@@ -51,15 +52,16 @@ namespace shyft {
                 all_response_collector() : destination_area(0.0) {}
                 explicit all_response_collector(const double destination_area) : destination_area(destination_area) {}
                 all_response_collector(const double destination_area, const timeaxis_t& time_axis)
-                 : destination_area(destination_area), avg_discharge(time_axis, 0.0),charge_m3s(time_axis,0.0), snow_total_stored_water(time_axis, 0.0),
-                   snow_outflow(time_axis, 0.0), glacier_melt(time_axis,0.0),ae_output(time_axis, 0.0), pe_output(time_axis, 0.0) {}
+                 : destination_area(destination_area), avg_discharge(time_axis, 0.0),charge_m3s(time_axis,0.0), snow_swe(time_axis, 0.0),
+                    snow_sca(time_axis, 0.0),snow_outflow(time_axis, 0.0), glacier_melt(time_axis,0.0),ae_output(time_axis, 0.0), pe_output(time_axis, 0.0) {}
 
                 /**\brief Called before run to allocate space for results */
                 void initialize(const timeaxis_t& time_axis,int start_step,int n_steps, double area) {
                     destination_area = area;
                     ts_init(avg_discharge           ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(charge_m3s              ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
-                    ts_init(snow_total_stored_water ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+                    ts_init(snow_swe ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
+                    ts_init(snow_sca ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(snow_outflow            ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(glacier_melt            ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
                     ts_init(ae_output               ,time_axis, start_step, n_steps, ts_point_fx::POINT_AVERAGE_VALUE);
@@ -79,7 +81,8 @@ namespace shyft {
                     // Convert discharge to volume per time unit (m^3/s) instead of mm per time step
                     avg_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area));
                     charge_m3s.set(idx, response.charge_m3s);
-                    snow_total_stored_water.set(idx, response.snow.swe);
+                    snow_swe.set(idx, response.snow.swe);
+                    snow_sca.set(idx, response.snow.sca);
                     // Convert snow outflow to volume per time unit (m^3/s) instead of mm per time step
                     snow_outflow.set(idx, mmh_to_m3s(response.snow.outflow, destination_area));
                     glacier_melt.set(idx, response.gm_melt_m3s);

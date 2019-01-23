@@ -316,6 +316,37 @@ namespace shyft {
                 sum_catchment_feature_value(*cells, indexes,
                     [](const cell& c) { return c.rc.charge_m3s; }, ith_timestep,ix_type);
         }
+        apoint_ts snow_swe(const cids_t& indexes, stat_scope ix_type) const {
+            return apoint_ts(*cell_statistics::
+                average_catchment_feature(*cells, indexes,
+                    [](const cell& c) { return c.rc.snow_swe; },ix_type));
+        }
+        vector<double> snow_swe(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
+            return cell_statistics::
+                catchment_feature(*cells, indexes,
+                    [](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
+        }
+        double snow_swe_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
+            return cell_statistics::
+                average_catchment_feature_value(*cells, indexes,
+                    [](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
+        }
+
+        apoint_ts snow_sca(const cids_t& indexes, stat_scope ix_type) const {
+            return apoint_ts(*cell_statistics::
+                average_catchment_feature(*cells, indexes,
+                    [](const cell& c) { return c.rc.snow_sca; },ix_type));
+        }
+        vector<double> snow_sca(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
+            return cell_statistics::
+                catchment_feature(*cells, indexes,
+                    [](const cell& c) { return c.rc.snow_sca; }, ith_timestep,ix_type);
+        }
+        double snow_sca_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
+            return cell_statistics::
+                average_catchment_feature_value(*cells, indexes,
+                    [](const cell& c) { return c.rc.snow_sca; }, ith_timestep,ix_type);
+        }
 
 		apoint_ts temperature(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
@@ -1011,17 +1042,17 @@ namespace shyft {
 		apoint_ts total_stored_water(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::
                 sum_catchment_feature(*cells, indexes,
-                [](const cell& c) { return c.rc.snow_total_stored_water; },ix_type));
+                [](const cell& c) { return c.rc.snow_swe; },ix_type));
         }
 		vector<double> total_stored_water(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				catchment_feature(*cells, indexes,
-				[](const cell& c) { return c.rc.snow_total_stored_water; }, ith_timestep,ix_type);
+				[](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
 		}
 		double total_stored_water_value(const cids_t& indexes, size_t ith_timestep, stat_scope ix_type) const {
 			return cell_statistics::
 				average_catchment_feature_value(*cells, indexes,
-					[](const cell& c) { return c.rc.snow_total_stored_water; }, ith_timestep,ix_type);
+					[](const cell& c) { return c.rc.snow_swe; }, ith_timestep,ix_type);
 		}
         apoint_ts glacier_melt(const cids_t& indexes, stat_scope ix_type) const {
             return apoint_ts(*cell_statistics::

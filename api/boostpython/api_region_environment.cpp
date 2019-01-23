@@ -16,7 +16,10 @@ namespace expose {
 	using ts::dd::ats_vector;
     namespace ta=shyft::time_axis;
     namespace sa=shyft::api;
-
+    using std::vector;
+    using std::shared_ptr;
+    using std::make_shared;
+    
     template <class S>
     static std::vector<double> geo_tsv_values(std::shared_ptr<std::vector<S>> const &geo_tsv, sc::utctime t) {
         std::vector<double> r;
@@ -38,6 +41,31 @@ namespace expose {
         return r;
     }
 
+    /** simple extension to support construct from python list 
+     * Since py-api register convertible only works for non-shared ptr classes.
+     */
+    struct geo_tsv_extension {
+        
+        template <class T>
+   		static shared_ptr<vector<T>> create_from_list(py::list tsl) {
+			if(py::len(tsl)==0)
+				return make_shared<vector<T>>();
+			auto r = make_shared<vector<T>>();
+			size_t n = py::len(tsl);
+			r->reserve(py::len(tsl));
+			for(size_t i=0;i<n;++i) {
+				py::object oi = tsl[i];
+				py::extract<T> xtract_gts(oi);
+				if (xtract_gts.check()) {
+					r->push_back(xtract_gts());
+				} else {
+					throw std::runtime_error(std::string("failed to convert ") + std::to_string(i) + " element to xxxSource");
+				}
+			}
+			return r;
+        }
+    };
+    
     template<class T>
     static void GeoPointSourceX(const char *py_name,const char *py_vector,const char *py_doc) {
         py::class_<T,py::bases<sa::GeoPointSource>>(py_name,py_doc)
@@ -45,6 +73,12 @@ namespace expose {
             ;
         typedef std::vector<T> TSourceVector;
         py::class_<TSourceVector,py::bases<>,std::shared_ptr<TSourceVector> > (py_vector)
+            .def("__init__", py::make_constructor(&geo_tsv_extension::template create_from_list<T>,
+				py::default_call_policies(),
+               (py::arg("geo_ts_list"))
+				),
+				doc_intro("Construct from list")
+			)
             .def(py::vector_indexing_suite<TSourceVector>())
             .def(py::init<const TSourceVector&>(py::args("src"),"clone src"))
             .def("from_geo_and_ts_vector",&create_from_geo_and_tsv<T>,(py::arg("geo_points"), py::arg("tsv")),
@@ -56,7 +90,7 @@ namespace expose {
             )
             .staticmethod("from_geo_and_ts_vector")
             ;
-        py_api::iterable_converter().from_python<TSourceVector>();
+        //not supported for shared_ptr, leaks mem etc: py_api::iterable_converter().from_python<TSourceVector>();
 
         py::def("compute_geo_ts_values_at_time", &geo_tsv_values<T>, py::args("geo_ts_vector", "t"),
             doc_intro("compute the ts-values of the GeoPointSourceVector type for the specified time t and return DoubleVector")
@@ -95,7 +129,7 @@ namespace expose {
             doc_returns("values","DoubleValue","List of extracted values at same size/position as the geo_ts_vector")
             );
 
-        py::register_ptr_to_python<std::shared_ptr<sa::GeoPointSource>>();
+        //py::register_ptr_to_python<std::shared_ptr<sa::GeoPointSource>>();
         GeoPointSourceX<sa::TemperatureSource>("TemperatureSource","TemperatureSourceVector","geo located temperatures[deg Celcius]");
         GeoPointSourceX<sa::PrecipitationSource>("PrecipitationSource","PrecipitationSourceVector","geo located precipitation[mm/h]");
         GeoPointSourceX<sa::WindSpeedSource>("WindSpeedSource","WindSpeedSourceVector","geo located wind speeds[m/s]");

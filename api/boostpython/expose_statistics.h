@@ -463,7 +463,12 @@ namespace expose {
 
             rts_ (bc_stat::*precipitation_ts)(cids_,stat_scope) const = &bc_stat::precipitation;
             vd_  (bc_stat::*precipitation_vd)(cids_,ix_,stat_scope) const =&bc_stat::precipitation;
+            
+            rts_(bc_stat::*snow_swe_ts)(cids_,stat_scope) const = &bc_stat::snow_swe;
+            vd_(bc_stat::*snow_swe_vd)(cids_, ix_,stat_scope) const = &bc_stat::snow_swe;
 
+            rts_(bc_stat::*snow_sca_ts)(cids_,stat_scope) const = &bc_stat::snow_sca;
+            vd_(bc_stat::*snow_sca_vd)(cids_, ix_,stat_scope) const = &bc_stat::snow_sca;
 
 
             class_<bc_stat>(base_name,
@@ -480,6 +485,12 @@ namespace expose {
                 .def("charge", charge_ts, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns sum charge[m^3/s] for catcment_ids")
                 .def("charge", charge_vd, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns charge[m^3/s]  for cells matching catchments_ids at the i'th timestep")
                 .def("charge_value", &bc_stat::charge_value, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns charge[m^3/s] for cells matching catchments_ids at the i'th timestep")
+                .def("snow_swe", snow_swe_ts, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_swe [mm] for catcment_ids")
+                .def("snow_swe", snow_swe_vd, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_swe [mm]  for cells matching catchments_ids at the i'th timestep")
+                .def("snow_swe_value", &bc_stat::snow_swe_value, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_swe [mm] for cells matching catchments_ids at the i'th timestep")
+                .def("snow_sca", snow_sca_ts, (py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_sca [] for catcment_ids")
+                .def("snow_sca", snow_sca_vd, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_sca []  for cells matching catchments_ids at the i'th timestep")
+                .def("snow_sca_value", &bc_stat::snow_sca_value, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns snow_sca [] for cells matching catchments_ids at the i'th timestep")
                 .def("temperature",temperature_ts,(py::arg("self"),py::arg("indexes"),py::arg("ix_type")=stat_scope::catchment_ix), "returns sum  for catcment_ids")
                 .def("temperature",temperature_vd,(py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix),"returns  for cells matching catchments_ids at the i'th timestep")
 				.def("temperature_value", &bc_stat::temperature_value, (py::arg("self"),py::arg("indexes"),py::arg("i"),py::arg("ix_type")=stat_scope::catchment_ix), "returns  for cells matching catchments_ids at the i'th timestep")
