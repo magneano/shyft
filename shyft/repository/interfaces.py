@@ -3,6 +3,7 @@
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from shyft import api
+from typing import List, Any, Dict, Optional
 
 """Module description: This module contain the abstract base-classes for the
 repositories in shyft, defining the contracts that a repository should
@@ -347,7 +348,8 @@ class GeoTsRepository:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_timeseries(self, input_source_types, utc_period, geo_location_criteria=None):
+    def get_timeseries(self, input_source_types: List[str], utc_period: Any,
+                       geo_location_criteria: Optional[Any] = None) -> Dict[str, Any]:
         """
         Parameters
         ----------
@@ -372,7 +374,8 @@ class GeoTsRepository:
             "Interface method 'get_timeseries' not implemented for repository {}.".format(self.__class__.__name__))
 
     @abstractmethod
-    def get_timeseries_ensemble(self, input_source_types, utc_period, geo_location_criteria=None):
+    def get_timeseries_ensemble(self, input_source_types: List[str], utc_period: Any,
+                       geo_location_criteria: Optional[Any] = None) -> List[Dict[str, Any]]:
         """
         Parameters
         ----------
@@ -396,7 +399,8 @@ class GeoTsRepository:
                 self.__class__.__name__))
 
     @abstractmethod
-    def get_forecast(self, input_source_types, utc_period, t_c, geo_location_criteria=None):
+    def get_forecast(self, input_source_types: List[str], utc_period: Any, t_c: int,
+                     geo_location_criteria: Optional[Any] = None) -> Dict[str, Any]:
         """
         Parameters
         ----------
@@ -404,7 +408,7 @@ class GeoTsRepository:
             List of source types to retrieve (precipitation, temperature, ...)
         utc_period: api.UtcPeriod
             The utc time period that should (as a minimum) be covered.
-        t_c: long
+        t_c: int
             Forecast specification; return newest forecast older than t_c.
         geo_location_criteria: {shapely.geometry.Polygon, shapely.geometry.MultiPolygon}
             Polygon defining the boundary for selecting points. All points located inside this boundary will be fetched.
@@ -423,8 +427,8 @@ class GeoTsRepository:
             "Interface method 'get_forecast' not implemented for repository {}.".format(self.__class__.__name__))
 
     @abstractmethod
-    def get_forecast_ensemble(self, input_source_types, utc_period,
-                              t_c, geo_location_criteria=None):
+    def get_forecast_ensemble(self, input_source_types: List[str], utc_period: Any, t_c: int,
+                              geo_location_criteria: Optional[Any] = None) -> List[Dict[str, Any]]:
         """
         Parameters
         ----------
@@ -432,7 +436,7 @@ class GeoTsRepository:
             List of source types to retrieve (precipitation, temperature, ...)
         utc_period: api.UtcPeriod
             The utc time period that should (as a minimum) be covered.
-        t_c: long
+        t_c: int
             Forecast specification; return newest forecast older than t_c.
         geo_location_criteria: {shapely.geometry.Polygon, shapely.geometry.MultiPolygon}
             Polygon defining the boundary for selecting points. All points located inside this boundary will be fetched.
@@ -450,7 +454,8 @@ class GeoTsRepository:
                 self.__class__.__name__))
 
     @abstractmethod
-    def get_forecast_collection(self, input_source_types, fc_selection_criteria, geo_location_criteria=None):
+    def get_forecast_collection(self, input_source_types: List, fc_selection_criteria: ForecastSelectionCriteria,
+                                geo_location_criteria: Optional[Any] = None) -> List[Dict[str, Any]]:
         """
         Parameters
         ----------
@@ -472,7 +477,8 @@ class GeoTsRepository:
                 self.__class__.__name__))
 
     @abstractmethod
-    def get_forecast_ensemble_collection(self, input_source_types, fc_selection_criteria, geo_location_criteria=None):
+    def get_forecast_ensemble_collection(self, input_source_types: List, fc_selection_criteria: ForecastSelectionCriteria,
+                                         geo_location_criteria: Optional[Any] = None) -> List[List[Dict[str, Any]]]:
         """
         Parameters
         ----------
