@@ -588,6 +588,7 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period, numb_years=None):
     counter = 0
     while counter < numb_years:
         y = first_year_in_ts + counter # for y in range(first_year_in_ts, last_year_in_ts + 1):
+        counter += 1
         period_to_shift = UTC.time(utc_period_start_date.year, utc_period_start_date.month, utc_period_start_date.day) \
                           - UTC.time(y, utc_period_start_date.month, utc_period_start_date.day)
         ta_shifted = api.TimeAxis(utc_period.start - period_to_shift, dt, n)
@@ -596,7 +597,6 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period, numb_years=None):
                                                 s.ts.average(ta_shifted).time_shift(period_to_shift)) for s in geo_ts]) 
                                                 for key, geo_ts in geo_ts_dict.items()})
             years.append(y)
-            counter += 1
     return years, ensemble
 
 def create_ncfile(data_file, variables, dimensions, ncattrs=None):
