@@ -641,6 +641,8 @@ namespace shyft{
                 find_ts_bind_info(dynamic_cast<const qac_ts*>(its.get())->cts, r);
             } else if (dynamic_cast<const inside_ts*>(its.get())) {
                 find_ts_bind_info(dynamic_cast<const inside_ts*>(its.get())->ts, r);
+            } else if (dynamic_cast<const derivative_ts*>(its.get())){
+                find_ts_bind_info(dynamic_cast<const derivative_ts*>(its.get())->ts, r);                
             }
 		}
 

@@ -1,4 +1,4 @@
-from shyft.api import TimeSeries, TimeAxis, Calendar, UtcPeriod, TsVector, DoubleVector, POINT_AVERAGE_VALUE, POINT_INSTANT_VALUE
+from shyft.api import TimeSeries, TimeAxis, Calendar, UtcPeriod, TsVector, DoubleVector, POINT_AVERAGE_VALUE, POINT_INSTANT_VALUE, derivative_method
 import math
 import unittest
 
@@ -54,3 +54,9 @@ class TimeSeriesDerivative(unittest.TestCase):
         self.assertAlmostEqual(v[3], -0.4)
         self.assertAlmostEqual(v[4], 0.6)
         self.assertFalse(math.isfinite(v[5]))
+
+    def test_bind_info(self):
+        ts = TimeSeries("a")
+        tsd = ts.derivative(derivative_method.FORWARD)
+        bi = tsd.find_ts_bind_info()
+        self.assertEqual(len(bi), 1)
