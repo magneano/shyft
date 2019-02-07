@@ -254,6 +254,13 @@ namespace shyft {
                 state,
                 sc,
                 rc);
+		}
+		
+        template<>
+        inline void cell<pt_ss_k::parameter_t, environment_t, pt_ss_k::state_t,
+                         pt_ss_k::null_collector, pt_ss_k::discharge_collector>
+            ::set_snow_sca_swe_collection(bool on_or_off) {
+            rc.collect_snow=on_or_off;// possible, if true, we do collect both swe and sca, default is off
         }
     } // core
 } // shyft
