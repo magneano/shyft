@@ -155,7 +155,7 @@ class WXParallelizationRepositoryError(Exception):
 class WXParallelizationRepository(GeoTsRepository):
 
     def __init__(self, epsg: int, filename: str, truth_file: Optional[str] = None, padding: float = 15000.,
-                 cache_data: bool = True, numb_years: Optional[int] = None):
+                 cache_data: bool = True, first_year: Optional[int] = None, numb_years: Optional[int] = None):
         """
         Reads weather scenario from flattened netcdf-file(s) of geo-located weather data.
 
@@ -174,6 +174,8 @@ class WXParallelizationRepository(GeoTsRepository):
             that netcdf file containing truth scenarios must have same format as synthetic scenarios
         cache_data: bool
             Use cache data if True
+        first_year: int
+            First year to start parallelization from. I None start as early as possible
         numb_years: int
             Limits number of years (i.e. scenarios) to return from ensemble methods. If None return as many as possible.
 
@@ -208,6 +210,7 @@ class WXParallelizationRepository(GeoTsRepository):
         self.cache_data = cache_data
         self.cache = None
         self.truth_file = truth_file
+        self.first_year = first_year
         self.numb_years = numb_years
         self.syn_repo = WXRepository(epsg, filename, padding=padding, flattened=True, allow_year_shift=True, cache_data=False)
         if truth_file is not None:
@@ -228,7 +231,8 @@ class WXParallelizationRepository(GeoTsRepository):
              see interfaces.GeoTsRepository
         """
         scen = self._read_from_file_and_merge(input_source_types, geo_location_criteria=geo_location_criteria)
-        self.parallelized_years, wx_scen_parallelized = parallelize_geo_timeseries(scen[0], utc_period, self.numb_years)
+        self.parallelized_years, wx_scen_parallelized = parallelize_geo_timeseries(scen[0], utc_period,
+                                                                first_year=self.first_year, numb_years=self.numb_years)
         return wx_scen_parallelized
 
     def get_forecast_ensemble(self, input_source_types: List[str], utc_period: Any, t_c: int,
