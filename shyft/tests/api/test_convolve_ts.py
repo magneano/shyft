@@ -22,3 +22,10 @@ class ConvolveTs(unittest.TestCase):
         self.assertIsNotNone(cts)
         self.assertEquals(len(cts), len(ts))
         self.assertEquals(cts.values.to_numpy().sum(), ts.values.to_numpy().sum())
+
+    def test_bind_info(self):
+        ts = TimeSeries("a")
+        w = DoubleVector.from_numpy([0.05, 0.15, 0.6, 0.15, 0.05])
+        tsd = ts.convolve_w(w, convolve_policy.USE_FIRST)
+        bi = tsd.find_ts_bind_info()
+        self.assertEqual(len(bi), 1)

@@ -643,6 +643,8 @@ namespace shyft{
                 find_ts_bind_info(dynamic_cast<const inside_ts*>(its.get())->ts, r);
             } else if (dynamic_cast<const derivative_ts*>(its.get())){
                 find_ts_bind_info(dynamic_cast<const derivative_ts*>(its.get())->ts, r);                
+            } else if (dynamic_cast<const convolve_w_ts*>(its.get())){
+                find_ts_bind_info(dynamic_cast<const convolve_w_ts*>(its.get())->ts_impl.ts.ts, r);                
             }
 		}
 
