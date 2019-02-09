@@ -79,7 +79,7 @@ class DtssTestCase(unittest.TestCase):
     def dtss_read_callback(self, ts_ids: StringVector, read_period: UtcPeriod) -> TsVector:
         self.callback_count += 1
         r = TsVector()
-        ta = TimeAxis(read_period.start, deltahours(1), int(read_period.timespan()//deltahours(1)))
+        ta = TimeAxis(read_period.start, deltahours(1), int(read_period.timespan() // deltahours(1)))
         if self.rd_throws:
             self.rd_throws = False
             raise RuntimeError("read-ts-problem")
@@ -125,7 +125,7 @@ class DtssTestCase(unittest.TestCase):
         for i in range(n_ts):
             pts = TimeSeries(ta, np.linspace(start=0, stop=1.0, num=ta.size()),
                              point_fx.POINT_AVERAGE_VALUE)
-            tsv.append(float(1 + i/10)*pts)
+            tsv.append(float(1 + i / 10) * pts)
             store_tsv.append(TimeSeries("cache://test/{0}".format(i), pts))  # generate a bound pts to store
 
         dummy_ts = TimeSeries('dummy://a')
@@ -149,8 +149,9 @@ class DtssTestCase(unittest.TestCase):
         tsv1x = tsv.inside(-0.5, 0.5)
         tsv1x.append(tsv1x[-1].decode(start_bit=1, n_bits=1))  # just to verify serialization/bind
         tsv1x.append(store_tsv[1].derivative())
-        tsv1x.append(store_tsv[1].pow(2.0)) # just for verify pow serialization(well, it's a bin-op..)
+        tsv1x.append(store_tsv[1].pow(2.0))  # just for verify pow serialization(well, it's a bin-op..)
         r1x = dts.evaluate(tsv1x, ta.total_period())
+        r1c = dts.evaluate(tsv, ta.total_period(), clip_result=ta.period(1))  # how to clip result to a period
         r2 = dts.percentiles(tsv, ta.total_period(), ta24, percentile_list)
         r3 = dts.find('netcdf://dummy\.nc/ts\d')
         self.rd_throws = True
@@ -171,7 +172,7 @@ class DtssTestCase(unittest.TestCase):
         dtss.clear()  # close server
         self.assertEqual(ex_count, 2)
         self.assertEqual(len(r1), len(tsv))
-        self.assertEqual(self.callback_count, 4)
+        self.assertEqual(self.callback_count, 5)
         for i in range(n_ts - 1):
             self.assertEqual(r1[i].time_axis, tsv[i].time_axis)
             assert_array_almost_equal(r1[i].values.to_numpy(), tsv[i].values.to_numpy(), decimal=4)
@@ -190,6 +191,10 @@ class DtssTestCase(unittest.TestCase):
         for i in range(len(r3)):
             self.assertEqual(r3[i], self.ts_infos[i])
         self.assertIsNotNone(r1x)
+        self.assertIsNotNone(r1c)
+        for i in range(len(r1c)):  # verify we clipped the result
+            self.assertEquals(r1c[i].total_period(), ta.period(1))
+
         self.assertEqual(1, len(self.stored_tsv))
         self.assertEqual(len(store_tsv), len(self.stored_tsv[0]))
         for i in range(len(store_tsv)):
@@ -218,7 +223,7 @@ class DtssTestCase(unittest.TestCase):
             # setup data to be calculated
             utc = Calendar()
             d = deltahours(1)
-            n = 365*24//3
+            n = 365 * 24 // 3
             t = utc.time(2016, 1, 1)
             ta = TimeAxis(t, d, n)
             n_ts = 10
@@ -226,10 +231,10 @@ class DtssTestCase(unittest.TestCase):
             tsv = TsVector()  # something we put an expression into, refering to stored ts-symbols
 
             for i in range(n_ts):
-                pts = TimeSeries(ta, np.sin(np.linspace(start=0, stop=1.0*i, num=ta.size())),
+                pts = TimeSeries(ta, np.sin(np.linspace(start=0, stop=1.0 * i, num=ta.size())),
                                  point_fx.POINT_AVERAGE_VALUE)
                 ts_id = shyft_store_url("{0}".format(i))
-                tsv.append(float(1.0)*TimeSeries(ts_id))  # make an expression that returns what we store
+                tsv.append(float(1.0) * TimeSeries(ts_id))  # make an expression that returns what we store
                 store_tsv.append(TimeSeries(ts_id, pts))  # generate a bound pts to store
             # krls with some extra challenges related to serialization
             tsv_krls = TsVector()
@@ -238,7 +243,7 @@ class DtssTestCase(unittest.TestCase):
             # min_max_check_ts_fill also needs a serial check
             # create a  trivial-case
             ts9 = TimeSeries(shyft_store_url("9"))
-            ts_qac = ts9.min_max_check_linear_fill(v_min=-10.0*n_ts, v_max=10.0*n_ts)
+            ts_qac = ts9.min_max_check_linear_fill(v_min=-10.0 * n_ts, v_max=10.0 * n_ts)
             tsv_krls.append(ts_qac)
             tsv_krls.append(ts9)
             tsv_krls.append(ts9.inside(min_v=-0.5, max_v=0.5))
@@ -301,10 +306,10 @@ class DtssTestCase(unittest.TestCase):
             tsv = TsVector()  # something we put an expression into, refering to stored ts-symbols
 
             for i in range(n_ts):
-                pts = TimeSeries(ta, np.sin(np.linspace(start=0, stop=1.0*i, num=ta.size())),
+                pts = TimeSeries(ta, np.sin(np.linspace(start=0, stop=1.0 * i, num=ta.size())),
                                  point_fx.POINT_AVERAGE_VALUE)
                 ts_id = shyft_store_url("{0}".format(i))
-                tsv.append(float(1.0)*TimeSeries(ts_id))  # make an expression that returns what we store
+                tsv.append(float(1.0) * TimeSeries(ts_id))  # make an expression that returns what we store
                 store_tsv.append(TimeSeries(ts_id, pts))  # generate a bound pts to store
 
             # add one external ts
@@ -370,14 +375,14 @@ class DtssTestCase(unittest.TestCase):
             self.assertEqual(cs1.misses, 1)  # because we cache on store, so 10 cached, 1 external with miss
             self.assertEqual(cs1.coverage_misses, 0)
             self.assertEqual(cs1.id_count, n_ts + 1)
-            self.assertEqual(cs1.point_count, (n_ts + 1)*n)
+            self.assertEqual(cs1.point_count, (n_ts + 1) * n)
             self.assertEqual(cs1.fragment_count, n_ts + 1)
             # verify client side cache_stats
             self.assertEqual(ccs1.hits, n_ts)
             self.assertEqual(ccs1.misses, 1)  # because we cache on store, so 10 cached, 1 external with miss
             self.assertEqual(ccs1.coverage_misses, 0)
             self.assertEqual(ccs1.id_count, n_ts + 1)
-            self.assertEqual(ccs1.point_count, (n_ts + 1)*n)
+            self.assertEqual(ccs1.point_count, (n_ts + 1) * n)
             self.assertEqual(ccs1.fragment_count, n_ts + 1)
 
             self.assertEqual(cs2.hits, 0)
@@ -391,21 +396,21 @@ class DtssTestCase(unittest.TestCase):
             self.assertEqual(cs3.misses, n_ts + 1)  # because we cache on store, we don't even miss one time
             self.assertEqual(cs3.coverage_misses, 0)
             self.assertEqual(cs3.id_count, n_ts + 1)
-            self.assertEqual(cs3.point_count, (n_ts + 1)*n)
+            self.assertEqual(cs3.point_count, (n_ts + 1) * n)
             self.assertEqual(cs3.fragment_count, n_ts + 1)
 
             self.assertEqual(cs4.hits, n_ts + 1)  # because previous read filled cache
             self.assertEqual(cs4.misses, n_ts + 1)  # remembers previous misses.
             self.assertEqual(cs4.coverage_misses, 0)
             self.assertEqual(cs4.id_count, n_ts + 1)
-            self.assertEqual(cs4.point_count, (n_ts + 1)*n)
+            self.assertEqual(cs4.point_count, (n_ts + 1) * n)
             self.assertEqual(cs4.fragment_count, n_ts + 1)
 
             self.assertEqual(cs6.hits, 1)  # because previous read filled cache
-            self.assertEqual(cs6.misses, n_ts*2 + 1)  # remembers previous misses.
+            self.assertEqual(cs6.misses, n_ts * 2 + 1)  # remembers previous misses.
             self.assertEqual(cs6.coverage_misses, 0)
             self.assertEqual(cs6.id_count, 1)
-            self.assertEqual(cs6.point_count, 1*n)
+            self.assertEqual(cs6.point_count, 1 * n)
             self.assertEqual(cs6.fragment_count, 1)
 
     def test_merge_store_ts_points(self):
@@ -419,7 +424,7 @@ class DtssTestCase(unittest.TestCase):
             utc = Calendar()
             d = deltahours(1)
             t = utc.time(2016, 1, 1)
-            ta = TimeAxis(UtcTimeVector.from_numpy(np.array([t, t + d, t + 3*d], dtype=np.int64)), t + 4*d)
+            ta = TimeAxis(UtcTimeVector.from_numpy(np.array([t, t + d, t + 3 * d], dtype=np.int64)), t + 4 * d)
 
             n_ts = 10
             store_tsv = TsVector()  # something we store at server side
@@ -439,7 +444,7 @@ class DtssTestCase(unittest.TestCase):
 
             dts.store_ts(store_tsv)  # 1. store the initial time-series, they are required for the merge_store_points function
 
-            tb = TimeAxis(UtcTimeVector.from_numpy(np.array([t - d, t + 3*d, t + 4*d], dtype=np.int64)), t + 5*d)  # make some points, one before, one in the middle and after
+            tb = TimeAxis(UtcTimeVector.from_numpy(np.array([t - d, t + 3 * d, t + 4 * d], dtype=np.int64)), t + 5 * d)  # make some points, one before, one in the middle and after
             mpv = TsVector()  # merge point vector
             for i in range(n_ts):
                 ts_id = shyft_store_url("{0}".format(i))
@@ -471,11 +476,11 @@ class DtssTestCase(unittest.TestCase):
             t = utc.time(2000, 1, 1)
             n = utc.diff_units(t, utc.add(t, Calendar.YEAR, 10), d)
             ta = TimeAxis(t, d, n)
-            td = TimeAxis(t, d*24, n//24)
+            td = TimeAxis(t, d * 24, n // 24)
             n_ts = 1
             store_tsv = TsVector()  # something we store at server side
             for i in range(n_ts):
-                pts = TimeSeries(ta, np.sin(np.linspace(start=0, stop=1.0*(i + 1), num=ta.size())), point_fx.POINT_AVERAGE_VALUE)
+                pts = TimeSeries(ta, np.sin(np.linspace(start=0, stop=1.0 * (i + 1), num=ta.size())), point_fx.POINT_AVERAGE_VALUE)
                 ts_id = shyft_store_url(f"{i}")
                 store_tsv.append(TimeSeries(ts_id, pts))  # generate a bound pts to store
 
@@ -514,7 +519,7 @@ class DtssTestCase(unittest.TestCase):
             # setup some data
             utc = Calendar()
             d = deltahours(1)
-            n = 365*24//3
+            n = 365 * 24 // 3
             t = utc.time(2016, 1, 1)
             ta = TimeAxis(t, d, n)
             tsv = TsVector()
@@ -574,7 +579,7 @@ class DtssTestCase(unittest.TestCase):
             # setup some data
             utc = Calendar()
             d = deltahours(1)
-            n = 365*24//3
+            n = 365 * 24 // 3
             t = utc.time(2016, 1, 1)
             ta = TimeAxis(t, d, n)
             tsv = TsVector()
@@ -606,7 +611,7 @@ class DtssTestCase(unittest.TestCase):
             # setup some data
             utc = Calendar()
             d = deltahours(1)
-            n = 365*24//3
+            n = 365 * 24 // 3
             t = utc.time(2016, 1, 1)
             ta = TimeAxis(t, d, n)
             tsv = TsVector()

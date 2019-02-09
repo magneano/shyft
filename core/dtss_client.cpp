@@ -211,19 +211,21 @@ client::percentiles(ts_vector_t const& tsv, utcperiod p, gta_t const&ta, const s
 }
 
 std::vector<apoint_ts>
-client::evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,bool update_ts_cache) {
+client::evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,bool update_ts_cache,utcperiod result_clip) {
     if (tsv.size() == 0)
         throw std::runtime_error("evaluate requires a source ts-vector with more than 0 time-series");
     if (!p.valid())
         throw std::runtime_error("evaluate require a valid period-specification");
     scoped_connect ac(*this);
     // local lambda to ensure one definition of communication with the server
-    auto eval_io = [this] (srv_connection &sc,const ts_vector_t& tsv,const utcperiod& p,bool use_ts_cached_read,bool update_ts_cache) ->ts_vector_t {
+    auto eval_io = [this] (srv_connection &sc,const ts_vector_t& tsv,const utcperiod& p,bool use_ts_cached_read,bool update_ts_cache,const utcperiod result_clip) ->ts_vector_t {
 		ts_vector_t r;
 		do_io_with_repair_and_retry(sc,
-			[this,&r,&tsv,&p,&use_ts_cached_read,&update_ts_cache](srv_connection &sc) {
+			[this,&r,&tsv,&p,&use_ts_cached_read,&update_ts_cache,&result_clip](srv_connection &sc) {
 				dlib::iosockstream& io = *sc.io;
-				msg::write_type(compress_expressions ? message_type::EVALUATE_EXPRESSION : message_type::EVALUATE_TS_VECTOR, io); {
+                bool rc=result_clip.valid();
+				msg::write_type(compress_expressions ? (rc?message_type::EVALUATE_EXPRESSION_CLIP:message_type::EVALUATE_EXPRESSION) : 
+                                                        (rc?message_type::EVALUATE_TS_VECTOR_CLIP:message_type::EVALUATE_TS_VECTOR), io); {
 					core_oarchive oa(io, core_arch_flags);
 					oa << p;
 					if (compress_expressions) { // notice that we stream out all in once here
@@ -232,6 +234,9 @@ client::evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,boo
 					} else {
 						oa << tsv << use_ts_cached_read << update_ts_cache;
 					}
+					if(rc) {
+                        oa<<result_clip;
+                    }
 				}
 				auto response_type = msg::read_type(io);
 				if (response_type == message_type::SERVER_EXCEPTION) {
@@ -249,15 +254,15 @@ client::evaluate(ts_vector_t const& tsv, utcperiod p,bool use_ts_cached_read,boo
     };
 
     if(srv_con.size()==1 || tsv.size() == 1) { // one server, or just one ts, do it easy
-        return eval_io(srv_con[0],tsv,p,use_ts_cached_read,update_ts_cache);
+        return eval_io(srv_con[0],tsv,p,use_ts_cached_read,update_ts_cache,result_clip);
     } else {
         ts_vector_t rt(tsv.size()); // make place for the result contributions from threads
         // lamda to eval partition on server
-        auto eval_partition= [&rt,&tsv,&eval_io,p,use_ts_cached_read,update_ts_cache]
+        auto eval_partition= [&rt,&tsv,&eval_io,p,use_ts_cached_read,update_ts_cache,result_clip]
             (srv_connection& sc,size_t i0, size_t n) {
                 ts_vector_t ptsv;ptsv.reserve(tsv.size());
                 for(size_t i=i0;i<i0+n;++i) ptsv.push_back(tsv[i]);
-                auto pt = eval_io(sc,ptsv,p,use_ts_cached_read,update_ts_cache);
+                auto pt = eval_io(sc,ptsv,p,use_ts_cached_read,update_ts_cache,result_clip);
                 for(size_t i=0;i<pt.size();++i)
                     rt[i0+i]=pt[i];// notice how se stash data into common result variable, safe because each thread using it's own preallocated space
         };

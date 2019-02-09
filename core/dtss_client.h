@@ -83,7 +83,7 @@ struct client {
 
 	vector<apoint_ts> percentiles(const ts_vector_t & tsv, utcperiod p, const gta_t & ta, const vector<int64_t> & percentile_spec, bool use_ts_cached_read, bool update_ts_cache);
 
-	vector<apoint_ts> evaluate(const ts_vector_t & tsv, utcperiod p, bool use_ts_cached_read, bool update_ts_cache);
+	vector<apoint_ts> evaluate(const ts_vector_t & tsv, utcperiod p, bool use_ts_cached_read, bool update_ts_cache, utcperiod clip_result=utcperiod{});
 
 	void store_ts(const ts_vector_t & tsv, bool overwrite_on_write, bool cache_on_write);
     

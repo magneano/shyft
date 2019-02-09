@@ -1546,6 +1546,42 @@ namespace shyft{
             for(auto&x:r) x=p.decode(x);
             return r;
 		}
+		
+        apoint_ts clip_to_period(apoint_ts const& ts, utcperiod p) {
+            //sanity checks:
+            if(ts.size()==0)
+                return ts;
+            
+            auto ts_tp=ts.total_period();
+            if(p.contains(ts_tp)) 
+                return ts; //easy, nothing to clip
+            if(!ts_tp.overlaps(p)) 
+                return apoint_ts(gta_t{},shyft::nan,ts.point_interpretation());//easy!
+            // it's overlap, and we have to take a serious look into it.
+            auto const& ta=ts.time_axis();
+            size_t ix_hint=0;
+            auto ix_left=ta.open_range_index_of(p.start,ix_hint);// get left ix, less than p.start
+            if(ix_left==string::npos) ix_left=0;// possible scenario, then we start at i0
+            auto ix_right=ta.open_range_index_of(p.end,ix_hint);
+            assert(ix_right != string::npos);// pr.def. we should **always** have ix_right if it's overlap.
+            auto t_right=ta.time(ix_right);
+            if(ts.point_interpretation()==ts_point_fx::POINT_INSTANT_VALUE) {// linear between point
+                if(t_right < p.end && ix_right+1<ta.size())// tricky end-definition, we need point to the right
+                    ++ix_right;// add end point, so we can do f(t) when t in range [p.start..p.end>
+            } else if(t_right==p.end && ix_right>ix_left) {
+                --ix_right;//drop off this point, since we do not need it.
+            }
+            
+            return ts.slice(ix_left,1u+ix_right-ix_left);
+        }
+        
+        ats_vector clip_to_period(ats_vector const& tsv, utcperiod p) {
+            ats_vector r;r.reserve(tsv.size());
+            for(auto const &ts:tsv)
+                r.emplace_back(clip_to_period(ts,p));
+            return r;
+        }
+		
     }
 }}
 

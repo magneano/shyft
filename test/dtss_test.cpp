@@ -658,7 +658,7 @@ TEST_CASE("dlib_server_performance") {
 }
 
 TEST_CASE("dtss_store") { /*
-    This test simply create and host a dtss on port 20000,
+    This test simply create and host a dtss on auto-port,
     then uses shyft:// prefix to test
     all internal operations that involve mapping to the
     shyft ts-db-store.
@@ -743,6 +743,35 @@ TEST_CASE("dtss_store") { /*
         auto cs = our_server.get_cache_stats();
         std::cout<<"cache stats(hits,misses,cover_misses,id_count,frag_count,point_count):\n "<<cs.hits<<","<<cs.misses<<","<<cs.coverage_misses<<","<<cs.id_count<<","<<cs.fragment_count<<","<<cs.point_count<<")\n";
     }
+    SUBCASE("evaluate_clip") {
+        // 1. ARRANGE (given the doctest context above)
+        size_t n_ts=2;
+        time_axis::generic_dt fta(t, dt, n);
+        constexpr auto stair_case=ts_point_fx::POINT_AVERAGE_VALUE;
+        //constexpr auto linear=ts_point_fx::POINT_INSTANT_VALUE;
+
+        ts_vector_t tsv;
+        auto ts_name=[](size_t i)->string {return string("ec")+to_string(i);};
+        for(size_t i=0;i<n_ts;++i) 
+            tsv.emplace_back(shyft_url(tc,ts_name(i)),apoint_ts{fta,i*10.0,stair_case});
+        dtss.store_ts(tsv, true, true); // store(overwrite) and cache
+
+        ts_vector_t ev;
+        for(size_t i=0;i<tsv.size();++i)
+            ev.push_back(apoint_ts(shyft_url(tc,ts_name(i))));
+        our_server.set_auto_cache(true);
+        // 2. ACT
+        auto r1= dtss.evaluate(ev,fta.total_period(),true,false); // should give full result
+        auto r2= dtss.evaluate(ev,fta.period(2),true,false);// at least period(2), but in practice full result due to cache
+        auto r3= dtss.evaluate(ev,fta.total_period(),true,false,fta.period(2));// will clip to 2
+        auto r4= dtss.evaluate(ev,fta.period(1),true,false,fta.period(2));// will clip to 2, since it's
+        
+        // 3. ASSERT
+        FAST_CHECK_EQ(r1[0].total_period(),fta.total_period());
+        FAST_CHECK_EQ(r2[0].total_period(),fta.total_period());
+        FAST_CHECK_EQ(r3[0].total_period(),fta.period(2));
+        FAST_CHECK_EQ(r4[0].total_period(),fta.period(2));
+    }
 
     our_server.clear();
 #ifdef _WIN32
@@ -815,7 +844,7 @@ TEST_CASE("dtss_baseline") {
     vector<vector<double>> xmr;xmr.reserve(n_ts);
     //auto xtsv = deflate_ts_vector<point_ts<time_axis::generic_dt>>(tsv);
     for(const auto &ts:tsv) {
-        xmr.emplace_back(move(ts.values()));
+        xmr.emplace_back(ts.values());
     }
     auto t3 = timing::now();
 
@@ -1331,18 +1360,18 @@ TEST_CASE("dtss_server_with_multiple_containers") {
     SUBCASE("Save dispatched to the correct container") {
         core::utctime t = utc.time(2016, 1, 1);
         core::utctimespan dt = core::deltahours(1);
-size_t n = 10;
-generic_dt ta{ t, dt, n };
+        size_t n = 10;
+        generic_dt ta{ t, dt, n };
 
-ts_vector_t vec{};
-vec.emplace_back(
-    shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "0"}, {"container", "first"} }),
-    apoint_ts{ ta, 0 * 10.0, ts_point_fx::POINT_INSTANT_VALUE });
-vec.emplace_back(
-    shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "1"}, {"container", "second"} }),
-    apoint_ts{ ta, 1 * 10.0, ts_point_fx::POINT_INSTANT_VALUE });
+        ts_vector_t vec{};
+        vec.emplace_back(
+            shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "0"}, {"container", "first"} }),
+            apoint_ts{ ta, 0 * 10.0, ts_point_fx::POINT_INSTANT_VALUE });
+        vec.emplace_back(
+            shyft::dtss::shyft_url("container", "foo/bar/baz", queries_t{ {"value", "1"}, {"container", "second"} }),
+            apoint_ts{ ta, 1 * 10.0, ts_point_fx::POINT_INSTANT_VALUE });
 
-cli.store_ts(vec, false, false);
+        cli.store_ts(vec, false, false);
     }
 
     SUBCASE("Read dispatched to the correct container") {

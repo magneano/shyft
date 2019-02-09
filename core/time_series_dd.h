@@ -1984,7 +1984,32 @@ namespace shyft {
 
             x_serialize_decl();
         };
-
+        
+    /** @brief clip a concrete time-series to period
+        *
+        * Rely on the apoint_ts.slice(i,n) algo.
+        * Which in effect *will* to a memcpy of the slice (values, potentially also the time-axis points).
+        * -> cost = memcpy the slice of ts.
+        * 
+        * The usage context for this function is currently *only* at the dtss final stage before 
+        * serializing values back to the client. User might want to set a clip period to remove
+        * excessive amount of data for non-expressional request 
+        * where time-axis usually determines precicely what should be returned.
+        * 
+        * @note Not valid for expression time-series (yet). 
+        *       It will throw at the first point where it dive into slice function.
+        *       When .slice() supports expressions (not useful for now), - this will also work.
+        *       
+        * 
+        */
+        apoint_ts clip_to_period(apoint_ts const& ts, utcperiod p) ;
+        
+        /** @brief clip all time-series in a tsvector to specified clip_to_period
+        *
+        *  @see clip_to_period for apoint_ts for spec/algo and context (dtss server, before serialize stage)
+        */
+        ats_vector clip_to_period(ats_vector const& tsv, utcperiod p);
+        
         /** The iop_t represent the basic 'binary' operation,
          *   a stateless function that takes two doubles and returns the binary operation.
          *   E.g.: a+b

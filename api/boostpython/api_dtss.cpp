@@ -42,7 +42,7 @@ namespace dtss {
 using time_series::dd::gta_t;
 using time_series::dd::apoint_ts;
 using time_series::dd::ats_vector;
-
+using core::utcperiod;
 using std::mutex;
 using std::unique_lock;
 
@@ -52,7 +52,7 @@ struct py_server : server<standard_dtss_dispatcher> {
         boost::python::object scb;///< callback for the store function
 
         py_server():server(
-            [=](id_vector_t const &ts_ids,core::utcperiod p){ return this->fire_cb(ts_ids,p); },
+            [=](id_vector_t const &ts_ids,utcperiod p){ return this->fire_cb(ts_ids,p); },
             [=](std::string search_expression) { return this->find_cb(search_expression); },
             [=](const ts_vector_t& tsv) { this->store_cb(tsv); }
         ) {
@@ -125,7 +125,7 @@ struct py_server : server<standard_dtss_dispatcher> {
             }
             return r;
         }
-        ts_vector_t fire_cb(id_vector_t const &ts_ids,core::utcperiod p) {
+        ts_vector_t fire_cb(id_vector_t const &ts_ids,utcperiod p) {
             ats_vector r;
             if (cb.ptr()!=Py_None) {
                 scoped_gil_aquire gil;
@@ -172,16 +172,16 @@ struct py_server : server<standard_dtss_dispatcher> {
             unique_lock<mutex> lck(mx);
             impl.reopen(timeout_ms);
         }
-        ts_vector_t percentiles(const ts_vector_t & tsv, core::utcperiod p,const gta_t &ta,const std::vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
+        ts_vector_t percentiles(const ts_vector_t & tsv, utcperiod p,const gta_t &ta,const std::vector<int64_t>& percentile_spec,bool use_ts_cached_read,bool update_ts_cache) {
             scoped_gil_release gil;
             unique_lock<mutex> lck(mx);
             //std::vector<int64_t> p_spec;for(auto p:percentile_spec) p_spec.push_back(p);
             return impl.percentiles(tsv,p,ta,percentile_spec,use_ts_cached_read,update_ts_cache);
         }
-        ts_vector_t evaluate(const ts_vector_t& tsv, core::utcperiod p,bool use_ts_cached_read,bool update_ts_cache) {
+        ts_vector_t evaluate(const ts_vector_t& tsv, utcperiod p,bool use_ts_cached_read,bool update_ts_cache,utcperiod clip_result) {
             scoped_gil_release gil;
             unique_lock<mutex> lck(mx);
-            return ts_vector_t(impl.evaluate(tsv,p,use_ts_cached_read,update_ts_cache));
+            return ts_vector_t(impl.evaluate(tsv,p,use_ts_cached_read,update_ts_cache,clip_result));
         }
         ts_info_vector_t find(const std::string& search_expression) {
             scoped_gil_release gil;
@@ -228,9 +228,13 @@ struct py_server : server<standard_dtss_dispatcher> {
 
 
 namespace expose {
-
     using namespace boost::python;
     namespace py = boost::python;
+    using shyft::core::utcperiod;
+    using shyft::core::utctimespan;
+    using shyft::core::utctime;
+    using shyft::time_series::ts_point_fx;
+    
     void dtss_finalize() {
 #ifdef _WIN32
         WSACleanup();
@@ -245,7 +249,7 @@ namespace expose {
             doc_intro("about the stored time-series, that could be useful in some contexts")
             ,init<>(py::arg("self"))
             )
-            .def(init<std::string, shyft::time_series::ts_point_fx, shyft::core::utctimespan, std::string, shyft::core::utcperiod, shyft::core::utctime, shyft::core::utctime>(
+            .def(init<std::string, ts_point_fx, utctimespan, std::string, utcperiod, utctime, utctime>(
                 (py::arg("self"),py::arg("name"), py::arg("point_fx"), py::arg("delta_t"), py::arg("olson_tz_id"), py::arg("data_period"), py::arg("created"), py::arg("modified")),
                 doc_intro("construct a TsInfo with all values specified")
                 )
@@ -278,7 +282,7 @@ namespace expose {
 
         typedef std::vector<TsInfo> TsInfoVector;
         class_<TsInfoVector>("TsInfoVector",
-            doc_intro("A vector/list of TsInfo")
+            doc_intro("A strongly typed list of TsInfo")
             ,init<>(py::arg("self"))
             )
             .def(vector_indexing_suite<TsInfoVector>())
@@ -312,7 +316,7 @@ namespace expose {
             doc_intro("The server object will then compute the resulting time-series vector,")
             doc_intro("and respond back to clients with the results")
             doc_intro("multi-node considerations:")
-            doc_intro("    1. firewall/routing: ensure that the port you are using are open for ip-traffic")
+            doc_intro("    1. firewall/routing: ensure that the port you are using are open for ip-traffic(use ssh-tunnel if you need ssl/tls)")
             doc_intro("    2. currently we only support heterogenous client/server types(e.g. windows-windows, linux-linux)")
             doc_see_also("shyft.api.DtsClient"),
             init<>(args("self"))
@@ -551,7 +555,7 @@ namespace expose {
                 doc_returns("tsvector","TsVector","an evaluated list of percentile time-series in the same order as the percentile input list")
                 doc_see_also(".evaluate(), DtsServer")
             )
-            .def("evaluate", &DtsClient::evaluate, (py::arg("self"),py::arg("ts_vector"), py::arg("utcperiod"),py::arg("use_ts_cached_read")=true,py::arg("update_ts_cache")=false ),
+            .def("evaluate", &DtsClient::evaluate, (py::arg("self"),py::arg("ts_vector"), py::arg("utcperiod"),py::arg("use_ts_cached_read")=true,py::arg("update_ts_cache")=false,py::arg("clip_result")=utcperiod{} ),
                 doc_intro("Evaluates the expressions in the ts_vector.")
                 doc_intro("If the expression includes unbound symbolic references to time-series,")
                 doc_intro("these time-series will be passed to the binding service callback")
@@ -566,12 +570,16 @@ namespace expose {
                 doc_intro("      can be used to exactly control the returned result size.")
                 doc_intro("      Also note that the semantics of utcperiod is ")
                 doc_intro("      to ensure that enough data is read from the backend, so that it can evaluate the expressions.")
+                doc_intro("      Use clip_result argument to clip the time-range of the resulting time-series to fit your need if needed")
+                doc_intro("      - this will typically be in scenarios where you have not supplied time-axis operations (unbounded eval),")
+                doc_intro("        and you also are using caching.")
                 doc_intro("      ")
                 doc_parameters()
                 doc_parameter("ts_vector","TsVector","a list of time-series (expressions), including unresolved symbolic references")
                 doc_parameter("utcperiod","UtcPeriod","the valid non-zero length period that the binding service should read from the backing ts-store/ts-service")
                 doc_parameter("use_ts_cached_read","bool","allow use of server-side cached results, use it for immutable data-reads!")
                 doc_parameter("update_ts_cache","bool","when reading time-series, also update the cache with the data, use it for immutable data-reads!")
+                doc_parameter("clip_result","UtcPeriod","If supplied, clip the time-range of the resulting time-series to cover evaluation f(t) over this period only")
                 doc_returns("tsvector","TsVector","an evaluated list of point time-series in the same order as the input list")
                 doc_see_also(".percentiles(),DtsServer")
             )

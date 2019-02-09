@@ -26,6 +26,8 @@ enum class message_type : uint8_t {
 	EVALUATE_EXPRESSION_PERCENTILES,
     MERGE_STORE_TS,
     REMOVE_TS,
+	EVALUATE_TS_VECTOR_CLIP,
+    EVALUATE_EXPRESSION_CLIP
 	// EVALUATE_TS_VECTOR_HISTOGRAM //-- tsv,period,ta,bin_min,bin_max -> ts_vector[n_bins]
 };
 

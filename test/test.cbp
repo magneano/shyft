@@ -154,6 +154,9 @@
 		<Unit filename="merge_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_clip_to_period_test.cpp">
+		     <Option virtualFolder="time_series/" />
+		</Unit>
 		<Unit filename="mocks.cpp">
 			<Option virtualFolder="compiler_etc/" />
 		</Unit>

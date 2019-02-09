@@ -283,7 +283,7 @@ struct server : dlib::server_iostream {
     ts_vector_t do_read(const id_vector_t& ts_ids,utcperiod p,bool use_ts_cached_read,bool update_ts_cache);
     void do_remove_ts(const std::string & ts_url);
     void do_bind_ts(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache);
-    ts_vector_t do_evaluate_ts_vector(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache);
+    ts_vector_t do_evaluate_ts_vector(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache,utcperiod clip_period);
     ts_vector_t do_evaluate_percentiles(utcperiod bind_period, ts_vector_t& atsv, gta_t const&ta,std::vector<int64_t> const& percentile_spec,bool use_ts_cached_read,bool update_ts_cache);
 
     // ref. dlib, all connection calls are directed here
@@ -692,9 +692,12 @@ inline void server<CD>::do_bind_ts(utcperiod bind_period, ts_vector_t& atsv, boo
 
 
 template < class CD >
-inline ts_vector_t server<CD>::do_evaluate_ts_vector(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache) {
+inline ts_vector_t server<CD>::do_evaluate_ts_vector(utcperiod bind_period, ts_vector_t& atsv,bool use_ts_cached_read,bool update_ts_cache,utcperiod clip_period) {
     do_bind_ts(bind_period, atsv, use_ts_cached_read, update_ts_cache);
-    return ts_vector_t{ shyft::time_series::dd::deflate_ts_vector<apoint_ts>(atsv) };
+    if(clip_period.valid()) 
+        return clip_to_period(ts_vector_t{ shyft::time_series::dd::deflate_ts_vector<apoint_ts>(atsv) },clip_period);
+    else
+        return ts_vector_t{ shyft::time_series::dd::deflate_ts_vector<apoint_ts>(atsv) };
 }
 
 
@@ -756,12 +759,14 @@ inline void server<CD>::on_connect(
               //  at the cost of early& fast response. I leave the commented scopes in there for now, and aim for fastest response-time
             switch (msg_type) { // currently switch, later maybe table[msg_type]=msg_handler
             case message_type::EVALUATE_TS_VECTOR:
-            case message_type::EVALUATE_EXPRESSION:{
-                utcperiod bind_period;bool use_ts_cached_read,update_ts_cache;
+            case message_type::EVALUATE_TS_VECTOR_CLIP:
+            case message_type::EVALUATE_EXPRESSION:
+            case message_type::EVALUATE_EXPRESSION_CLIP:{
+                utcperiod bind_period;bool use_ts_cached_read,update_ts_cache;utcperiod clip_period;
                 ts_vector_t rtsv;
                 core_iarchive ia(in,core_arch_flags);
                 ia>>bind_period;
-                if(msg_type==message_type::EVALUATE_EXPRESSION) {
+                if(msg_type==message_type::EVALUATE_EXPRESSION || msg_type==message_type::EVALUATE_EXPRESSION_CLIP) {
                     compressed_ts_expression c_expr;
                     ia>>c_expr;
                     rtsv=expression_decompressor::decompress(c_expr);
@@ -769,7 +774,10 @@ inline void server<CD>::on_connect(
                     ia>>rtsv;
                 }
                 ia>>use_ts_cached_read>>update_ts_cache;
-                auto result=do_evaluate_ts_vector(bind_period, rtsv,use_ts_cached_read,update_ts_cache);//first get result
+                if(msg_type==message_type::EVALUATE_TS_VECTOR_CLIP || msg_type==message_type::EVALUATE_EXPRESSION_CLIP) {
+                    ia>>clip_period;
+                }
+                auto result=do_evaluate_ts_vector(bind_period, rtsv,use_ts_cached_read,update_ts_cache,clip_period);//first get result
                 msg::write_type(message_type::EVALUATE_TS_VECTOR,out);// then send
                 core_oarchive oa(out,core_arch_flags);
                 oa<<result;
