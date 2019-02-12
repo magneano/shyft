@@ -556,7 +556,7 @@ def _convert_time_series_to_fixed_dt(ts):
     return ts
 
 
-def parallelize_geo_timeseries(geo_ts_dict, utc_period, numb_years=None):
+def parallelize_geo_timeseries(geo_ts_dict, utc_period, first_year=None, numb_years=None):
     """
     Parallelize (yearly) geo_ts and return as ensemble of fixed_dt time series
 
@@ -567,6 +567,8 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period, numb_years=None):
         api vectors of geo located time series over the same time axis
     utc_period: api.UtcPeriod
         The utc time period that should (as a minimum) be covered
+    first_year: int
+        First year to start parallelization from. I None start as early as possible
     numb_years: int
         Limits number of years to return. If None return as many as possible.
         
@@ -584,10 +586,11 @@ def parallelize_geo_timeseries(geo_ts_dict, utc_period, numb_years=None):
     n = utc_period.diff_units(UTC, dt) + 1 
     ensemble = []
     years = []
+    first_year = first_year_in_ts if first_year is None else first_year
     numb_years = last_year_in_ts - first_year_in_ts if numb_years is None else numb_years
     counter = 0
     while counter < numb_years:
-        y = first_year_in_ts + counter # for y in range(first_year_in_ts, last_year_in_ts + 1):
+        y = first_year + counter # for y in range(first_year_in_ts, last_year_in_ts + 1):
         counter += 1
         period_to_shift = UTC.time(utc_period_start_date.year, utc_period_start_date.month, utc_period_start_date.day) \
                           - UTC.time(y, utc_period_start_date.month, utc_period_start_date.day)
