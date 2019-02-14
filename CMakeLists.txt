@@ -42,9 +42,15 @@ endif()
 # The dependencies directory if set
 if(DEFINED ENV{SHYFT_DEPENDENCIES_DIR})
     set(SHYFT_DEPENDENCIES_DIR $ENV{SHYFT_DEPENDENCIES_DIR})
-
     # Our code requires an absolute directory for the dependencies
     get_filename_component(SHYFT_DEPENDENCIES ${SHYFT_DEPENDENCIES_DIR} ABSOLUTE)
+
+    # Prevent conflict wit system boost if present
+    set(Boost_NO_SYSTEM_PATHS ON)
+
+    # Armadillo, dlib and doctest provide their own cmake config files
+    # Setting CMAKE_PREFIX_PATH so that `find_module` will find them
+    set(CMAKE_PREFIX_PATH "${SHYFT_DEPENDENCIES}" ${CMAKE_PREFIX_PATH})
     message("Using SHYFT_DEPENDENCIES directory: " ${SHYFT_DEPENDENCIES})
     message("You can change the above via the SHYFT_DEPENDENCIES_DIR environment variable.")
 else()
@@ -52,7 +58,6 @@ else()
 endif()
 
 # shyft uses boost, dlib, armadillo and doctest, and python +  numpy
-set(CMAKE_PREFIX_PATH "${SHYFT_DEPENDENCIES}" ${CMAKE_PREFIX_PATH})
 
 # Find python version (Want matching Boost::python version)
 find_package(PythonInterp ${python_min_required_version} REQUIRED)
