@@ -84,7 +84,8 @@ add_definitions("-DARMA_USE_CXX11 -DARMA_NO_DEBUG")
 add_definitions("-DBOOST_ERROR_CODE_HEADER_ONLY -DBOOST_VARIANT_MINIMIZE_SIZE -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS -DBOOST_MPL_LIMIT_LIST_SIZE=30 -DBOOST_MPL_LIMIT_VECTOR_SIZE=30")
 
 # Include
-include_directories(${CMAKE_SOURCE_DIR} ${ARMADILLO_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR} ${ARMADILLO_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIRS})
 
 # Convenience function for adding python modules
 # If using pybind11 replace this with `pybind11_add_module`

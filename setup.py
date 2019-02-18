@@ -75,6 +75,10 @@ class CMakeBuild(build_ext):
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j2']
 
+        # Get numpy include dir
+        import numpy
+        cmake_args += ['-DNUMPY_INCLUDE_DIRS=' + numpy.get_include()]
+
         env = os.environ.copy()
         env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(
             env.get('CXXFLAGS', ''),
