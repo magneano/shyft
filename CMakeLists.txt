@@ -12,8 +12,14 @@
 #
 # The next environment variables are honored:
 #
-#   SHYFT_DEPENDENCIES_DIR: default ${PROJECT_SOURCE_DIR}/../shyft_dependencies
+#   SHYFT_DEPENDENCIES_DIR
 #
+# If SHYFT_DEPENDENCIES_DIR is set, then cmake will find dependencies
+# installed in this location.
+#
+# NOTE: If SHYFT_DEPENDENCIES_DIR is set, then a system installation of Boost
+# will _NOT_ be found.
+
 cmake_minimum_required(VERSION 3.9.0)
 project(shyft C CXX)
 
@@ -45,7 +51,7 @@ if(DEFINED ENV{SHYFT_DEPENDENCIES_DIR})
     # Our code requires an absolute directory for the dependencies
     get_filename_component(SHYFT_DEPENDENCIES ${SHYFT_DEPENDENCIES_DIR} ABSOLUTE)
 
-    # Prevent conflict wit system boost if present
+    # Prevent conflict with system boost if present
     set(Boost_NO_SYSTEM_PATHS ON)
 
     # Armadillo, dlib and doctest provide their own cmake config files
