@@ -87,11 +87,10 @@ add_definitions("-DBOOST_ERROR_CODE_HEADER_ONLY -DBOOST_VARIANT_MINIMIZE_SIZE -D
 include_directories(${CMAKE_SOURCE_DIR} ${ARMADILLO_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
 
 # Convenience function for adding python modules
+# If using pybind11 replace this with `pybind11_add_module`
 function (add_module target_name)
-    set(options SOURCE LIB)
-    cmake_parse_arguments(ARG "" "" "${options}" ${ARGN})
-    add_library(${target_name} MODULE ${ARG_SOURCE})
-    target_link_libraries(${target_name} PRIVATE ${ARG_LIB})
+    cmake_parse_arguments(ARG "" "" "" ${ARGN})
+    add_library(${target_name} MODULE ${ARG_UNPARSED_ARGUMENTS})
     set_target_properties(${target_name} PROPERTIES PREFIX "_")
     set_target_properties(${target_name} PROPERTIES CXX_VISIBILITY_PRESET "hidden")
     set_property(TARGET ${target_name} APPEND PROPERTY COMPILE_DEFINITIONS SHYFT_EXTENSION)

@@ -18,12 +18,16 @@ set(core_api_sources
     api_interpolation.cpp              api_vectors.cpp
 )
 
-set(api_link_libraries shyft_core shyft_api ${Boost_LIBRARIES} dlib::dlib ${ARMADILLO_LIBRARIES} ${PYTHON_LIBRARIES})
+# Force all Boost packages as direct dependencies. This avoids some linking
+# issues with secondary dependencies (i.e. Boost::system)
+set(api_link_libraries shyft_core shyft_api ${ARMADILLO_LIBRARIES} ${PYTHON_LIBRARIES} ${Boost_LIBRARIES} dlib::dlib)
 
 # Core
-add_module(${core_api} SOURCE ${core_api_sources} LIB ${api_link_libraries})
+add_module(${core_api} ${core_api_sources})
+target_link_libraries(${core_api} PRIVATE ${api_link_libraries})
 
 # define each shyft method-stack that exposes complete stacks
 foreach(shyft_stack  "pt_gs_k" "pt_ss_k" "pt_hs_k" "hbv_stack" "pt_hps_k")
-    add_module(${shyft_stack} SOURCE "${shyft_stack}.cpp" LIB ${api_link_libraries})
+    add_module(${shyft_stack} "${shyft_stack}.cpp")
+    target_link_libraries(${shyft_stack} PRIVATE ${api_link_libraries})
 endforeach()
