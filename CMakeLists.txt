@@ -56,7 +56,7 @@ if(DEFINED ENV{SHYFT_DEPENDENCIES_DIR})
 
     # Armadillo, dlib and doctest provide their own cmake config files
     # Setting CMAKE_PREFIX_PATH so that `find_module` will find them
-    set(CMAKE_PREFIX_PATH "${SHYFT_DEPENDENCIES}" ${CMAKE_PREFIX_PATH})
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${SHYFT_DEPENDENCIES}")
     message("Using SHYFT_DEPENDENCIES directory: " ${SHYFT_DEPENDENCIES})
     message("You can change the above via the SHYFT_DEPENDENCIES_DIR environment variable.")
 else()
