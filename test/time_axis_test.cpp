@@ -903,5 +903,9 @@ TEST_CASE("time_axis_g_slice") {
     }
 
 }
+TEST_CASE("ct_point_dt") {
+    CHECK_THROWS_AS(time_axis::point_dt(vector<utctime>{_t(0)},_t(0)),std::runtime_error);
+    CHECK_THROWS_AS(time_axis::point_dt(vector<utctime>{_t(0),_t(0)}),std::runtime_error);
+}
 
 }

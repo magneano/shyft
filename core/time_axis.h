@@ -265,31 +265,36 @@ namespace shyft {
         struct point_dt:continuous<true>{
             vector<utctime> t;
             utctime  t_end;// need one extra, after t.back(), to give the last period!
+            inline void throw_if_invalid_points() const {
+                if(t.size()==0 ) {
+                    if(t_end!=no_utctime)
+                        throw runtime_error("time_axis::point_dt: need at least two time-points to define one period");
+                } else if(t.back() >= t_end)
+                    throw runtime_error("time_axis::point_dt: t_end should be after last time-point");
+            }
+            inline void checked_ct_from_points() {
+                if(t.size()>0) {
+                    if(t.size()<2)
+                        throw runtime_error("time_axis::point_dt() needs at least two time-points");
+                    t_end = t.back();
+                    t.pop_back();
+                    throw_if_invalid_points();
+                }
+            }
             point_dt()
                 : t( vector<utctime>{} ),
                   t_end( no_utctime ) {}
             point_dt( const vector<utctime>& t, utctime t_end ) : t( t ), t_end( t_end ) {
-                //TODO: throw if t.back()>= t_end
-                // consider t_end==no_utctime , t_end=t.back()+tick.
-                if(t.size()==0 || t.back()>=t_end )
-                    throw runtime_error("time_axis::point_dt() illegal initialization parameters");
+                    throw_if_invalid_points();
             }
             point_dt(vector<utctime>&& tx, utctime t_end) : t(move(tx)), t_end(t_end) {
-                if (t.size()==0 || t.back()>=t_end)
-                    throw runtime_error("time_axis::point_dt() illegal initialization parameters");
+                throw_if_invalid_points();
             }
-            explicit point_dt(const vector<utctime>& all_points):t(all_points){
-                if(t.size()<2)
-                    throw runtime_error("time_axis::point_dt() needs at least two time-points");
-				t_end = t.back();
-				t.pop_back();
-
+            explicit point_dt(const vector<utctime>& all_points):t(all_points),t_end(no_utctime){
+                checked_ct_from_points();
             }
-			explicit point_dt(vector<utctime> && all_points):t(move(all_points)) {
-				if (t.size() < 2)
-					throw runtime_error("time_axis::point_dt() needs at least two time-points");
-				t_end = t.back();
-				t.pop_back();
+			explicit point_dt(vector<utctime> && all_points):t(move(all_points)),t_end(no_utctime) {
+                checked_ct_from_points();
 			}
             // ms seems to need explicit move etc.
             point_dt(const point_dt&c) : t(c.t), t_end(c.t_end) {}
