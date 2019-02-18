@@ -20,7 +20,8 @@ set(core_api_sources
 
 # Force all Boost packages as direct dependencies. This avoids some linking
 # issues with secondary dependencies (i.e. Boost::system)
-set(api_link_libraries shyft_core shyft_api ${ARMADILLO_LIBRARIES} ${PYTHON_LIBRARIES} ${Boost_LIBRARIES} dlib::dlib)
+set(api_link_libraries shyft_core shyft_api ${ARMADILLO_LIBRARIES} ${PYTHON_LIBRARIES}
+	"-Wl,--no-as-needed" ${Boost_LIBRARIES} "-Wl,--as-needed" dlib::dlib)
 
 # Core
 add_module(${core_api} ${core_api_sources})
