@@ -186,6 +186,7 @@
     <ClCompile Include="time_series_use_time_axis_test.cpp" />
     <ClCompile Include="time_series_clip_to_period_test.cpp" />
     <ClCompile Include="time_axis_test.cpp" />
+    <ClCompile Include="time_series_test_accumulate.cpp"/>
     <ClCompile Include="utctime_utilities_test.cpp" />
     <ClCompile Include="serialization_test.cpp" />
   </ItemGroup>

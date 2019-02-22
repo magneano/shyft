@@ -53,6 +53,8 @@
 			<Add option="-DBOOST_VARIANT_MINIMIZE_SIZE" />
 			<Add option="-DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS" />
 			<Add option="-DBOOST_MPL_LIMIT_LIST_SIZE=30" />
+        auto r2 = a.use_time_axis_from(a);
+        FAST_CHECK_EQ(r2,a);
 			<Add option="-DBOOST_MPL_LIMIT_VECTOR_SIZE=30" />
 			<Add option="-DARMA_DONT_USE_WRAPPER" />
 			<Add option="-DARMA_DONT_PRINT_ERRORS" />
@@ -203,6 +205,9 @@
 			<Option virtualFolder="methods/" />
 		</Unit>
 		<Unit filename="test_ice_packing.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>
+        <Unit filename="time_series_test_accumulate.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
 		<Unit filename="test_pch.cpp">

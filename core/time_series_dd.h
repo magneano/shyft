@@ -660,7 +660,8 @@ namespace shyft {
                     return 0.0;
                 size_t ix_hint = 0;// assume almost fixed delta-t.
                 utctimespan tsum;
-                return accumulate_value(*ts, utcperiod(ta.time(0), ta.time(i)), ix_hint, tsum, ts->point_interpretation() == ts_point_fx::POINT_INSTANT_VALUE);
+                double x= accumulate_value(*ts, utcperiod(ta.time(0), ta.time(i)), ix_hint, tsum, ts->point_interpretation() == ts_point_fx::POINT_INSTANT_VALUE);
+                return isfinite(x)?x:0.0;
             }
             virtual double value_at(utctime t) const {
                 // return true accumulated value at t
@@ -670,13 +671,19 @@ namespace shyft {
                     return 0.0; // by definition
                 utctimespan tsum;
                 size_t ix_hint = 0;
-                return accumulate_value(*this, utcperiod(ta.time(0), t), ix_hint, tsum, ts->point_interpretation() == ts_point_fx::POINT_INSTANT_VALUE);// also note: average of non-nan areas !;
+                double x= accumulate_value(*this, utcperiod(ta.time(0), t), ix_hint, tsum, ts->point_interpretation() == ts_point_fx::POINT_INSTANT_VALUE);// also note: average of non-nan areas !;
+                return isfinite(x)?x:0.0;
             }
-            virtual std::vector<double> values() const {
-                std::vector<double> r;r.reserve(ta.size());
-                accumulate_accessor<ipoint_ts, gta_t> accumulate(*ts, ta);// use accessor, that
-                for (size_t i = 0;i<ta.size();++i) {                      // given sequential access
-                    r.push_back(accumulate.value(i));                     // reuses acc.computation
+            virtual vector<double> values() const {
+                utctime tsum;
+                size_t ix_hint = 0;
+                double a=0.0;
+                vector<double> r; r.reserve(ta.size());
+                auto lin= ts->point_interpretation() == ts_point_fx::POINT_INSTANT_VALUE;
+                for(size_t i=0;i<ta.size();++i) {
+                    r.push_back(a);
+                    auto x=accumulate_value(*ts, ta.period(i), ix_hint, tsum,lin);
+                    if(isfinite(x)) a+=x;
                 }
                 return r;
             }
