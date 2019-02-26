@@ -197,7 +197,6 @@ class TimeSeries(unittest.TestCase):
         Test that timeseries functionality is exposed, and briefly verify correctness
         of operators (the  shyft core do the rest of the test job, not repeated here).
         """
-        c = api.Calendar()
         t0 = api.utctime_now()
         dt = api.deltahours(1)
         n = 240
@@ -218,9 +217,14 @@ class TimeSeries(unittest.TestCase):
         h = c.max(300.0)
         k = c.min(-300)
 
+        log_func = api.log(c)
+        log_ts = c.log()
+
         self.assertEqual(a.size(), n)
         self.assertEqual(b.size(), n)
         self.assertEqual(c.size(), n)
+        self.assertEqual(log_func.size(), n)
+        self.assertEqual(log_ts.size(), n)
         self.assertAlmostEqual(c.value(0), 3.0 + 2.0*3.0 - 3.0/2.0)  # 7.5
         for i in range(n):
             self.assertAlmostEqual(c.value(i), a.value(i) + b.value(i)*3.0 - a.value(i)/2.0, delta=0.0001)
@@ -230,6 +234,8 @@ class TimeSeries(unittest.TestCase):
             self.assertAlmostEqual(h.value(i), +300.0, delta=0.00001)
             self.assertAlmostEqual(g.value(i), -300.0, delta=0.00001)
             self.assertAlmostEqual(k.value(i), -300.0, delta=0.00001)
+            self.assertAlmostEqual(log_func.value(i), np.log(c.value(i)), delta=1e-5)
+            self.assertAlmostEqual(log_ts.value(i), np.log(c.value(i)), delta=1e-5)
         # now some more detailed tests for setting values
         b.set(0, 3.0)
         self.assertAlmostEqual(b.value(0), 3.0)
@@ -258,6 +264,25 @@ class TimeSeries(unittest.TestCase):
         a.fill(1.0)
         self.assertAlmostEqual(v[0].value(0), 1.0, "expect first ts to be 1.0, because the vector keeps a reference ")
         self.assertAlmostEqual(aa.value(0), 3.0)
+
+    def test_timeseries_vector_logarithm(self):
+        t0 = api.utctime_now()
+        dt = api.deltahours(1)
+        n = 240
+        ta = api.TimeAxisFixedDeltaT(t0, dt, n)
+
+        a = api.TimeSeries(ta=ta, fill_value=3.0, point_fx=api.point_interpretation_policy.POINT_AVERAGE_VALUE)
+        b = api.TimeSeries(ta=ta, fill_value=2.0, point_fx=api.point_interpretation_policy.POINT_AVERAGE_VALUE)
+
+        tsv = api.TsVector([a, b])
+        tsv_log = tsv.log()
+
+        self.assertEqual(len(tsv), len(tsv_log))
+        self.assertEqual(len(tsv[0]), len(tsv_log[0]))
+        self.assertEqual(len(tsv[1]), len(tsv_log[1]))
+        for i in range(n):
+            self.assertAlmostEqual(tsv_log[0].value(i), np.log(3.0), delta=1e-5)
+            self.assertAlmostEqual(tsv_log[1].value(i), np.log(2.0), delta=1e-5)
 
     def test_percentiles(self):
         c = api.Calendar()

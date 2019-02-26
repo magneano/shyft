@@ -41,17 +41,18 @@ namespace expose {
 	}
 
 	static string nice_str(const string& lhs,iop_t op,const string &rhs) {
-		switch (op) {
-		case iop_t::OP_ADD:return "("+ lhs + " + " + rhs +")";
-		case iop_t::OP_SUB:return "(" + lhs + " - " + rhs + ")";
-		case iop_t::OP_DIV:return "(" + lhs + "/" + rhs + ")";
-		case iop_t::OP_MUL:return "(" + lhs + "*" + rhs + ")";
-		case iop_t::OP_MAX:return "max("+lhs+", "+rhs+")";
-		case iop_t::OP_MIN:return "min(" + lhs + ", " + rhs + ")";
+        switch (op) {
+        case iop_t::OP_ADD:return "("+ lhs + " + " + rhs + ")";
+        case iop_t::OP_SUB:return "(" + lhs + " - " + rhs + ")";
+        case iop_t::OP_DIV:return "(" + lhs + "/" + rhs + ")";
+        case iop_t::OP_MUL:return "(" + lhs + "*" + rhs + ")";
+        case iop_t::OP_MAX:return "max(" + lhs + ", " + rhs + ")";
+        case iop_t::OP_MIN:return "min(" + lhs + ", " + rhs + ")";
         case iop_t::OP_POW:return "pow(" + lhs + ", " + rhs + ")";
-		case iop_t::OP_NONE:break;// just fall to exception
-		}
-		return "unsupported_op(" + lhs + "," + rhs + ")";
+        case iop_t::OP_LOG:return "log(" + lhs + ")";
+        case iop_t::OP_NONE:break;// just fall to exception
+        }
+        return "unsupported_op(" + lhs + "," + rhs + ")";
 	}
 	static string nice_str(const apoint_ts&ats);
 	static string nice_str(double x) { return to_string(x); }
@@ -145,6 +146,7 @@ namespace expose {
         typedef ats_vector(ats_vector::*m_double)(double)const;
         typedef ats_vector(ats_vector::*m_ts)(apoint_ts const&)const;
         typedef ats_vector(ats_vector::*m_tsv) (ats_vector const&)const;
+        typedef ats_vector(ats_vector::*m_na) () const;
 
         class_<ats_vector>("TsVector",
                 doc_intro("A vector of time-series that supports ts-math operations.")
@@ -295,7 +297,8 @@ namespace expose {
             .def("max", (m_tsv)&ats_vector::max, (py::arg("self"),py::arg("tsv")), "returns max of ts-vector and another ts-vector")
             .def("pow", (m_double)&ats_vector::pow, (py::arg("self"),py::arg("number")), "returns TsVector pow(self,number)")
             .def("pow", (m_ts)&ats_vector::pow, (py::arg("self"),py::arg("ts")), "returns TsVector pow(self,ts)")
-            .def("pow", (m_tsv)&ats_vector::pow,  (py::arg("self"),py::arg("tsv")), "returns TsVector pow(self,tsv)")
+            .def("pow", (m_tsv)&ats_vector::pow, (py::arg("self"), py::arg("tsv")), "returns TsVector pow(self,tsv)")
+            .def("log", (m_na)&ats_vector::log, (py::arg("self")), "returns TsVector log(self)")
             .def("forecast_merge",&ats_vector::forecast_merge,args("lead_time","fc_interval"),
                  doc_intro("merge the forecasts in this vector into a time-series that is constructed")
                  doc_intro("taking a slice of length fc_interval starting lead_time into each of the forecasts")
@@ -614,15 +617,17 @@ namespace expose {
         using namespace shyft::api;
         using shyft::time_series::dd::qac_parameter;
         typedef apoint_ts pts_t;
-        typedef pts_t (pts_t::*self_dbl_t)(double) const;
-        typedef pts_t (pts_t::*self_ts_t)(const pts_t &)const;
-
+        typedef pts_t (pts_t::*self_na_t)() const;  // no arg function type
+        typedef pts_t (pts_t::*self_dbl_t)(double) const;  // double arg function type
+        typedef pts_t (pts_t::*self_ts_t)(const pts_t &)const;  // ts arg function type
+        
         self_dbl_t min_double_f=&pts_t::min;
         self_ts_t  min_ts_f =&pts_t::min;
         self_dbl_t max_double_f=&pts_t::max;
         self_ts_t  max_ts_f =&pts_t::max;
         self_dbl_t pow_double_f=&pts_t::pow;
-        self_ts_t  pow_ts_f =&pts_t::pow;
+        self_ts_t  pow_ts_f = &pts_t::pow;
+        self_na_t  log_na_f =&pts_t::log;
 
         typedef ts_bind_info TsBindInfo;
         class_<TsBindInfo>("TsBindInfo",
@@ -1214,6 +1219,7 @@ namespace expose {
             .def("min",min_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains the min of self and ts_other")
             .def("max",max_double_f,(py::arg("self"),py::arg("number")),"create a new ts that contains the max of self and number for each time-step")
             .def("max",max_ts_f,(py::arg("self"),py::arg("ts_other")),"create a new ts that contains the max of self and ts_other")
+            .def("log", log_na_f, (py::arg("self")), "create a new ts that contains log(self)")
             .def("min_max_check_linear_fill",min_max_check_linear_fill_i,
                  (py::arg("self"),py::arg("v_min"),py::arg("v_max"),py::arg("dt_max")=shyft::core::max_utctime),
                  doc_intro("Create a min-max range checked ts with linear-fill-values if value is NaN or outside range")
@@ -1387,6 +1393,8 @@ namespace expose {
 		def("ts_stringify",ts_stringify , (py::arg("ts")),
 			doc_intro("Given a TimeSeries, return a string showing the details/expression")
 		);
+
+        typedef apoint_ts(*ts_op_t)(const apoint_ts&a);
         typedef apoint_ts (*ts_op_ts_t)(const apoint_ts&a, const apoint_ts&b);
         typedef apoint_ts (*double_op_ts_t)(double, const apoint_ts&b);
         typedef apoint_ts (*ts_op_double_t)(const apoint_ts&a, double);
@@ -1411,6 +1419,9 @@ namespace expose {
         def("pow",pow_ts_ts    ,args("ts_a","ts_b"),"returns a new ts as pow(ts_a,ts_b)");
         def("pow",pow_double_ts,args("a"   ,"ts_b"),"returns a new ts as pow(a,ts_b)");
         def("pow",pow_ts_double,args("ts_a","b"   ),"returns a new ts as pow(ts_a,b)");
+
+        ts_op_t log_ts_ts = time_series::dd::log;
+        def("log", log_ts_ts, args("ts"), "returns a new ts as log(ts)");
 
         def("time_shift", time_series::dd::time_shift,args("timeseries","delta_t"),
             "returns a delta_t time-shifted time-series\n"

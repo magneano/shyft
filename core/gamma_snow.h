@@ -242,7 +242,7 @@ namespace shyft {
                       } else {
                           const double x = lambda/scale;
                           y = gamma_p(shape, x);
-                          y1 = y - exp(shape*log(x) - x - lgamma(shape))/shape;
+                          y1 = y - exp(shape*std::log(x) - x - lgamma(shape))/shape;
                           swe = m*(1.0 - y1) - lambda*(1 - y);
                           sca = (1.0 - y)*(1.0 - y0);
                       }
@@ -251,7 +251,7 @@ namespace shyft {
                           const double sat = lwd/max_water_frac;
                           const double x = sat/scale;
                           const double ssa = gamma_p(shape, x);
-                          const double ssa1 = ssa - exp(shape*log(x) - x - lgamma(shape))/shape;
+                          const double ssa1 = ssa - exp(shape*std::log(x) - x - lgamma(shape))/shape;
                           const double liqwat = max_water_frac*(m*(ssa1 - y1) + sat*(1.0 - ssa) - lambda*(1.0 - y));
                           swe += liqwat;
                       }

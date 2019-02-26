@@ -154,21 +154,23 @@ static void test_bin_op(const TS_A& a, const TS_B &b, const TA ta,double a_value
     TS_E a_mult_b(ta,a_value*b_value);
     TS_E a_div_b(ta,a_value/b_value);
     TS_E max_a_b(ta,std::max(a_value,b_value));
-    TS_E min_a_b(ta,std::min(a_value,b_value));
+    TS_E min_a_b(ta, std::min(a_value, b_value));
+    TS_E log_a(ta,std::log(a_value));
     // Step 1:   ts bin_op ts
     TS_ASSERT(is_equal_ts(a_plus_b,a+b));
     TS_ASSERT(is_equal_ts(a_minus_b,a-b));
     TS_ASSERT(is_equal_ts(a_mult_b,a*b));
     TS_ASSERT(is_equal_ts(a_div_b,a/b));
     TS_ASSERT(is_equal_ts(max_a_b,max(a,b)));
-    TS_ASSERT(is_equal_ts(min_a_b,min(a,b)));
+    TS_ASSERT(is_equal_ts(min_a_b, min(a, b)));
     // Step 2:  ts bin_op double
     TS_ASSERT(is_equal_ts(a_plus_b,a+b_value));
     TS_ASSERT(is_equal_ts(a_minus_b,a-b_value));
     TS_ASSERT(is_equal_ts(a_mult_b,a*b_value));
     TS_ASSERT(is_equal_ts(a_div_b,a/b_value));
     TS_ASSERT(is_equal_ts(max_a_b,max(a,b_value)));
-    TS_ASSERT(is_equal_ts(min_a_b,min(a,b_value)));
+    TS_ASSERT(is_equal_ts(min_a_b, min(a, b_value)));
+    TS_ASSERT(is_equal_ts(log_a,log(a)));
     // Step 3: double bin_op ts
     TS_ASSERT(is_equal_ts(a_plus_b,a_value+b));
     TS_ASSERT(is_equal_ts(a_minus_b,a_value-b));
@@ -925,7 +927,17 @@ TEST_SUITE("time_series") {
 		FAST_CHECK_EQ(c.time_axis().size(), 10);
 
 	}
-
+	TEST_CASE("log_ts") {
+		auto utc = make_shared<calendar>();
+        vector<double> vv{0.5,1.0,2.5};
+		apoint_ts a{ gta_t{ _t(0), seconds(1), 3 }, vv, shyft::time_series::POINT_AVERAGE_VALUE };
+        auto log_a=a.log();
+        auto lv=log_a.values();
+        for(size_t i=0;i<vv.size();++i) {
+            FAST_CHECK_EQ(lv[i],doctest::Approx(std::log(vv[i])));
+            FAST_CHECK_EQ(log_a.value(i),doctest::Approx(std::log(vv[i])));            
+        }
+    }
     TEST_CASE("test_rating_curve_ts") {
         const core::utctime t0 = core::utctime_now();
         const double a = 2., b = 2., c = 3.;

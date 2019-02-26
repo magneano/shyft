@@ -65,110 +65,118 @@ namespace shyft{
             return source.ta.index_of(p.start,i);
         }
 
-		namespace dd {
+namespace dd {
 
-		static inline double do_op(double a, iop_t op, double b) {
-			switch (op) {
-			case iop_t::OP_ADD:return a + b;
-			case iop_t::OP_SUB:return a - b;
-			case iop_t::OP_DIV:return a / b;
-			case iop_t::OP_MUL:return a * b;
-			case iop_t::OP_MAX:return std::max(a, b);
-			case iop_t::OP_MIN:return std::min(a, b);
+        static inline double do_op(double a, iop_t op, double b) {
+            switch (op) {
+            case iop_t::OP_ADD:return a + b;
+            case iop_t::OP_SUB:return a - b;
+            case iop_t::OP_DIV:return a / b;
+            case iop_t::OP_MUL:return a * b;
+            case iop_t::OP_MAX:return std::max(a, b);
+            case iop_t::OP_MIN:return std::min(a, b);
             case iop_t::OP_POW:return std::pow(a, b);
-			case iop_t::OP_NONE:break;// just fall to exception
-			}
-			throw std::runtime_error("unsupported shyft::api::iop_t");
-		}
-		// add operators and functions to the apoint_ts class, of all variants that we want to expose
-		apoint_ts average(const apoint_ts& ts, const gta_t& ta/*fx-type */) { return apoint_ts(std::make_shared<average_ts>(ta, ts)); }
-		apoint_ts average(apoint_ts&& ts, const gta_t& ta) { return apoint_ts(std::make_shared<average_ts>(ta, std::move(ts))); }
-		apoint_ts integral(const apoint_ts& ts, const gta_t& ta/*fx-type */) { return apoint_ts(std::make_shared<integral_ts>(ta, ts)); }
-		apoint_ts integral(apoint_ts&& ts, const gta_t& ta) { return apoint_ts(std::make_shared<integral_ts>(ta, std::move(ts))); }
+            case iop_t::OP_LOG:return std::log(a);
+            case iop_t::OP_NONE:break;// just fall to exception
+            }
+            throw std::runtime_error("unsupported shyft::api::iop_t");
+        }
+        // add operators and functions to the apoint_ts class, of all variants that we want to expose
+        apoint_ts average(const apoint_ts& ts, const gta_t& ta/*fx-type */) { return apoint_ts(std::make_shared<average_ts>(ta, ts)); }
+        apoint_ts average(apoint_ts&& ts, const gta_t& ta) { return apoint_ts(std::make_shared<average_ts>(ta, std::move(ts))); }
+        apoint_ts integral(const apoint_ts& ts, const gta_t& ta/*fx-type */) { return apoint_ts(std::make_shared<integral_ts>(ta, ts)); }
+        apoint_ts integral(apoint_ts&& ts, const gta_t& ta) { return apoint_ts(std::make_shared<integral_ts>(ta, std::move(ts))); }
+        
+        apoint_ts accumulate(const apoint_ts& ts, const gta_t& ta/*fx-type */) { return apoint_ts(std::make_shared<accumulate_ts>(ta, ts)); }
+        apoint_ts accumulate(apoint_ts&& ts, const gta_t& ta) { return apoint_ts(std::make_shared<accumulate_ts>(ta, std::move(ts))); }
+        
+        apoint_ts create_periodic_pattern_ts(const vector<double>& pattern, utctimespan dt, utctime pattern_t0, const gta_t& ta) { return apoint_ts(make_shared<periodic_ts>(pattern, dt, pattern_t0, ta)); }
+        
+        apoint_ts operator+(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_ADD, rhs)); }
+        apoint_ts operator+(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_ADD, rhs)); }
+        apoint_ts operator+(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_ADD, rhs)); }
+        
+        apoint_ts operator-(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_SUB, rhs)); }
+        apoint_ts operator-(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_SUB, rhs)); }
+        apoint_ts operator-(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_SUB, rhs)); }
+        apoint_ts operator-(const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(-1.0, iop_t::OP_MUL, rhs)); }
+        
+        apoint_ts operator/(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_DIV, rhs)); }
+        apoint_ts operator/(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_DIV, rhs)); }
+        apoint_ts operator/(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_DIV, rhs)); }
+        
+        apoint_ts operator*(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_MUL, rhs)); }
+        apoint_ts operator*(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MUL, rhs)); }
+        apoint_ts operator*(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MUL, rhs)); }
+        
+        
+        apoint_ts max(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_MAX, rhs)); }
+        apoint_ts max(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MAX, rhs)); }
+        apoint_ts max(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MAX, rhs)); }
+        
+        apoint_ts min(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts>(lhs, iop_t::OP_MIN, rhs)); }
+        apoint_ts min(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MIN, rhs)); }
+        apoint_ts min(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MIN, rhs)); }
+        
+        apoint_ts pow(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts>(lhs, iop_t::OP_POW, rhs)); }
+        apoint_ts pow(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_POW, rhs)); }
+        apoint_ts pow(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_POW, rhs)); }
+        
+        apoint_ts log(const apoint_ts& lhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_LOG, 1.0)); }
+        
+        double abin_op_ts::value_at(utctime t) const {
+            if (!time_axis().total_period().contains(t))
+                return nan;
+            return do_op(lhs(t), op, rhs(t));// this might cost a 2xbin-search if not the underlying ts have smart incremental search (at the cost of thread safety)
+        }
 
-		apoint_ts accumulate(const apoint_ts& ts, const gta_t& ta/*fx-type */) { return apoint_ts(std::make_shared<accumulate_ts>(ta, ts)); }
-		apoint_ts accumulate(apoint_ts&& ts, const gta_t& ta) { return apoint_ts(std::make_shared<accumulate_ts>(ta, std::move(ts))); }
-
-		apoint_ts create_periodic_pattern_ts(const vector<double>& pattern, utctimespan dt, utctime pattern_t0, const gta_t& ta) { return apoint_ts(make_shared<periodic_ts>(pattern, dt, pattern_t0, ta)); }
-
-		apoint_ts operator+(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_ADD, rhs)); }
-		apoint_ts operator+(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_ADD, rhs)); }
-		apoint_ts operator+(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_ADD, rhs)); }
-
-		apoint_ts operator-(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_SUB, rhs)); }
-		apoint_ts operator-(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_SUB, rhs)); }
-		apoint_ts operator-(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_SUB, rhs)); }
-		apoint_ts operator-(const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(-1.0, iop_t::OP_MUL, rhs)); }
-
-		apoint_ts operator/(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_DIV, rhs)); }
-		apoint_ts operator/(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_DIV, rhs)); }
-		apoint_ts operator/(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_DIV, rhs)); }
-
-		apoint_ts operator*(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_MUL, rhs)); }
-		apoint_ts operator*(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MUL, rhs)); }
-		apoint_ts operator*(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MUL, rhs)); }
-
-
-		apoint_ts max(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts       >(lhs, iop_t::OP_MAX, rhs)); }
-		apoint_ts max(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MAX, rhs)); }
-		apoint_ts max(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MAX, rhs)); }
-
-		apoint_ts min(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts>(lhs, iop_t::OP_MIN, rhs)); }
-		apoint_ts min(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_MIN, rhs)); }
-		apoint_ts min(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_MIN, rhs)); }
-
-		apoint_ts pow(const apoint_ts& lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_ts>(lhs, iop_t::OP_POW, rhs)); }
-		apoint_ts pow(const apoint_ts& lhs, double           rhs) { return apoint_ts(std::make_shared<abin_op_ts_scalar>(lhs, iop_t::OP_POW, rhs)); }
-		apoint_ts pow(double           lhs, const apoint_ts& rhs) { return apoint_ts(std::make_shared<abin_op_scalar_ts>(lhs, iop_t::OP_POW, rhs)); }
-
-		
-		double abin_op_ts::value_at(utctime t) const {
-			if (!time_axis().total_period().contains(t))
-				return nan;
-			return do_op(lhs(t), op, rhs(t));// this might cost a 2xbin-search if not the underlying ts have smart incremental search (at the cost of thread safety)
-		}
-
-		static vector<double> ts_op_ts_values(const vector<double>& l, iop_t op, const vector<double>& r) {
-			vector<double> x; x.reserve(l.size());
-			switch (op) {
-			case OP_ADD:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] + r[i]); return x;
-			case OP_SUB:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] - r[i]); return x;
-			case OP_MUL:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] * r[i]); return x;
-			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] / r[i]); return x;
-			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::max(l[i], r[i])); return x;
-			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::min(l[i], r[i])); return x;
+        static vector<double> ts_op_ts_values(const vector<double>& l, iop_t op, const vector<double>& r) {
+            vector<double> x; x.reserve(l.size());
+            switch (op) {
+            case OP_ADD:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] + r[i]); return x;
+            case OP_SUB:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] - r[i]); return x;
+            case OP_MUL:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] * r[i]); return x;
+            case OP_DIV:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(l[i] / r[i]); return x;
+            case OP_MAX:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::max(l[i], r[i])); return x;
+            case OP_MIN:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::min(l[i], r[i])); return x;
             case OP_POW:for (size_t i = 0; i < r.size(); ++i) x.emplace_back(std::pow(l[i], r[i])); return x;
-			default: break;
-			}
-			throw runtime_error("Unsupported operation " + to_string(int(op)));
-		}
+            [[fallthrough]];
+            case OP_LOG:  // only exposed through for abin_op_ts_scalar
+            default: break;
+            }
+            throw runtime_error("Unsupported operation " + to_string(int(op)));
+        }
 
-		static void lhs_in_place_ts_op_ts_values(vector<double>& l, iop_t op, const vector<double>& r) {
-			switch (op) {
-			case OP_ADD:for (size_t i = 0; i < r.size(); ++i) l[i] += r[i]; return;
-			case OP_SUB:for (size_t i = 0; i < r.size(); ++i) l[i] -= r[i]; return;
-			case OP_MUL:for (size_t i = 0; i < r.size(); ++i) l[i] *= r[i]; return;
-			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) l[i] /= r[i]; return;
-			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) l[i] = std::max(l[i], r[i]); return;
-			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) l[i] = std::min(l[i], r[i]); return;
-			case OP_POW:for (size_t i = 0; i < r.size(); ++i) l[i] = std::pow(l[i], r[i]); return;
-			default: break;
-			}
-			throw runtime_error("Unsupported operation " + to_string(int(op)));
-		}
-		static void rhs_in_place_ts_op_ts_values(const vector<double>& l, iop_t op, vector<double>& r) {
-			switch (op) {
-			case OP_ADD:for (size_t i = 0; i < r.size(); ++i) r[i] += l[i]; return;
-			case OP_SUB:for (size_t i = 0; i < r.size(); ++i) r[i] = l[i] - r[i]; return;
-			case OP_MUL:for (size_t i = 0; i < r.size(); ++i) r[i] *= l[i]; return;
-			case OP_DIV:for (size_t i = 0; i < r.size(); ++i) r[i] = l[i] / r[i]; return;
-			case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(l[i], r[i]); return;
-			case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(l[i], r[i]); return;
-			case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l[i], r[i]); return;
-			default: break;
-			}
-			throw runtime_error("Unsupported operation " + to_string(int(op)));
-		}
+        static void lhs_in_place_ts_op_ts_values(vector<double>& l, iop_t op, const vector<double>& r) {
+            switch (op) {
+            case OP_ADD:for (size_t i = 0; i < r.size(); ++i) l[i] += r[i]; return;
+            case OP_SUB:for (size_t i = 0; i < r.size(); ++i) l[i] -= r[i]; return;
+            case OP_MUL:for (size_t i = 0; i < r.size(); ++i) l[i] *= r[i]; return;
+            case OP_DIV:for (size_t i = 0; i < r.size(); ++i) l[i] /= r[i]; return;
+            case OP_MAX:for (size_t i = 0; i < r.size(); ++i) l[i] = std::max(l[i], r[i]); return;
+            case OP_MIN:for (size_t i = 0; i < r.size(); ++i) l[i] = std::min(l[i], r[i]); return;
+            case OP_POW:for (size_t i = 0; i < r.size(); ++i) l[i] = std::pow(l[i], r[i]); return;
+            [[fallthrough]];
+            case OP_LOG:  // only exposed through for abin_op_ts_scalar
+            default: break;
+            }
+            throw runtime_error("Unsupported operation " + to_string(int(op)));
+        }
+        static void rhs_in_place_ts_op_ts_values(const vector<double>& l, iop_t op, vector<double>& r) {
+            switch (op) {
+            case OP_ADD:for (size_t i = 0; i < r.size(); ++i) r[i] += l[i]; return;
+            case OP_SUB:for (size_t i = 0; i < r.size(); ++i) r[i] = l[i] - r[i]; return;
+            case OP_MUL:for (size_t i = 0; i < r.size(); ++i) r[i] *= l[i]; return;
+            case OP_DIV:for (size_t i = 0; i < r.size(); ++i) r[i] = l[i] / r[i]; return;
+            case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(l[i], r[i]); return;
+            case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(l[i], r[i]); return;
+            case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l[i], r[i]); return;
+            [[fallthrough]];
+            case OP_LOG:  // only exposed through for abin_op_ts_scalar
+            default: break;
+            }
+            throw runtime_error("Unsupported operation " + to_string(int(op)));
+        }
 
 		static inline const vector<double>* terminal_values(const shared_ptr<ipoint_ts>& ts) {
 			if (dynamic_pointer_cast<aref_ts>(ts))
@@ -717,6 +725,9 @@ namespace shyft{
         apoint_ts apoint_ts::pow(const apoint_ts &a, const apoint_ts&b) { return shyft::time_series::dd::pow(a, b); }
 		apoint_ts apoint_ts::pow(double a) const { return shyft::time_series::dd::pow(*this, a); }
 		apoint_ts apoint_ts::pow(const apoint_ts& other) const { return shyft::time_series::dd::pow(*this, other); }
+		
+		apoint_ts apoint_ts::log() const { return shyft::time_series::dd::log(*this); }
+		apoint_ts apoint_ts::log(const apoint_ts & a) { return shyft::time_series::dd::log(a); }
 
 		apoint_ts apoint_ts::convolve_w(const std::vector<double> &w, shyft::time_series::convolve_policy conv_policy) const {
 			return apoint_ts(std::make_shared<convolve_w_ts>(*this, w, conv_policy));
@@ -865,6 +876,8 @@ namespace shyft{
 				case OP_MAX:for (const auto&v : r_v) r.emplace_back(std::max(v, l)); return r;
 				case OP_MIN:for (const auto&v : r_v) r.emplace_back(std::min(v, l)); return r;
                 case OP_POW:for (const auto&v : r_v) r.emplace_back(std::pow(l, v)); return r;
+				[[fallthrough]];
+				case OP_LOG:  // only exposed through for abin_op_ts_scalar
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			} else {
@@ -878,6 +891,8 @@ namespace shyft{
 				case OP_MAX:for (size_t i = 0; i < r.size(); ++i) r[i] = std::max(r[i], l); return r;
 				case OP_MIN:for (size_t i = 0; i < r.size(); ++i) r[i] = std::min(r[i], l); return r;
 				case OP_POW:for (size_t i = 0; i < r.size(); ++i) r[i] = std::pow(l,r[i]); return r;
+				[[fallthrough]];
+				case OP_LOG:  // only exposed through for abin_op_ts_scalar
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			}
@@ -905,6 +920,7 @@ namespace shyft{
 				case OP_MAX:for (const auto&lv : *lhs_v) r.emplace_back(std::max(lv, rv)); return r;
 				case OP_MIN:for (const auto&lv : *lhs_v) r.emplace_back(std::min(lv, rv)); return r;
 				case OP_POW:for (const auto&lv : *lhs_v) r.emplace_back(std::pow(lv, rv)); return r;
+				case OP_LOG:for (const auto&lv : *lhs_v) r.emplace_back(std::log(lv)); return r;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			} else {
@@ -917,7 +933,8 @@ namespace shyft{
 				case OP_DIV:for (size_t i = 0; i < l.size(); ++i) l[i] /= r; return l;
 				case OP_MAX:for (size_t i = 0; i < l.size(); ++i) l[i] = std::max(l[i], r); return l;
 				case OP_MIN:for (size_t i = 0; i < l.size(); ++i) l[i] = std::min(l[i], r); return l;
-                case OP_POW:for (size_t i = 0; i < l.size(); ++i) l[i] = std::pow(l[i], r); return l;
+				case OP_POW:for (size_t i = 0; i < l.size(); ++i) l[i] = std::pow(l[i], r); return l;
+				case OP_LOG:for (size_t i = 0; i < l.size(); ++i) l[i] = std::log(l[i]); return l;
 				default: throw runtime_error("Unsupported operation " + to_string(int(op)));
 				}
 			}
@@ -1120,6 +1137,8 @@ namespace shyft{
             return r;             
         }
 		ats_vector pow(ats_vector const &a, ats_vector const & b) { return a.pow(b); }
+
+		ats_vector log(ats_vector const & a) { return a.log(); }
 
 		apoint_ts  ats_vector::forecast_merge(utctimespan lead_time, utctimespan fc_interval) const {
 			//verify arguments

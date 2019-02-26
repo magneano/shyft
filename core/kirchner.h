@@ -214,7 +214,7 @@ namespace shyft {
                     state_type x_tmp;
                     const double min_q = 0.00001;// ref note above
                     if (q < min_q) q = min_q;
-                    x_tmp = log(q); // Log transform
+                    x_tmp = std::log(q); // Log transform
 
                     double t0 = 0.0;
                     double t1 = to_seconds(T1 - T0)/to_seconds(deltahours(1)); // Units in kirchner are mm/hour.

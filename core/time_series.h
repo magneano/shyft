@@ -1869,6 +1869,9 @@ namespace shyft{
         struct op_min {
             double operator()(const double&a,const double&b) const {return min(a,b);}
         };
+        struct op_log {
+        	double operator()(const double a, const double) const { return std::log(a); }
+        };
 
         template <class A,class B, typename =
                     enable_if_t<
@@ -1935,6 +1938,12 @@ namespace shyft{
                   >
         auto min(const A& lhs, const B& rhs) {
             return bin_op<A,B,op_min,typename op_axis<A,B>::type> (lhs,op_min(),rhs);
+        }
+
+        /** unary base e logarithm implemented as log(ts), the extra 1.0 arg is ignored but must be present to use the bin_op mechanics */
+        template <class A, typename = enable_if_t< is_ts<A>::value >>
+        auto log (const A& lhs) {
+        	return bin_op<A, double, op_log, typename op_axis<A, double>::type>(lhs, op_log(), 1.0);
         }
 
         /** \brief A constant_source, just return the same constant value for all points
