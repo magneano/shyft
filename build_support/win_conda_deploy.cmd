@@ -11,6 +11,6 @@ set /p minor=<VERSION.tmp
 echo 4.6.%minor% >VERSION
 set SHYFT_VERSION=4.6.%minor%
 echo Starting to build %SHYFT_VERSION% numpy %SHYFT_BOOST_NUMPY_VERSION%
-conda build --numpy %SHYFT_BOOST_NUMPY_VERSION% --no-test --no-copy-test-source-files conda_recipe
+conda build --numpy %SHYFT_BOOST_NUMPY_VERSION% --no-test --no-copy-test-source-files --label %1 conda_recipe
 popd
 exit /b %errorlevel%

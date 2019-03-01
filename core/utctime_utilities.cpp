@@ -303,6 +303,8 @@ utctime calendar::add(utctime t, utctimespan deltaT, int64_t n) const {
         return time(c);
     }
     utctime r = t + dt; //naive first estimate
+    if( (-HOUR <= dt) && (dt <= HOUR)) 
+        return r;// for effective dt less than hour, no dst logic.
     auto utc_diff_1=tz_info->utc_offset(t);
     auto utc_diff_2=tz_info->utc_offset(r);
     return r + (utc_diff_1-utc_diff_2);

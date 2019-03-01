@@ -249,6 +249,40 @@ TEST_CASE("test_add_over_dst_transitions") {
 
 
 }
+TEST_CASE("test_add_over_dst_transitions_hour_dt") {
+    using namespace shyft::core;
+    using namespace shyft::core::time_zone;
+    tz_info_database tz_info_db;
+    tz_info_db.load_from_iso_db();
+    /// case 1: 23hour day, winter to summer shift.
+    auto cet_info=tz_info_db.tz_info_from_region("Europe/Oslo");
+    calendar cet(cet_info);
+    calendar utc;
+    utctime t0=cet.time(YMDhms(2016, 3,27,1,0,0));
+    // case 1: into the details
+    utctime t1_1=cet.add(t0,deltahours(1),1);
+    utctime t1_2=cet.add(t0,deltahours(2),1);
+    utctime t1_3=cet.add(t0,deltahours(3),1);
+    TS_ASSERT_EQUALS(t1_1,t0+deltahours(1));
+    TS_ASSERT_EQUALS(t1_2,t0+deltahours(1));
+    TS_ASSERT_EQUALS(YMDhms(2016,3,27,3),cet.calendar_units(t1_2));
+    TS_ASSERT_EQUALS(t1_3,t0+deltahours(2));
+    TS_ASSERT_EQUALS(1, cet.diff_units(t0, t1_3, deltahours(3)));
+    /// case 2: 25 hour, summer->winter
+    t0 = cet.time(2016,10,30,1);
+    /// case 2: into the details
+    t1_1=cet.add(t0,deltahours(1),1);
+    t1_2=cet.add(t0,deltahours(2),1);
+    t1_3=cet.add(t0,deltahours(3),1);
+    utctime
+    t1_4=cet.add(t0,deltahours(4),1);
+    TS_ASSERT_EQUALS(t1_1,t0+deltahours(1));TS_ASSERT_EQUALS(YMDhms(2016,10,30,2),cet.calendar_units(t1_1));
+    TS_ASSERT_EQUALS(t1_2,t0+deltahours(3));TS_ASSERT_EQUALS(YMDhms(2016,10,30,3),cet.calendar_units(t1_2));
+    TS_ASSERT_EQUALS(t1_3,t0+deltahours(4));TS_ASSERT_EQUALS(YMDhms(2016,10,30,4),cet.calendar_units(t1_3));
+    TS_ASSERT_EQUALS(t1_4,t0+deltahours(5));
+    auto xx=cet.calendar_units(t1_4);
+    TS_ASSERT_EQUALS(YMDhms(2016,10,30,5),xx);
+}
 
 TEST_CASE("test_calendar_trim_with_dst") {
     using namespace shyft::core;

@@ -38,7 +38,7 @@ namespace shyft {
         constexpr const utctime no_utctime = utctime::min();
 
         /** \brief current utctime
-        *  \return current systemclock utctime
+        *  @return current systemclock utctime
         */
         inline utctime utctime_now() {return std::chrono::time_point_cast<utctimespan>(utc_clock::now()).time_since_epoch(); }
 
@@ -48,7 +48,7 @@ namespace shyft {
         *
         * If dt is 0, t is returned
         * if dt< 0 then it computes ceil, (hmm)
-        * \return floor of t vs dt as explained above
+        * @return floor of t vs dt as explained above
         */
         inline utctime floor(utctime t, utctimespan dt) noexcept {
             int64_t den = dt.count();
@@ -110,7 +110,7 @@ namespace shyft {
 		/** returns intersection of a and b
          *  ensures that if there is an a.overlaps(b), the intersection is returned, where .timespan() >0
          *  otherwise an empty not .valid() period is returned.
-         *  \note: that intersection of 0 is not defined as intersection
+         *  @note: that intersection of 0 is not defined as intersection
          */
         inline utcperiod intersection(const utcperiod&a, const utcperiod& b) noexcept {
 			if (a.overlaps(b)) {
@@ -122,7 +122,7 @@ namespace shyft {
         namespace time_zone {
             using namespace std;
 
-            /**\brief time_zone handling, basically just a wrapper that hides
+            /** @brief time_zone handling, basically just a wrapper that hides
             * the fact we are using boost::date_time for getting/providing tz info
             */
             template<typename tz>
@@ -137,7 +137,7 @@ namespace shyft {
             };
 
 
-            /**\brief The tz_table is a table driven approach where each year in a specified range have
+            /** @brief The tz_table is a table driven approach where each year in a specified range have
              * a dst information containing start/end, and the applied dst offset.
              * This approach allows to have historical correct dst-rules, at minor space/time overhead
              * E.g. Norway, summertime rules are changed to EU defs. in 1996
@@ -150,11 +150,11 @@ namespace shyft {
                 vector<utcperiod> dst;
                 vector<utctimespan> dt;
 
-                /**\brief construct a tz_table using a information from provided Tz adapter
+                /** @brief construct a tz_table using a information from provided Tz adapter
                  *\tparam Tz a type that provids dst_start(year),dst_end(year), dst_offset(year)
-                 *\param tz const ref to provide tz information that will be used to construct a table driven interpretation
-                 *\param start_year default 1905 (limit of posix time is 1901) for which the dst table is constructed
-                 *\param n_years default 200 giving range from 1905 to 2105 with dst info.
+                 *@param tz const ref to provide tz information that will be used to construct a table driven interpretation
+                 *@param start_year default 1905 (limit of posix time is 1901) for which the dst table is constructed
+                 *@param n_years default 200 giving range from 1905 to 2105 with dst info.
                  */
                 template<typename Tz>
                 tz_table(const Tz& tz ,int start_year=1905,size_t n_years=200):start_year(start_year) {
@@ -164,9 +164,9 @@ namespace shyft {
                     }
                     tz_name=tz.name();
                 }
-                /**\brief construct a simple dst infotable with no dst, just tz-offset
+                /** @brief construct a simple dst infotable with no dst, just tz-offset
                 * suitable for non-dst time-zones and data-exchange.
-                * \param dt of type utctimespan, positive for tz east of GMT
+                * @param dt of type utctimespan, positive for tz east of GMT
                 */
                 explicit tz_table(utctimespan dt):start_year(0) {
                     if(dt != utctimespan{0}) {
@@ -185,7 +185,7 @@ namespace shyft {
                 x_serialize_decl();
             };
 
-            /**\brief a table driven tz_info, using the tz_table implementation */
+            /** @brief a table driven tz_info, using the tz_table implementation */
             template<>
             struct tz_info<tz_table> {
                 utctimespan base_tz;
@@ -252,7 +252,7 @@ namespace shyft {
         /** \brief YMDhms, simple structure that contains calendar coordinates.
          * Contains year,month,day,hour,minute, second,
          * for ease of constructing utctime.
-         *\note the constructor do a range check for Y M D h m s, and throws if fail.
+         *@note the constructor do a range check for Y M D h m s, and throws if fail.
          *
          */
 		struct YMDhms {
@@ -265,7 +265,7 @@ namespace shyft {
 			}
 
 			int year; int month; int day; int hour; int minute; int second;int micro_second;
-			///< just check that YMDhms are within reasonable ranges,\note it might still be an 'invalid' date!
+			///< just check that YMDhms are within reasonable ranges,@note it might still be an 'invalid' date!
 			bool is_valid_coordinates() const {return !(year<YEAR_MIN || year>YEAR_MAX || month<1 || month>12 ||day<1 || day>31 ||hour<0 || hour>23 || minute<0 ||minute>59||second<0 ||second>59||micro_second<0 || micro_second>=1000000);}
             ///< if a 'null' or valid_coordinates
 			bool is_valid() const { return is_null() || is_valid_coordinates(); }
@@ -304,7 +304,7 @@ namespace shyft {
             }
             bool operator!=(YWdhms const&x) const { return !operator==(x); }
             bool is_null() const { return iso_year == 0 && iso_week == 0 && week_day == 0 && hour == 0 && minute == 0 && second == 0 && micro_second==0; }
-            ///< just check that YMDhms are within reasonable ranges,\note it might still be an 'invalid' date!
+            ///< just check that YMDhms are within reasonable ranges,@note it might still be an 'invalid' date!
             bool is_valid_coordinates() const { return !(iso_year<YMDhms::YEAR_MIN || iso_year>YMDhms::YEAR_MAX || iso_week < 1 || iso_week>53 || week_day < 1 || week_day>7 || hour < 0 || hour>23 || minute < 0 || minute>59 || second < 0 || second>59 || micro_second<0 || micro_second >=1000000); }
             ///< if a 'null' or valid_coordinates
             bool is_valid() const { return is_null() || is_valid_coordinates(); }
@@ -372,12 +372,12 @@ namespace shyft {
 
 
 			time_zone::tz_info_t_ tz_info;
-			/**\brief returns tz_info (helper for boost python really) */
+			/** @brief returns tz_info (helper for boost python really) */
 			time_zone::tz_info_t_ get_tz_info() const {return tz_info;}
-			/**\brief construct a timezone with standard offset, no dst, name= UTC+01 etc. */
+			/** @brief construct a timezone with standard offset, no dst, name= UTC+01 etc. */
 			explicit calendar(utctimespan tz): tz_info(new time_zone::tz_info_t(tz)) {}
 			explicit calendar(int tz_s=0) :tz_info(new time_zone::tz_info_t(utctimespan{seconds(tz_s)})) {}
-			/**\brief construct a timezone from tz_info shared ptr provided from typically time_zone db */
+			/** @brief construct a timezone from tz_info shared ptr provided from typically time_zone db */
 			explicit calendar(time_zone::tz_info_t_ tz_info):tz_info(tz_info) {}
             calendar(calendar const&o) :tz_info(o.tz_info) {}
             calendar(calendar&&o) :tz_info(std::move(o.tz_info)) {}
@@ -390,23 +390,23 @@ namespace shyft {
                 tz_info = std::move(o.tz_info);
                 return *this;
             }
-            /**\brief construct a timezone based on region id
+            /** @brief construct a timezone based on region id
              * uses internal tz_info_database to lookup the name.
-             * \param region_id like Europe/Oslo, \sa time_zone::tz_info_database
+             * @param region_id like Europe/Oslo, @sa time_zone::tz_info_database
              */
             explicit calendar(std::string region_id);
-            /**\brief get list of available time zone region */
+            /** @brief get list of available time zone region */
             static std::vector<std::string> region_id_list();
 
-			/**\brief construct utctime from calendar coordinates YMDhms
+			/** @brief construct utctime from calendar coordinates YMDhms
 			 *
 			 * If the YMDhms is invalid, runtime_error is thrown.
 			 * Currently just trivial checks is done.
 			 *
-			 * \param c YMDhms that has to be valid calendar coordinates.
-			 * \note special values of YMDhms, like max,min,null is mapped to corresponding utctime concepts.
-			 * \sa YMDhms
-			 * \return utctime
+			 * @param c YMDhms that has to be valid calendar coordinates.
+			 * @note special values of YMDhms, like max,min,null is mapped to corresponding utctime concepts.
+			 * @sa YMDhms
+			 * @return utctime
 			 */
 			utctime time(YMDhms c) const;
             utctime time(YWdhms c) const;
@@ -416,28 +416,28 @@ namespace shyft {
                 return time(YMDhms(Y,M,D,h,m,s,us));
             }
             utctime time_from_week(int Y, int W = 1, int wd = 1, int h = 0, int m = 0, int s = 0,int us=0) const;
-            /**\brief returns *utc_year* of t \note for internal dst calculations only */
+            /** @brief returns *utc_year* of t @note for internal dst calculations only */
 			static inline int utc_year(utctime t) {
                 if(t == no_utctime  ) throw std::runtime_error("year of no_utctime");
                 if(t == max_utctime ) return YMDhms::YEAR_MAX;
                 if(t == min_utctime ) return YMDhms::YEAR_MIN;
 				return from_day_number(day_number(t)).year;
 			}
-            /**\brief return the calendar units of t taking timezone and dst into account
+            /** @brief return the calendar units of t taking timezone and dst into account
              *
              * Special utctime values, no_utctime max_utctime, min_utctime are mapped to corresponding
              * YMDhms special values.
-             * \sa YMDhms
-             * \return calendar units YMDhms
+             * @sa YMDhms
+             * @return calendar units YMDhms
              */
 			YMDhms  calendar_units(utctime t) const ;
 
-            /**\brief return the calendar iso week units of t taking timezone and dst into account
+            /** @brief return the calendar iso week units of t taking timezone and dst into account
             *
             * Special utctime values, no_utctime max_utctime, min_utctime are mapped to corresponding
             * YWdhms special values.
-            * \sa YWdhms
-            * \return calendar iso week units YWdhms
+            * @sa YWdhms
+            * @return calendar iso week units YWdhms
             */
             YWdhms calendar_week_units(utctime t) const;
 
@@ -459,19 +459,19 @@ namespace shyft {
 			std::string to_string(utcperiod p) const;
 
 			// calendar arithmetic
-			/**\brief round down (floor) to nearest utctime with deltaT resolution.
+			/** @brief round down (floor) to nearest utctime with deltaT resolution.
 			 *
              * If delta T is calendar::DAY,WEEK,MONTH,YEAR it do a time-zone semantically
              * correct rounding.
              * if delta T is any other number, e.g. minute/hour, the result is similar to
              * integer truncation at the level of delta T.
-             * \param t utctime to be trimmed
-             * \param deltaT utctimespan specifying the resolution, use calendar::DAY,WEEK,MONTH,YEAR specify calendar specific resolutions
-             * \return a trimmed utctime
+             * @param t utctime to be trimmed
+             * @param deltaT utctimespan specifying the resolution, use calendar::DAY,WEEK,MONTH,YEAR specify calendar specific resolutions
+             * @return a trimmed utctime
              */
 			utctime trim(utctime t, utctimespan deltaT) const ;
 
-			/**\brief calendar semantic add
+			/** @brief calendar semantic add
 			 *
 			 *  conceptually this is similar to t + deltaT*n
 			 *  but with deltaT equal to calendar::DAY,WEEK,MONTH,YEAR
@@ -480,33 +480,34 @@ namespace shyft {
 			 *  e.g. add one day, and calendar have dst, could give 23,24 or 25 hours due to dst.
 			 *  similar for week or any other time steps.
 			 *
-			 *  \sa calendar::diff_units
+			 *  @sa calendar::diff_units
 			 *
-			 *  \note DST -if the calendar include dst, following rules applies:
+			 *  @note DST -if the calendar include dst, following rules applies:
+             *   -# if effective abs( n*deltaT) <= HOUR, ordinary arithmetic applies(no dst logic)
 			 *   -# transition hour 1st hour after dst has changed
 			 *   -# if t and resulting t have different utc-offsets, the result is adjusted dst adjustment with the difference.
 			 *
 			 *
-			 * \param t utctime to add n deltaT from
-			 * \param deltaT that can be any, but with calendar::DAY,WEEK,MONTH,YEAR calendar semantics applies
-			 * \param n number of delta T to add, can be negative
-			 * \return new calculated utctime
+			 * @param t utctime to add n deltaT from
+			 * @param deltaT that can be any, but with calendar::DAY,WEEK,MONTH,YEAR calendar semantics applies
+			 * @param n number of delta T to add, can be negative
+			 * @return new calculated utctime
 			 */
 			utctime add(utctime t, utctimespan deltaT, int64_t n) const ;
 
-			/**\brief calculate the distance t1..t2 in specified units
+			/** @brief calculate the distance t1..t2 in specified units
 			 *
 			 * The function takes calendar semantics when deltaT is calendar::DAY,WEEK,MONTH,YEAR,
 			 * and in addition also dst.
 			 * e.g. the diff_units of calendar::DAY over summer->winter shift is 1, remainder is 0,
 			 * even if the number of hours during those days are 23 and 25 summer and winter transition respectively
 			 *
-			 * \sa calendar::add
+			 * @sa calendar::add
 			 *
-			 * \return (t2-t1)/deltaT, and remainder, where deltaT could be calendar units DAY,WEEK,MONTH,YEAR
+			 * @return (t2-t1)/deltaT, and remainder, where deltaT could be calendar units DAY,WEEK,MONTH,YEAR
 			 */
 			int64_t diff_units(utctime t1, utctime t2, utctimespan deltaT, utctimespan &remainder) const ;
-			///< diff_units discarding remainder, \sa diff_units
+			///< diff_units discarding remainder, @sa diff_units
 			int64_t diff_units(utctime t1, utctime t2, utctimespan deltaT) const {
 			    utctimespan ignore;
 			    return diff_units(t1,t2,deltaT,ignore);

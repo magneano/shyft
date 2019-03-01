@@ -28,6 +28,7 @@ build::linux:
             - shyft/api/pt_hps_k/_pt_hps_k.so
             - shyft/api/pt_hs_k/_pt_hs_k.so
             - shyft/api/pt_ss_k/_pt_ss_k.so
+            - shyft/api/r_pm_gs_k/_r_pm_gs_k.so
             - shyft/api/hbv_stack/_hbv_stack.so
             - shyft/lib/
 
@@ -35,14 +36,14 @@ build::linux:
 
 build::win64:
     stage: build
-    tags: 
+    tags:
         - shyft
         - win64
     script:
         - "echo Using $SHYFT_DEPENDENCIES"
         - "echo Path $PATH"
         - "build_support/win_build_shyft.cmd"
-    
+
     artifacts:
         name: binaries-win64
         expire_in: 2 day
@@ -53,6 +54,7 @@ build::win64:
             - shyft/api/pt_hps_k/_pt_hps_k.pyd
             - shyft/api/pt_hs_k/_pt_hs_k.pyd
             - shyft/api/pt_ss_k/_pt_ss_k.pyd
+            - shyft/api/r_pm_gs_k/_r_pm_gs_k.pyd
             - shyft/api/hbv_stack/_hbv_stack.pyd
 
 test::win64:
@@ -97,8 +99,8 @@ test::linux:
 
 deploy::win64:
     stage: deploy
-    only:
-        - master
+    #only:
+    #    - master
     tags:
         - shyft
         - win64
@@ -106,12 +108,13 @@ deploy::win64:
         - build::win64
         - test::win64
     script:
-        - "build_support/win_conda_deploy.cmd"
+        - "echo %CI_COMMIT_REF_NAME%"
+        - "build_support/win_conda_deploy.cmd  %CI_COMMIT_REF_NAME%"
 
 deploy::linux:
     stage: deploy
-    only:
-        - master
+    #only:
+    #    - master
     tags:
         - shyft
         - linux
@@ -124,4 +127,4 @@ deploy::linux:
         - "export SHYFT_VERSION=4.6.`git rev-list HEAD --count`"
         - "echo ${SHYFT_VERSION}>VERSION"
         - "echo ${SHYFT_VERSION} ${np_version}"
-        - "conda build --numpy ${np_version} --no-test --no-copy-test-source-files conda_recipe"
+        - "conda build --numpy ${np_version} --no-test --no-copy-test-source-files --label ${CI_COMMIT_REF_NAME} conda_recipe"
