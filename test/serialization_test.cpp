@@ -202,7 +202,11 @@ TEST_CASE("test_serialization") {
     auto a_use_ta2= serialize_loop(a_use_ta);
     TS_ASSERT(is_equal(a_use_ta,a_use_ta2));
     
+    auto a_bucket= agts.bucket_to_hourly(3,-1000.0);
+    auto a_bucket2= serialize_loop(a_bucket);
+    TS_ASSERT(is_equal(a_bucket,a_bucket2));
 
+    
     // verify vector stuff.
     vector<apoint_ts> tsv;
     tsv.push_back(agts);
@@ -561,6 +565,7 @@ TEST_CASE("study_apoint_ts_expression_speed") {
     expr_sym.push_back(expr_sym[0].min_max_check_linear_fill(0,100.0,deltahours(1000)));
     expr_sym.push_back(expr_sym[0].min_max_check_ts_fill(0,100.0,deltahours(1000),expr_sym[1]));
 	expr_sym.push_back(expr_sym[0].average(ta24).accumulate(ta24).integral(ta24));
+    expr_sym.push_back(expr_sym[0].bucket_to_hourly(3,-1e6));
     auto t0=timing::now();
     decltype(t0) t1_0,t1_1,t1_2,t1_3;
 	vector<apoint_ts> expr_dz;

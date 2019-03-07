@@ -8,7 +8,7 @@ set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_tes
     time_series_average_test.cpp time_series_fixup_test.cpp time_series_test.cpp utctime_utilities_test.cpp hbv_physical_snow_test.cpp
     pt_hps_k_test.cpp test_ice_packing.cpp dtss_stress_test.cpp dtss_mutex_test.cpp time_series_decode_test.cpp time_series_derivative_test.cpp
     dtss_db_test.cpp dtss_url_test.cpp dtss_krls_pred_db_test.cpp geo_test.cpp time_series_qac_test.cpp time_series_use_time_axis_test.cpp
-    time_series_clip_to_period_test.cpp time_series_test_accumulate.cpp
+    time_series_clip_to_period_test.cpp time_series_test_accumulate.cpp time_series_bucket_test.cpp time_series_eval_test.cpp
 )
 
 set(target "test_shyft")

@@ -20,7 +20,7 @@ namespace expose {
 	using shyft::time_series::dd::rts_t;
 	using namespace shyft::time_series::dd;
     namespace py = boost::python;
-
+    
     ats_vector quantile_map_forecast_5(vector<ats_vector> const & forecast_set, vector<double> const& set_weights, ats_vector const& historical_data, shyft::time_series::dd::gta_t const&time_axis, utctime interpolation_start ) {
         return quantile_map_forecast(forecast_set, set_weights, historical_data, time_axis, interpolation_start);
     }
@@ -54,6 +54,15 @@ namespace expose {
         }
         return "unsupported_op(" + lhs + "," + rhs + ")";
 	}
+	static string nice_str(derivative_method dm) {
+        switch(dm) {
+            case derivative_method::default_diff:return "default";
+            case derivative_method::forward_diff:return "forward";
+            case derivative_method::backward_diff:return "backward";
+            case derivative_method::center_diff:return "center";            
+        }
+        return "unknown_method";
+    }
 	static string nice_str(const apoint_ts&ats);
 	static string nice_str(double x) { return to_string(x); }
 	static string nice_str(const shared_ptr<gpoint_ts>& g) {return g? "Ts{" + nice_str(g->rep.ta) + "v[..]}":string("null");}
@@ -77,6 +86,8 @@ namespace expose {
 	static string nice_str(const shared_ptr<time_series::dd::qac_ts>&b) { return "qac_ts(" + nice_str(apoint_ts(b->ts)) + ", "+nice_str(apoint_ts(b->cts))+"..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::inside_ts>&b) { return "inside_ts(" + nice_str(apoint_ts(b->ts)) + ", "+to_string(b->p.min_x)+", "+to_string(b->p.max_x)+", ..)"; }
 	static string nice_str(const shared_ptr<time_series::dd::decode_ts>&b) { return "decode_ts(" + nice_str(apoint_ts(b->ts)) + ",start_bit="+to_string(b->p.start_bit)+",n_bits="+to_string(b->p.n_bits())+")"; }
+	static string nice_str(const shared_ptr<time_series::dd::bucket_ts>&b) { return "bucket_ts(" + nice_str(apoint_ts(b->ts)) + ",start_hour_utc="+to_string(static_cast<int>(to_seconds64(b->p.hour_offset)/3600)) + ",bucket_emptying_limit="+to_string(b->p.bucket_empty_limit)+")"; }
+	static string nice_str(const shared_ptr<time_series::dd::derivative_ts>&b) { return "derivative(" + nice_str(apoint_ts(b->ts)) + ",dm="+nice_str(b->dm)+")"; }
 
 
 	static string nice_str(const apoint_ts&ats) {
@@ -103,6 +114,9 @@ namespace expose {
         if (const auto& b = dynamic_pointer_cast<time_series::dd::inside_ts>(ats.ts)) return nice_str(b);
         if (const auto& b = dynamic_pointer_cast<time_series::dd::decode_ts>(ats.ts)) return nice_str(b);
         if (const auto& b = dynamic_pointer_cast<time_series::dd::use_time_axis_from_ts>(ats.ts)) return nice_str(b);
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::bucket_ts>(ats.ts)) return nice_str(b);
+        if (const auto& b = dynamic_pointer_cast<time_series::dd::derivative_ts>(ats.ts)) return nice_str(b);
+        
 		return "not_yet_stringified_ts";
 	}
     static string ts_stringify(const apoint_ts&ats) { return nice_str(ats); }
@@ -685,11 +699,13 @@ namespace expose {
                 doc_intro("b = TimeSeries(ta, dv.from_numpy(np.linspace(0,  1, num=len(ta))), fx_avg)")
                 doc_intro("c = a + b*3.0  # c is now an expression, time-axis is the overlap of a and b, lazy evaluation")
                 doc_intro("c_values = c.values.to_numpy()  # compute and extract the values, as numpy array")
+                doc_intro("c_evaluated=c.evaluate() # computes the expression, return a new concrete point-ts equal to the expression")
                 doc_intro("")
                 doc_intro("The TimeSeries functionality includes ")
                 doc_intro(" resampling:average,accumulate,time_shift")
                 doc_intro(" statistics: min/max,correlation by nash-sutcliffe, kling-gupta")
-                doc_intro(" filtering: convolution,average")
+                doc_intro(" filtering: convolution,average,derivative")
+                doc_intro(" quality and correction: min-max limits, replace by linear interpolation or replacement ts")
                 doc_intro(" partitioning and percentiles ")
                 doc_intro("Please check notebooks, examples and api-tests for usage.")
                 doc_see_also("TimeAxis,DoubleVector,Calendar,point_interpretation_policy"),
@@ -779,6 +795,38 @@ namespace expose {
                 doc_intro("returns ts_id of symbolic ts, or empty string if not symbolic ts")
                 doc_returns("ts_id","str","url-like ts_id as passed to constructor or empty if the ts is not a ts with ts_id")
                 doc_see_also("TimeSeries('url://like/id'),TimeSeries('url://like/id',ts_with_values)")
+            )
+            .def("bucket_to_hourly",&apoint_ts::bucket_to_hourly,(py::arg("self"),py::arg("start_hour_utc"),py::arg("bucket_emptying_limit")),
+                doc_intro(
+                "Precipitation bucket measurements have a lot of tweaks that needs to be resolved,\n"
+                "including negative variations over the day due to faulty temperature-dependent\n"
+                "volume/weight sensors attached.\n"
+                "\n"
+                "A precipitation bucket accumulates precipitation, so the readings should be strictly\n"
+                "increasing by time, until the bucket is emptied (full, or as part of maintenance).\n"
+                "\n" 
+                "The goal for the bucket_to_hourly algorithm is to provide *hourly* precipitation, based on some input signal\n"
+                "that usually is hourly(averaging is used if not hourly).\n"
+                "\n"
+                "The main strategy is to use 24 hour differences (typically at hours in a day where the\n"
+                "temperature is low, like early in the morning.), to adjust the hourly volume.\n"
+                "\n"
+                "Differences in periods of 24hour are distributed on all positive hourly evenets, the \n"
+                "negative derivatives are zeroed out, so that the hourly result for each 24 hour\n"
+                "is steady increasing, and equal to the difference of the 24hour area.\n"
+                "\n"
+                "The derivative is then used to compute the hourly precipitation rate in mm/h\n"
+                )
+                doc_parameters()
+                doc_parameter("start_hour_utc","int","valid range [0..24], usually set to early morning(low-stable temperature)")
+				doc_parameter("bucket_emptying_limit", "float", "a negative number, range[-oo..0>, limit of when to detect an emptying of a bucket in the unit of the measurements series")
+                doc_returns("ts","TimeSeries","a new hourly rate ts, that transforms the accumulated series, compensated for the described defects")
+            )
+            .def("evaluate",&apoint_ts::evaluate,(py::arg("self")),
+                doc_intro("Forces evaluation of the expression, returns a new concrete time-series")
+                doc_intro("that is detached from the expression")
+                doc_returns("ts","TimeSeries","the evaluated copy of the expression that self represents")
+                doc_see_also("TimeSeries.values")
             )
 			DEF_STD_TS_STUFF()
 			//--

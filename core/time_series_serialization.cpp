@@ -572,6 +572,17 @@ void shyft::time_series::dd::decode_ts::serialize(Archive & ar, const unsigned i
 }
 
 template<class Archive>
+void shyft::time_series::dd::bucket_ts::serialize(Archive & ar, const unsigned int version) {
+	ar
+		& core_nvp("ipoint_ts", base_object<shyft::time_series::dd::ipoint_ts>(*this))
+		& core_nvp("ts", ts)
+		& core_nvp("p", p)
+        & core_nvp("bound",bound)
+        & core_nvp("ta",ta)
+		;
+}
+
+template<class Archive>
 void shyft::time_series::dd::apoint_ts::serialize(Archive & ar, const unsigned int version) {
 	ar
 		& core_nvp("ts", ts)
@@ -653,6 +664,7 @@ x_serialize_implement(shyft::time_series::dd::qac_parameter);
 x_serialize_implement(shyft::time_series::dd::qac_ts);
 x_serialize_implement(shyft::time_series::dd::inside_ts);
 x_serialize_implement(shyft::time_series::dd::decode_ts);
+x_serialize_implement(shyft::time_series::dd::bucket_ts);
 
 //-- export predictors
 x_serialize_implement(shyft::prediction::krls_rbf_predictor);
@@ -732,6 +744,7 @@ x_arch(shyft::time_series::dd::qac_parameter);
 x_arch(shyft::time_series::dd::qac_ts);
 x_arch(shyft::time_series::dd::inside_ts);
 x_arch(shyft::time_series::dd::decode_ts);
+x_arch(shyft::time_series::dd::bucket_ts);
 
 
 std::string shyft::time_series::dd::apoint_ts::serialize() const {

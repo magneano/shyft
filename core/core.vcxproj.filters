@@ -22,6 +22,9 @@
     <ClCompile Include="time_series_dd.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
+    <ClCompile Include="time_series_dd_eval.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
     <ClCompile Include="time_series_serialization.cpp">
       <Filter>serialization</Filter>
     </ClCompile>

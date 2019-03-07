@@ -60,7 +60,46 @@ namespace shyft {
         using gts_t=point_ts<gta_t>;
         using rts_t=point_ts<time_axis::fixed_dt>;
         using intv_t=vector<int64_t>; ///< vector<int64_t> to ensure expose to python works same linux and win
+        struct ipoint_ts;
 
+        /** @brief evalutation context,
+        * 
+        * The purpose of this class is to establish an evaulation context,
+        * that keeps track of time-series during evaluation of a direct represented
+        * time-series expression, so that :
+        * 
+        *  a) same series/expression is evaluated only once
+        * 
+        *  b) that an expression tree nodes  is evaluated reducing each of it's siblings into 
+        *      a concrete time-series (no expression), recursively,  so such that the tree
+        *     collapses into a concrete representation of its final values.
+        * 
+        * The eval_ctx is used mutable in the ipoint_ts.evalute(..) method, 
+        * to ref_count/register results.
+        * 
+        * It's primary use is in the tsv.flatten algo, executed multithreaded by the dtss-server'
+        * 
+        */
+        struct eval_ctx {
+            map<ipoint_ts const *,shared_ptr<ipoint_ts>> evaluated; ///< map of node pointer to its evaluated gpoint_ts
+            map<ipoint_ts const *,size_t> ref_count; ///< ref count of node, so that we know which results we need to keep
+            bool ref_count_mode{true}; ///< we run evaluation in two phases, first ref_count, then evalute(!ref_count_mode)
+            
+            size_t ref_counting(ipoint_ts const* ts_this) {
+                if(ref_count_mode){
+                    return  ++ref_count[ts_this];
+                }
+                return 0u;
+            }
+            
+            bool is_evaluated(ipoint_ts const* ts_this) const {return evaluated.find(ts_this)!=evaluated.end();}
+            
+            void  register_ts(ipoint_ts const *ts_this,shared_ptr<ipoint_ts> const& expr_result) {
+                if(ref_count[ts_this]>1) // only register ts with ref-count > 1, minimze use of memory
+                    evaluated[ts_this]=expr_result;
+            }
+            shared_ptr<ipoint_ts> evaluate(shared_ptr<ipoint_ts> const &ts);
+        };
 
         /** \brief A virtual abstract interface (thus the prefix i) base for point_ts
          *
@@ -130,10 +169,29 @@ namespace shyft {
              */
             virtual void do_bind()=0;
 
+            /** @brief evaluate/flatten the time-series to a concrete time-seres
+             *
+             * If the time-series is an expression, evaluate/flatten the expression
+             * using depth first. 
+             * The eval_ctx keeps a list of already evaluated ipoint_ts (this), so first do a lookup
+             * using ctx.already_don(this) and if true return ctx.evaluated[this],
+             * else to a deept first of the dependents, then with those inplace
+             *  clone it self to a new, with those new its as dependents,
+             *  then evaluate .values(), and create resulting time-series.
+             * @param ctx the evaluation context
+             * @param shared_this shared_ptr of this, needed for zero-copy multi-ref'd terminals
+             * 
+             */
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const=0;
             // to be removed:
             point get(size_t i) const {return point(time(i),value(i));}
             x_serialize_decl();
         };
+        
+        inline shared_ptr<ipoint_ts> eval_ctx::evaluate(shared_ptr<ipoint_ts> const &ts) {
+            if(!ts) return nullptr;
+            return ts->evaluate(*this,ts);
+        }
 
         struct average_ts;  // fwd api
         struct accumulate_ts;  // fwd api
@@ -267,7 +325,7 @@ namespace shyft {
             utctime time(size_t i) const {return sts()->time(i);};///< get the i'th time point
             double value(size_t i) const {return sts()->value(i);};///< get the i'th value
             double operator()(utctime t) const  {return sts()->value_at(t);}; // maybe nan for empty ts?
-            std::vector<double> values() const {return ts?sts()->values():vector<double>{};}
+            std::vector<double> values() const;
 
             //-- then some useful functions/properties
             apoint_ts extend( const apoint_ts & ts,
@@ -295,7 +353,7 @@ namespace shyft {
             apoint_ts rating_curve(const rating_curve_parameters & rc_param) const;
             apoint_ts ice_packing(const ice_packing_parameters & ip_param, ice_packing_temperature_policy ipt_policy) const;
             apoint_ts ice_packing_recession(const apoint_ts & ice_packing_ts, const ice_packing_recession_parameters & ipr_param) const;
-
+            apoint_ts bucket_to_hourly(int start_hour_utc,double empty_bucket_event_limit) const;
             apoint_ts krls_interpolation(core::utctimespan dt, double rbf_gamma, double tol, std::size_t size) const;
             prediction::krls_rbf_predictor get_krls_predictor(core::utctimespan dt, double rbf_gamma, double tol, std::size_t size) const;
 
@@ -335,6 +393,9 @@ namespace shyft {
              * \return a vector of ts_bind_info
              */
             std::vector<ts_bind_info> find_ts_bind_info() const;
+            
+            /** evaluate the expression, into a concrete ts, require a bounded ts */
+            apoint_ts evaluate() const;
 
             std::string serialize() const;
             static apoint_ts deserialize(const std::string&ss);
@@ -393,14 +454,15 @@ namespace shyft {
             void set(size_t i, double x) {rep.set(i,x);}
             void fill(double x) {rep.fill(x);}
             void scale_by(double x) {rep.scale_by(x);}
-            gpoint_ts slice(int i0, int n) const { return rep.slice(i0, n); };
+            gpoint_ts slice(int i0, int n) const  { return rep.slice(i0, n); }
             virtual bool needs_bind() const { return false;}
             virtual void do_bind()  {}
             gts_t & core_ts() {return rep;}
             const gts_t& core_ts() const {return rep;}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
         };
-
+        
         struct aref_ts:ipoint_ts {
             using ref_ts_t=shared_ptr<gpoint_ts>;// shyft::time_series::ref_ts<gts_t> ref_ts_t;
             ref_ts_t rep;
@@ -434,6 +496,7 @@ namespace shyft {
                     return rep->core_ts();
                 throw runtime_error("Attempt to use unbound ref_ts");
             }
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
        };
 
@@ -492,6 +555,7 @@ namespace shyft {
 			virtual std::vector<double> values() const;
             virtual bool needs_bind() const { return ts->needs_bind();}
             virtual void do_bind() {ts->do_bind();}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -550,6 +614,7 @@ namespace shyft {
             virtual std::vector<double> values() const ;
             virtual bool needs_bind() const { return ts->needs_bind();}
             virtual void do_bind() {ts->do_bind();}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -607,6 +672,7 @@ namespace shyft {
             virtual std::vector<double> values() const ;
             virtual bool needs_bind() const { return ts->needs_bind();}
             virtual void do_bind() {ts->do_bind();}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -691,6 +757,7 @@ namespace shyft {
             }
             virtual bool needs_bind() const { return ts->needs_bind();}
             virtual void do_bind() {ts->do_bind();}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             // to help the average function, return the i'th point of the underlying timeseries
             //point get(size_t i) const {return point(ts->time(i),ts->value(i));}
             x_serialize_decl();
@@ -758,6 +825,7 @@ namespace shyft {
             virtual std::vector<double> values() const {return ts->values();}
             virtual bool needs_bind() const { return ts->needs_bind();}
             virtual void do_bind() {ts->do_bind();local_do_bind();}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -823,7 +891,7 @@ namespace shyft {
                 rhs.do_bind();
 				local_do_bind();
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -879,6 +947,7 @@ namespace shyft {
             }
             virtual bool needs_bind() const { return ts->needs_bind(); }
             virtual void do_bind() { ts->do_bind(); local_do_bind(); }
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -919,6 +988,7 @@ namespace shyft {
             virtual vector<double> values() const { return ts.values(); }
             virtual bool needs_bind() const { return false;}// this is a terminal node, no bind needed
             virtual void do_bind()  {}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
         };
 
@@ -958,6 +1028,7 @@ namespace shyft {
             }
             virtual bool needs_bind() const { return ts_impl.needs_bind();}
             virtual void do_bind() {ts_impl.do_bind();}
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
         };
 
@@ -1056,7 +1127,7 @@ namespace shyft {
                 rhs.do_bind();
 				local_do_bind();
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -1104,7 +1175,7 @@ namespace shyft {
 				for ( std::size_t i = 0u; i < dim; ++i ) { ret.emplace_back(value(i)); }
 				return ret;
 			}
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
 			x_serialize_decl();
 
 		};
@@ -1169,7 +1240,7 @@ namespace shyft {
                 }
                 return ret;
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -1330,7 +1401,7 @@ namespace shyft {
                 }
                 return ret;
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
         private:
             double evaluate(core::utctime t) const {
                 ensure_bound();
@@ -1448,7 +1519,7 @@ namespace shyft {
                 bind_check();
                 return predictor.predict_vec(ts.time_axis());
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -1817,6 +1888,7 @@ namespace shyft {
                 if(cts)
                     cts->do_bind();
             }
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
         protected:
             double _fill_value(size_t i) const;
@@ -1894,7 +1966,7 @@ namespace shyft {
             virtual void do_bind() {
                 if(ts) ts->do_bind();
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
         };
 
@@ -1990,11 +2062,116 @@ namespace shyft {
             virtual void do_bind() {
                 if(ts) ts->do_bind();
             }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
         };
+
+    /** @brief bucket parameter 
+     *
+     * To support global use (in case there are precip. buckets around the world, 
+     *  with the same defects as in the nordic countries (!)),
+     * we keep the hour_offset that helps resolving the daily temperature variation pattern.
+     * The bucket_empty_limit is the largest negative drop we allow in the algorithm to remove 
+	 * the points where there has been an emptying of the measurement bucket.
+     */
+	struct bucket_parameter {
+		utctime hour_offset{0ul};
+		double bucket_empty_limit{-10};
+        bucket_parameter()=default;
+        bucket_parameter(utctime t, double bel):hour_offset{t},bucket_empty_limit{bel}{}
+        bool operator==(bucket_parameter const&o) const {return hour_offset==o.hour_offset && (fabs(bucket_empty_limit-o.bucket_empty_limit)<1e-8);}
+        bool operator!=(bucket_parameter const&o) const {return !operator==(o);}
+	};
+
+    /** @brief precipitation bucket handling
+     *
+     * Precipitation bucket measurements have a lot of tweaks that needs to be resolved,
+     * including negative variations over the day due to faulty temperature-dependent
+     * volume/weight sensors attached.
+     * 
+     * A precipitation bucket accumulates precipitation, so the readings should be strictly
+     * increasing by time, until the bucket is emptied (full, or as part of maintenance).
+     * 
+     * The goal for the bucket_ts is to provide *hourly* precipitation, based on some input signal
+     * that usually is hourly(averaging is used if not hourly).
+     * 
+     * The main strategy is to use 24 hour differences (typically at hours in a day where the
+     * temperature is low, like early in the morning.), to adjust the hourly volume.
+     * 
+     * Differences in periods of 24hour are distributed on all positive hourly evenets, the 
+     * negative derivatives are zeroed out, so that the hourly result for each 24 hour
+     * is steady increasing, and equal to the difference of the 24hour area.
+     * 
+     * The derivative is then used to compute the hourly precipitation rate in mm/h
+     * 
+     */
+	struct bucket_ts :ipoint_ts {
+		shared_ptr<ipoint_ts> ts;///< the source ts
+		bucket_parameter p;///< the parameters that control how the inside is done
+		gta_t ta; ///< the hourly timeaxis for this ts,usually equal to source ts.
+		bool bound{ false };
+		// useful constructors
+        void do_early_bind() {
+			if (ts && !ts->needs_bind())
+				local_do_bind();
+		}
+		//bucket_ts(const apoint_ts& ats) :ts(ats.ts) { do_early_bind(); }
+		//bucket_ts(apoint_ts&& ats) :ts(move(ats.ts)) { do_early_bind(); }
+		bucket_ts(const apoint_ts& ats, const bucket_parameter& qp) :ts(ats.ts), p{qp} { do_early_bind(); }
+
+		// std copy ct and assign
+		bucket_ts() = default;
+		void assert_ts() const { if (!ts) throw runtime_error("bucket_ts:source ts is null"); }
+		void assert_bound() const { if (!bound) throw runtime_error("bucket_ts:attemt to use method on unbound ts"); }
+		// implement ipoint_ts contract, these methods just forward to source ts
+		virtual ts_point_fx point_interpretation() const { return ts_point_fx::POINT_AVERAGE_VALUE; }
+		virtual void set_point_interpretation(ts_point_fx) {}
+		virtual const gta_t& time_axis() const { assert_bound(); return ta; }
+		virtual utcperiod total_period() const { assert_bound(); return ta.total_period(); }
+		virtual size_t index_of(utctime t) const { assert_bound(); return ta.index_of(t); }
+		virtual size_t size() const { assert_bound(); return ta.size(); }
+		virtual utctime time(size_t i) const { assert_bound(); return ta.time(i); }
+
+		// methods that needs special implementation according to inside rules
+		virtual double value(size_t i) const;
+		virtual double value_at(utctime t) const;
+		virtual vector<double> values() const;
+		virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
+		// methods for binding and symbolic ts
+		virtual bool needs_bind() const {
+			return ts ? ts->needs_bind() : false;
+		}
+		virtual void do_bind() {
+			if (ts) ts->do_bind();
+			local_do_bind();
+		}
+		bool hour_time_axis(time_axis::generic_dt const&ta)  const {
+			switch (ta.gt) {
+			case time_axis::generic_dt::POINT: return false;
+			case time_axis::generic_dt::FIXED: return ta.f.delta() == seconds(3600);
+			case time_axis::generic_dt::CALENDAR: return ta.c.dt == seconds(3600);
+			}
+			return false;
+		}
+
+		void local_do_bind() {
+			if (!bound && ts) {
+				ta = ts->time_axis();
+				if (!hour_time_axis(ta)) {
+					auto dt = seconds(3600);
+					auto t0 = floor(ta.total_period().start, dt);
+					auto tn = floor(ta.total_period().end + dt - utctime(1ul), dt);
+					auto n = static_cast<size_t>((tn - t0) / dt);
+					ta = time_axis::generic_dt(t0, seconds(dt), n);
+				}
+				bound = true;
+			}
+		}
+		x_serialize_decl();
+	};
         
-    /** @brief clip a concrete time-series to period
+        
+        /** @brief clip a concrete time-series to period
         *
         * Rely on the apoint_ts.slice(i,n) algo.
         * Which in effect *will* to a memcpy of the slice (values, potentially also the time-axis points).
@@ -2118,6 +2295,7 @@ namespace shyft {
                 rhs.do_bind();
                 local_do_bind();
             }
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
             x_serialize_decl();
 
         };
@@ -2165,6 +2343,7 @@ namespace shyft {
               std::vector<double> values() const ;
               bool needs_bind() const {return rhs.needs_bind(); }
               virtual void do_bind() {rhs.do_bind();local_do_bind();}
+              virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
               x_serialize_decl();
         };
 
@@ -2207,6 +2386,7 @@ namespace shyft {
               std::vector<double> values() const;
               bool needs_bind() const {return lhs.needs_bind(); }
               virtual void do_bind() {lhs.do_bind();local_do_bind();}
+              virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts> const& shared_this) const;
               x_serialize_decl();
 
         };
@@ -2285,8 +2465,16 @@ namespace shyft {
             std::vector<Ts> tsv2(tsv1.size());
 
             auto deflate_range=[&tsv1,&tsv2](size_t i0,size_t n) {
+                eval_ctx c;
+                // first register ref.count for all expressions
                 for(size_t i=i0;i<i0+n;++i)
-                    tsv2[i]= Ts(tsv1[i].time_axis(),tsv1[i].values(),tsv1[i].point_interpretation());
+                    c.evaluate(tsv1[i].ts);
+                // secondly, do the work
+                c.ref_count_mode=false;
+                for(size_t i=i0;i<i0+n;++i) {
+                    auto gts = dynamic_pointer_cast<gpoint_ts>(c.evaluate(tsv1[i].ts));
+                    tsv2[i]= Ts(gts->time_axis(),gts->rep.v,gts->point_interpretation());
+                }
             };
             auto n_threads =  thread::hardware_concurrency();
             if(n_threads <2) n_threads=4;// hard coded minimum
@@ -2542,5 +2730,7 @@ x_serialize_export_key(shyft::time_series::dd::inside_ts);
 x_serialize_export_key(shyft::time_series::dd::decode_ts);
 x_serialize_export_key(shyft::time_series::dd::use_time_axis_from_ts);
 x_serialize_export_key(shyft::time_series::dd::qac_parameter);
+x_serialize_export_key(shyft::time_series::dd::bucket_ts);
 x_serialize_binary(shyft::time_series::dd::inside_parameter);
 x_serialize_binary(shyft::time_series::dd::bit_decoder);
+x_serialize_binary(shyft::time_series::dd::bucket_parameter);

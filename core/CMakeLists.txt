@@ -2,7 +2,7 @@
 # library sources
 set(core_sources   dtss_client.cpp experimental.cpp dream_optimizer.cpp sceua_optimizer.cpp
     time_series_dd.cpp core_serialization.cpp time_series_serialization.cpp
-    utctime_utilities.cpp expression_serialization.cpp
+    utctime_utilities.cpp expression_serialization.cpp time_series_dd_eval.cpp
 )
 add_library(shyft_core STATIC ${core_sources})
 if (MSVC)

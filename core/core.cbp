@@ -233,6 +233,9 @@
 		<Unit filename="time_series_dd.h">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_dd_eval.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>
 		<Unit filename="time_series_info.h">
 			<Option virtualFolder="time_series/" />
 		</Unit>

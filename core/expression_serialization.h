@@ -123,7 +123,8 @@ namespace shyft { namespace time_series { namespace dd {
         o_index<inside_ts>,
         o_index<decode_ts>,
         o_index<derivative_ts>,
-        o_index<use_time_axis_from_ts>
+        o_index<use_time_axis_from_ts>,
+        o_index<bucket_ts>
     >;
 
     namespace srep {
@@ -333,8 +334,16 @@ namespace shyft { namespace time_series { namespace dd {
             a_index ts;
             bit_decoder p;
             bool operator==(const sdecode_ts& o) const { return ts == o.ts && p==o.p; } //
-        };
+        };        
         template<> struct _type<decode_ts> { using rep_t = srep::sdecode_ts; };
+
+        struct sbucket_ts {
+            using ts_t = bucket_ts;
+            a_index ts;
+            bucket_parameter p;
+            bool operator==(const sbucket_ts& o) const { return ts == o.ts && p==o.p; } //
+        };
+        template<> struct _type<bucket_ts> { using rep_t = srep::sbucket_ts; };
 
     } // namespace srep
 
@@ -481,7 +490,10 @@ namespace shyft { namespace time_series { namespace dd {
                     return f->second;
                 expr.rts.emplace_back(aref);
                 return rts_map[aref] = o_index<aref_ts>{ expr.rts.size() - 1 };
-            } else {
+            } else if(auto ts = dynamic_cast<bucket_ts*>(ats.ts.get())) {
+                _m_find_ts_map(ts);
+                return m[ts] = o_index<bucket_ts>{ expr.append(srep::_type<bucket_ts>::rep_t{ convert(apoint_ts(ts->ts)), ts->p }) };
+            }else {
                 throw runtime_error("Not supported yet");
             }
         #undef _m_find_ts_map
@@ -673,7 +685,11 @@ namespace shyft { namespace time_series { namespace dd {
             apoint_ts src_ts{ boost::apply_visitor(*this,rx.ts) };
             return make_shared<decode_ts>(src_ts, rx.p);
         }
-
+        shared_ptr<bucket_ts> make(o_index<bucket_ts> i) {
+            const auto& rx = expr.at(i);
+            apoint_ts src_ts{ boost::apply_visitor(*this,rx.ts) };
+            return make_shared<bucket_ts>(src_ts, rx.p);
+        }
     public: // required for the visitor callbacks
             /** generic callback called by visitor for any type
             * performs lookup in the table, then if missing
@@ -733,7 +749,7 @@ namespace shyft { namespace time_series { namespace dd {
     /**convinient macro to use for all know types, use as parameter-pack to ts_exp_rep, etc.*/
 #define all_srep_types  srep::sbinop_op_ts, srep::sbinop_ts_scalar, srep::sbin_op_scalar_ts, srep::sabs_ts, srep::saverage_ts, srep::sintegral_ts, srep::saccumulate_ts, \
             srep::stime_shift_ts, srep::speriodic_ts, srep::sconvolve_w_ts, srep::sextend_ts, srep::srating_curve_ts, srep::sice_packing_ts, srep::sice_packing_recession_ts, \
-            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts,srep::suse_time_axis_from_ts
+            srep::skrls_interpolation_ts, srep::sqac_ts, srep::sinside_ts,srep::sdecode_ts,srep::sderivative_ts,srep::suse_time_axis_from_ts,srep::sbucket_ts
 
     typedef ts_expression<all_srep_types> compressed_ts_expression;
     typedef ts_expression_compressor<all_srep_types> expression_compressor;
@@ -753,6 +769,7 @@ x_serialize_binary(shyft::time_series::dd::srep::suse_time_axis_from_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sqac_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sinside_ts);
 x_serialize_binary(shyft::time_series::dd::srep::sdecode_ts);
+x_serialize_binary(shyft::time_series::dd::srep::sbucket_ts);
 
 
 x_serialize_export_key(shyft::time_series::dd::srep::saverage_ts);
@@ -788,4 +805,5 @@ x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::krls_
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::qac_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::inside_ts>);
 x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::decode_ts>);
+x_serialize_binary(shyft::time_series::dd::o_index<shyft::time_series::dd::bucket_ts>);
 x_serialize_binary(boost::blank);

@@ -8,8 +8,7 @@ See file COPYING for more details **/
 #include "time_series_point_merge.h"
 #include "time_series_average.h"
 
-namespace shyft{
-    namespace time_series {
+namespace shyft::time_series {
         /*
          Some comments:
          The api-type ts, time-axis gives some challenges when it comes to performance on large amount of data.
@@ -653,6 +652,8 @@ namespace dd {
                 find_ts_bind_info(dynamic_cast<const derivative_ts*>(its.get())->ts, r);                
             } else if (dynamic_cast<const convolve_w_ts*>(its.get())){
                 find_ts_bind_info(dynamic_cast<const convolve_w_ts*>(its.get())->ts_impl.ts.ts, r);                
+            } else if (dynamic_cast<const bucket_ts*>(its.get())){
+                find_ts_bind_info(dynamic_cast<const bucket_ts*>(its.get())->ts, r);                
             }
 		}
 
@@ -1009,8 +1010,24 @@ namespace dd {
 			}
 			virtual bool needs_bind() const { return gm.temperature->needs_bind() || gm.sca_m2->needs_bind(); }
 			virtual void do_bind() { gm.temperature->do_bind(); gm.sca_m2->do_bind(); }
-
+            virtual shared_ptr<ipoint_ts> evaluate(eval_ctx& ctx, shared_ptr<ipoint_ts>const& shared_this) const;
 		};
+        
+        shared_ptr<ipoint_ts> aglacier_melt_ts::evaluate(eval_ctx&c, shared_ptr<ipoint_ts> const&) const {
+             if(auto ref_c=c.ref_counting(this)) {if(ref_c>1u) return nullptr;
+                 c.evaluate(gm.sca_m2);
+                 return c.evaluate(gm.temperature);
+            }
+            if(c.is_evaluated(this))
+                return c.evaluated[this];
+            auto sca_m2 = c.evaluate(gm.sca_m2);
+            auto temperature=c.evaluate(gm.temperature);
+            aglacier_melt_ts tmp(apoint_ts(temperature),apoint_ts(sca_m2),gm.glacier_area_m2,gm.dtf);
+            auto r= make_shared<gpoint_ts>(time_axis(),tmp.values(),point_interpretation());
+            c.register_ts(this,r);
+            return r;
+        }
+        
 		apoint_ts create_glacier_melt_ts_m3s(const apoint_ts & temp, const apoint_ts& sca_m2, double glacier_area_m2, double dtf) {
 			return apoint_ts(make_shared<aglacier_melt_ts>(temp, sca_m2, glacier_area_m2, dtf));
 		}
@@ -1600,7 +1617,116 @@ namespace dd {
                 r.emplace_back(clip_to_period(ts,p));
             return r;
         }
-		
+        apoint_ts apoint_ts::evaluate() const {
+            if(!ts) return apoint_ts{};
+            if(ts->needs_bind())
+                throw runtime_error("This time-series expression contains unbound time-series, please resolve before evaluate");
+            if(dynamic_pointer_cast<gpoint_ts>(ts))
+                return *this;
+            eval_ctx c;
+            c.evaluate(ts);
+            c.ref_count_mode=false;
+            return apoint_ts(c.evaluate(ts));
+        }
+
+        vector<double> apoint_ts::values()const {
+            if(!ts)
+                return vector<double>{};
+            if(ts->needs_bind())
+                throw runtime_error("This time-series expression contains unbound time-series, please resolve before evaluate");                
+            if(dynamic_pointer_cast<gpoint_ts>(ts))
+                return dynamic_pointer_cast<gpoint_ts>(ts)->values();
+            else if(dynamic_pointer_cast<aref_ts>(ts))
+                return dynamic_pointer_cast<aref_ts>(ts)->rep->values();
+            eval_ctx c;
+            c.evaluate(ts);c.ref_count_mode=false;
+            auto ets=c.evaluate(ts);
+            return ets->values();
+        }
+        
+        apoint_ts apoint_ts::bucket_to_hourly(int start_hour_utc,double bucket_empty_limit) const {
+            if( start_hour_utc<0 || start_hour_utc>23)
+                throw runtime_error("start_hour_utc must be in range [0..23]");
+            if(bucket_empty_limit>= 0.0)
+                throw runtime_error("the bucket_empty_limit should be less than 0.0, typically -10.0 mm");
+            return apoint_ts(make_shared<bucket_ts>(*this,bucket_parameter{deltahours(start_hour_utc),bucket_empty_limit}));
+        }
+
+		vector<double> bucket_fix(vector<double> const& v, size_t i0, size_t n,double bucket_empty_limit) {
+			vector<double> dv_p(n, shyft::nan);
+			vector<double> dv(n, shyft::nan);
+			vector<double> hi(n, shyft::nan);
+			if (n == 0 || i0 >= n)
+				return hi;
+			for (size_t i = i0; i < n - 1; ++i) {
+				double tmp_dv = v[i+1] - v[i];
+				dv[i] = tmp_dv > bucket_empty_limit ? tmp_dv : shyft::nan;
+			}
+            dv[n - 1] = 0.0;
+            // dv contains unfiltered hourly precip in the bucket
+            for (size_t d = 0; d < n / 24; ++d) {
+                double dv_sum = 0;
+                double dv_psum = 0;
+                for (size_t i = i0 + d * 24; i < i0 + (d + 1)*24 && i<n; ++i) {
+                    // daily sum
+                    if (isfinite(dv[i])) {
+                        dv_sum += dv[i];
+                        if (dv[i] > 0) {
+                            dv_p[i] = dv[i];// save positive derivatives
+                            dv_psum += dv[i];// daily positive sum
+                        } else {
+                            dv_p[i] = 0;
+                        }
+                    }
+                }
+                // calculate hourly intensity where positive diff
+                double p_diff = dv_sum > 0 ? dv_sum : 0;
+                if (p_diff > 0) {
+                    for (size_t i = i0 + d * 24; i < i0 + (d + 1) * 24 && i<n; ++i)
+                        hi[i] = dv_p[i] * p_diff / dv_psum;
+                } else {
+                    for (size_t i = i0 + d * 24; i < i0 + (d + 1) * 24&& i<n; ++i)
+                        hi[i] = 0;
+                }
+            }
+            return hi;
+        }
+
+        vector<double> bucket_ts::values() const {
+            assert_bound();
+            vector<double> v;
+            if (!hour_time_axis(ts->time_axis())) {
+                v = apoint_ts(ts).average(ta).values();
+            }
+            else {
+                v = ts->values();
+            }
+            auto t0 = floor(ta.total_period().start + calendar::DAY - utctime(1ul) - p.hour_offset, calendar::DAY) + p.hour_offset;
+            if (!ta.total_period().contains(t0))
+                return vector<double>(ta.size(), shyft::nan);
+            return bucket_fix(v, ta.index_of(t0), ta.size(),p.bucket_empty_limit);
+        }
+
+        double bucket_ts::value(size_t i) const {
+            if(i>=ta.size())
+                return shyft::nan;
+            auto t0 = floor(ta.time(i) - p.hour_offset, calendar::DAY) + p.hour_offset;
+            auto t1 = t0 + calendar::DAY;
+            if (!ta.total_period().contains(t0) )// we allow trailing ts, || !ta.total_period().contains(t1))
+                return shyft::nan;
+            auto v = apoint_ts(ts).average(time_axis::generic_dt(t0, seconds(3600), 24)).values();
+            auto r = bucket_fix(v, 0, 24,p.bucket_empty_limit);
+            auto hour_idx = (ta.time(i) - t0) / seconds(3600);
+            return r[hour_idx];
+        }
+
+        double bucket_ts::value_at(utctime t) const {
+            assert_bound();
+            if (!ta.total_period().contains(t))
+                return shyft::nan;
+            return value(ta.index_of(t));
+        }
     }
-}}
+
+}
 

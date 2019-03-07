@@ -111,6 +111,12 @@
     <ClCompile Include="time_series_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
+    <ClCompile Include="time_series_bucket_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
+    <ClCompile Include="time_series_eval_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>
     <ClCompile Include="merge_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
