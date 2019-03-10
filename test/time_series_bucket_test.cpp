@@ -30,37 +30,41 @@ TEST_SUITE("time_series") {
     using std::make_shared;
     using std::isfinite;
     vector<double> data{ 0, 0, 0, 0, 0, 0,
-                            4, 4, 4, 4, 4, 4,
-                            1, 1, 1, 1, 1, 1,
-                            9, 9, 9, 9, 9, 9,
-                            9, 9, 9, 9, 9, 9,
-                            -6,-6,-6,-6,-6,-6,
-                            6, 6, 6, 6, 6, 6,
-                            12,12,12,12,12,12,
-                            12,12,12,12,12,12,
-                            12,12,12,12,12,12,
-                            12,12,12,12,12,12,
-                            12,12,12,12,12,12};
-
-		
+                         4, 4, 4, 4, 4, 4,
+                         1, 1, 1, 1, 1, 1,
+                         9, 9, 9, 9, 9, 9,
+                         9, 9, 9, 9, 9, 9,
+                         -6,-6,-6,-6,-6,-6,
+                         6, 6, 6, 6, 6, 6,
+                         12,12,12,12,12,12,
+                         12,12,12,12,12,12,
+                         12,12,12,12,12,12,
+                         12,12,12,12,12,12,
+                         12,12,12,12,12,12};
 
     TEST_CASE("bucket_ts_normal") {
         generic_dt ta(seconds(0), calendar::HOUR, data.size());
         apoint_ts ts_raw(ta, data, ts_point_fx::POINT_AVERAGE_VALUE);
-        bucket_ts bts(ts_raw,bucket_parameter{seconds(0),-100.0});
+        bucket_ts bts(ts_raw, bucket_parameter{ seconds(0),-100.0 });
         auto vv = bts.values();
-        vector<double> expected{ 0, 0, 0, 0, 0, 3,
+        vector<double> expected{0, 0, 0, 0, 0, 0,
+                                3, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 6,
+                                6, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 2,
-                                0, 0, 0, 0, 0, 1,
-                                0, 0, 0, 0, 0, 0,
+                                2, 0, 0, 0, 0, 0,
+                                1, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0 };
+        //std::cout << "\nexpected:\n";
+        //for (const auto v : expected) std::cout << v << " ";
+        //std::cout << "\ngot:\n";
+        //for (const auto v : vv) std::cout << v << " ";
+        //std::cout << "\nvalue:\n";
+        //for (int i = 0; i < vv.size(); ++i) std::cout << i << " " << bts.value(i) << "\n";
         for (int i = 0; i < vv.size(); ++i) {
             FAST_CHECK_EQ(vv[i], doctest::Approx(expected[i]));
             FAST_CHECK_EQ(bts.value(i),doctest::Approx(expected[i]));
@@ -72,17 +76,18 @@ TEST_SUITE("time_series") {
 			generic_dt ta(seconds(0), calendar::HOUR, data.size());
 			apoint_ts ts_raw(ta, data, ts_point_fx::POINT_AVERAGE_VALUE);
 			bucket_ts bts(ts_raw,bucket_parameter{seconds(4*3600),-1000.0});
-			vector<double> ee{nan,nan,nan,nan,0, 3,
+			vector<double> ee{nan,nan,nan,nan,0, 0,
+                                3, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 6,
-                                0, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 2,
-                                0, 0, 0, 0, 0, 1,
+                                6, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0,
-                                0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                2, 0, 0, 0, 0, 0,
+                                1, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0,
             };
 			auto vv = bts.values();
             //TODO: consider if we should clip front/tail time-axis

@@ -1655,7 +1655,7 @@ namespace dd {
 		vector<double> bucket_fix(vector<double> const& v, size_t i0, size_t n,double bucket_empty_limit) {
 			vector<double> dv_p(n, shyft::nan);
 			vector<double> dv(n, shyft::nan);
-			vector<double> hi(n, shyft::nan);
+			vector<double> hi(n, 0);
 			if (n == 0 || i0 >= n)
 				return hi;
 			for (size_t i = i0; i < n - 1; ++i) {
@@ -1664,10 +1664,10 @@ namespace dd {
 			}
             dv[n - 1] = 0.0;
             // dv contains unfiltered hourly precip in the bucket
-            for (size_t d = 0; d < n / 24; ++d) {
+            for (size_t d = 0; d < n/24; ++d) {
                 double dv_sum = 0;
                 double dv_psum = 0;
-                for (size_t i = i0 + d * 24; i < i0 + (d + 1)*24 && i<n; ++i) {
+                for (size_t i = i0 + d*24; i < i0 + (d + 1)*24 && i<n; ++i) {
                     // daily sum
                     if (isfinite(dv[i])) {
                         dv_sum += dv[i];
@@ -1682,11 +1682,11 @@ namespace dd {
                 // calculate hourly intensity where positive diff
                 double p_diff = dv_sum > 0 ? dv_sum : 0;
                 if (p_diff > 0) {
-                    for (size_t i = i0 + d * 24; i < i0 + (d + 1) * 24 && i<n; ++i)
-                        hi[i] = dv_p[i] * p_diff / dv_psum;
+                    for (size_t i = i0 + d*24; i < i0 + (d + 1)*24 && i<(n-1); ++i)
+                        hi[i+1] = dv_p[i]*p_diff / dv_psum;
                 } else {
-                    for (size_t i = i0 + d * 24; i < i0 + (d + 1) * 24&& i<n; ++i)
-                        hi[i] = 0;
+                    for (size_t i = i0 + d*24; i < i0 + (d + 1)*24&& i<(n-1); ++i)
+                        hi[i+1] = 0;
                 }
             }
             return hi;
@@ -1716,7 +1716,7 @@ namespace dd {
                 return shyft::nan;
             auto v = apoint_ts(ts).average(time_axis::generic_dt(t0, seconds(3600), 24)).values();
             auto r = bucket_fix(v, 0, 24,p.bucket_empty_limit);
-            auto hour_idx = (ta.time(i) - t0) / seconds(3600);
+            auto hour_idx = (ta.time(i) - t0)/seconds(3600);
             return r[hour_idx];
         }
 
