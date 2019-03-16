@@ -1253,42 +1253,54 @@ namespace dd {
 		}
 
 		std::vector<double> extend_ts::values() const {
-			this->bind_check();
+            bind_check();
 
-			const utctime split_at = this->get_split_at();
-			const auto lhs_p = this->lhs.time_axis().total_period();
-			const auto rhs_p = this->rhs.time_axis().total_period();
+            const utctime split_at = get_split_at();
+            const auto lhs_p = lhs.time_axis().total_period();
+            const auto rhs_p = rhs.time_axis().total_period();
 
 			// get values
 			std::vector<double> lhs_values{}, rhs_values{};
-			if (split_at >= lhs_p.start) lhs_values = this->lhs.values();
-			if (split_at <= lhs_p.end)   rhs_values = this->rhs.values();
+            if (split_at >= lhs_p.start)  lhs_values = lhs.values();
+            if (split_at <= rhs_p.end)   rhs_values = rhs.values();
 
 			// possibly to long, but not too short, all values default to nan
 			std::vector<double> result;
-			result.reserve(lhs.size() + rhs_values.size());
+            result.reserve(ta.size());// exact size
 
 			auto res_oit = std::back_inserter(result);  // output iterator
 
 			// values from the lhs
+            // we  should at least include all values strictly left of split_at
 			if (split_at >= lhs_p.end) {  // use all of lhs
-				res_oit = std::copy(lhs_values.begin(), lhs_values.end(), res_oit);
+                res_oit = std::copy(lhs_values.begin(), lhs_values.end(), res_oit);
+                // if rhs starts _after_ split_at, we append a fill value
+                if(split_at<= rhs_p.start) {
+                    double fill_v=nan;
+                    switch (ets_fill_p) {
+                        case EPF_NAN:  fill_v=nan;break;
+                        case EPF_FILL: fill_v=fill_value;break;
+                        case EPF_LAST: fill_v= lhs_values.back();break;
+                        }
+                        *res_oit++ = fill_v;
+                }
 			} else if (split_at >= lhs_p.start) {  // split inside lhs
-				size_t lhs_i = this->lhs.time_axis().index_of(split_at);
+                size_t lhs_i = lhs.time_axis().index_of(split_at);
 				auto lhs_end_it = lhs_values.begin();
+                if(split_at< rhs_p.start) 
+                    lhs_i++; // inside a, filler is a
 				std::advance(lhs_end_it, lhs_i);
-
 				res_oit = std::copy(lhs_values.begin(), lhs_end_it, res_oit);
 			}
+
 
 			// values from the rhs
 			if (split_at <= rhs_p.start) {  // use all of rhs
 				std::copy(rhs_values.begin(), rhs_values.end(), res_oit);
-			} else if (split_at <= rhs_p.end) {  // split inside rhs
+			} else if (split_at < rhs_p.end) {  // split inside rhs
 				size_t rhs_i = this->rhs.time_axis().index_of(split_at);
 				auto rhs_start_it = rhs_values.begin();
 				std::advance(rhs_start_it, rhs_i);
-
 				std::copy(rhs_start_it, rhs_values.end(), res_oit);
 			}
 
@@ -1296,35 +1308,47 @@ namespace dd {
 		}
 
 		double extend_ts::value_at(utctime t) const {
-			//this->bind_check();  // done in time_axis()
-			if (!this->time_axis().total_period().contains(t)) {
+			// bind_check();  // done in time_axis()
+			if (!time_axis().total_period().contains(t)) {
 				return nan;
 			}
-
-			utctime split_at = this->get_split_at();
-
+			utctime split_at = get_split_at();
 			if (t < split_at) {  // lhs
-				if (this->lhs.time_axis().total_period().contains(t)) {
-					return this->lhs(t);
+                if (lhs.time_axis().total_period().contains(t)) {
+                    if(!lhs.time_axis().total_period().contains(split_at))
+                        return lhs(t);
+                    //-- a bit hard to get: we do not split exactly at t, we use split_at to find the interval in lhs where rhs should contribute,
+                    auto lhs_split_ix=lhs.time_axis().index_of(split_at);
+                    auto t_step_split=lhs.time_axis().time(lhs_split_ix);
+                    if(t < t_step_split) { // ok, we are to the left of the real split, so just return lhs(t)
+                        return lhs(t);
+                    } else { // we are on th left of split, but inside the split period that should have rhs-contrib
+                        if (rhs.time_axis().total_period().contains(t)) {
+                            return rhs(t);// rhs do have contrib
+                        } else {
+                            // ok, rhs can't give anything, but we are inside lhs, so use lhs value.
+                            return lhs(t);
+                        }
+                    }
 				} else {
 					// greater than lhs.end -> use policy
-					switch (this->ets_fill_p) {
-					default:
-					case EPF_NAN:  return nan;
-					case EPF_FILL: return this->fill_value;
-					case EPF_LAST: return this->lhs.value(lhs.size() - 1);
+                    switch (ets_fill_p) {
+                    default:
+                    case EPF_NAN:  return nan;
+                    case EPF_FILL: return fill_value;
+                    case EPF_LAST: return lhs.size()>0?lhs.value(lhs.size() - 1):nan;
 					}
 				}
 			} else {  // rhs
-				if (this->rhs.time_axis().total_period().contains(t)) {
-					return this->rhs(t);
+                if (rhs.time_axis().total_period().contains(t)) {
+                    return rhs(t);
 				} else {
 					// less than rhs.start -> use policy
 					switch (this->ets_fill_p) {
 					default:
 					case EPF_NAN:  return nan;
-					case EPF_FILL: return this->fill_value;
-					case EPF_LAST: return this->lhs.value(lhs.size() - 1);
+					case EPF_FILL: return fill_value;
+                    case EPF_LAST: return lhs.time_axis().total_period().contains(t)? lhs(t):(lhs.size()>0?lhs.value(lhs.size()-1):shyft::nan);// use *last* value from lhs(t), or keep lhs.last value!
 					}
 				}
 			}

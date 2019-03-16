@@ -9,6 +9,7 @@ set(test_sources actual_evapotranspiration_test.cpp api_test.cpp calibration_tes
     pt_hps_k_test.cpp test_ice_packing.cpp dtss_stress_test.cpp dtss_mutex_test.cpp time_series_decode_test.cpp time_series_derivative_test.cpp
     dtss_db_test.cpp dtss_url_test.cpp dtss_krls_pred_db_test.cpp geo_test.cpp time_series_qac_test.cpp time_series_use_time_axis_test.cpp
     time_series_clip_to_period_test.cpp time_series_test_accumulate.cpp time_series_bucket_test.cpp time_series_eval_test.cpp
+    time_series_extend_test.cpp
 )
 
 set(target "test_shyft")
@@ -71,4 +72,5 @@ set(target "test_shyft")
     add_test(dtss_url ${target} -nv --test-suite=dtss_url)
     add_test(dtss_krls_pred_db ${target} -nv --test_suite=dtss_krls_pred_db)
     add_test(geo_cell_data  ${target} -nv --test_suite=geo_cell_data)
+    add_test(time_series_extend ${target} -nv --test_suite=time_series_extend)
 

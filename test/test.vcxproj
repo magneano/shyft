@@ -180,6 +180,7 @@
     <ClCompile Include="time_series_average_test.cpp" />
     <ClCompile Include="time_series_bucket_test.cpp" />
     <ClCompile Include="time_series_eval_test.cpp" />
+    <ClCompile Include="time_series_extend_test.cpp" />
     <ClCompile Include="time_series_fixup_test.cpp" />
     <ClCompile Include="time_series_test.cpp" />
     <ClCompile Include="time_series_qac_test.cpp" />

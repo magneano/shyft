@@ -117,7 +117,9 @@
     <ClCompile Include="time_series_eval_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
-    <ClCompile Include="merge_test.cpp">
+    <ClCompile Include="time_series_extend_test.cpp">
+      <Filter>time_series</Filter>
+    </ClCompile>    <ClCompile Include="merge_test.cpp">
       <Filter>time_series</Filter>
     </ClCompile>
     <ClCompile Include="hbv_physical_snow_test.cpp">

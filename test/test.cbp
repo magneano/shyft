@@ -232,6 +232,9 @@
 		<Unit filename="time_series_eval_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
+		<Unit filename="time_series_extend_test.cpp">
+			<Option virtualFolder="time_series/" />
+		</Unit>
 		<Unit filename="time_series_decode_test.cpp">
 			<Option virtualFolder="time_series/" />
 		</Unit>
