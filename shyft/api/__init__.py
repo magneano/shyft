@@ -136,6 +136,9 @@ GeoCellData.__repr__ = GeoCellData.__str__
 UtcPeriod.to_string = lambda self: str(self)
 UtcPeriod.__repr__ = UtcPeriod.__str__
 
+# Allow convolve_policies to be |'ed together
+convolve_policy.__or__ = lambda self, other: (convolve_policy) (self + other)
+
 # Fix up TimeAxis
 
 def ta_iter(x):

@@ -921,8 +921,8 @@ namespace expose {
                 doc_parameters()
                 doc_parameter("weights","DoubleVector","the weights profile, use DoubleVector.from_numpy(...) to create these.\n"
                                 "\t it's the callers responsibility to ensure the sum of weights are 1.0\n")
-                doc_parameter("policy","convolve_policy","(.USE_FIRST|USE_ZERO|USE_NAN)\n"
-                "\t Specifies how to handle initial weight.size()-1 values\n")
+                doc_parameter("policy","convolve_policy","(USE_NEAREST|USE_ZERO|USE_NAN + BACKWARD|FORWARD|CENTER)\n"
+                "\t Specifies how to handle boundary values\n")
                 doc_returns("ts","TimeSeries","a new time-series that is evaluated on request to the convolution of self")
                 doc_see_also("ConvolvePolicy")
             )
@@ -2031,13 +2031,20 @@ namespace expose {
         enum_<time_series::convolve_policy>(
             "convolve_policy",
             "Ref Timeseries.convolve_w function, this policy determinte how to handle initial conditions\n"
-            "USE_FIRST: value(0) is used for all values before value(0), 'mass preserving'\n"
-            "USE_ZERO : fill in zero for all values before value(0):shape preserving\n"
-            "USE_NAN  : nan filled in for the first length-1 values of the filter\n"
+            "USE_NEAREST: value(0) is used for all values before value(0), and\n"
+            "             value(n-1) is used for all values after value(n-1) == 'mass preserving'\n"
+            "USE_ZERO : use zero for all values before value(0) or after value(n-1) == 'shape preserving'\n"
+            "USE_NAN  : nan is used for all values outside the ts\n"
+            "BACKWARD : filter is 'backward looking' == boundary handling in the beginning of ts\n"
+            "FORWARD  : filter is 'forward looking' == boundary handling in the end of ts\n"
+            "CENTER   : filter is centered == boundary handling in both ends\n"
             )
-            .value("USE_FIRST", time_series::convolve_policy::USE_FIRST)
+            .value("USE_NEAREST", time_series::convolve_policy::USE_NEAREST)
             .value("USE_ZERO", time_series::convolve_policy::USE_ZERO)
             .value("USE_NAN", time_series::convolve_policy::USE_NAN)
+            .value("BACKWARD", time_series::convolve_policy::BACKWARD)
+            .value("FORWARD", time_series::convolve_policy::FORWARD)
+            .value("CENTER", time_series::convolve_policy::CENTER)
             .export_values()
             ;
         enum_<time_series::dd::derivative_method>(

@@ -125,7 +125,9 @@ TEST_CASE("ts_evaluate") {
     FAST_CHECK_EQ(true,eval_ts_same_as_expr(e.log()));
     FAST_CHECK_EQ(true,eval_ts_same_as_expr(e.abs()));
     
-    FAST_CHECK_EQ(true,eval_ts_same_as_expr(e.convolve_w(vector<double>{0.1,0.2,0.4,0.2,0.1},shyft::time_series::convolve_policy::USE_FIRST)));
+    FAST_CHECK_EQ(true,eval_ts_same_as_expr(e.convolve_w(vector<double>{0.1,0.2,0.4,0.2,0.1},
+                                                         shyft::time_series::convolve_policy::USE_NEAREST |
+                                                         shyft::time_series::convolve_policy::BACKWARD)));
     {
         using shyft::time_series::rating_curve_function;
         using shyft::time_series::rating_curve_segment;

@@ -1620,52 +1620,84 @@ TEST_SUITE("time_series") {
     }
 
     TEST_CASE("test_convolution_w") {
-        using namespace shyft::core;
-        using namespace shyft;
-        calendar utc;
-        utctime t0=utc.time(2016,1,1);
-        utctimespan dt=deltahours(1);
-        time_axis::fixed_dt ta(t0,dt,24);
 
-        time_series::point_ts<decltype(ta)> ts(ta,10.0,shyft::time_series::POINT_AVERAGE_VALUE);
-        for(size_t i=0; i<5; ++i)
-            ts.set(10+i,i);
-        std::vector<double> w{0.1,0.15,0.5,0.15,0.1};
-        time_series::convolve_w_ts<decltype(ts)> cts_first(ts,w,time_series::convolve_policy::USE_FIRST);
-        time_series::convolve_w_ts<decltype(ts)> cts_zero(ts,w,time_series::convolve_policy::USE_ZERO);
-        time_series::convolve_w_ts<decltype(ts)> cts_nan(ts,w,time_series::convolve_policy::USE_NAN);
+      using namespace shyft::core;
+      using namespace shyft;
+      using time_series::convolve_policy;
 
-        // first policy will just repeat the first value through the filter, thus equal first 4 steps.
-        TS_ASSERT_DELTA(ts.value(0),cts_first.value(0),0.0001);
-        TS_ASSERT_DELTA(ts.value(1),cts_first.value(1),0.0001);
-        TS_ASSERT_DELTA(ts.value(2),cts_first.value(2),0.0001);
-        TS_ASSERT_DELTA(ts.value(3),cts_first.value(3),0.0001);
+      calendar utc;
+      time_axis::fixed_dt ta(utc.time(2016,1,1), deltahours(1), 12);
+      time_series::point_ts<decltype(ta)> ts(ta, 10.0, shyft::time_series::POINT_AVERAGE_VALUE);
 
-        // zero policy will fill in 0 for the values before 0, -loosing some mass.
-        TS_ASSERT_DELTA(cts_zero.value(0),1.0,0.0001);
-        TS_ASSERT_DELTA(cts_zero.value(1),2.5,0.0001);
-        TS_ASSERT_DELTA(cts_zero.value(2),7.5,0.0001);
-        TS_ASSERT_DELTA(cts_zero.value(3),9.0,0.0001);
-        TS_ASSERT_DELTA(cts_zero.value(4),10.0,0.0001);
+      // Assert that we throw on invalid configurations
+      std::vector<double> even_sized_kernel {1, 1};
+      std::vector<double> large_kernel{1,1,1,1,1,1,1,1,1,1,1,1,1};
+      try {
+        time_series::convolve_w_ts<decltype(ts)> invalid_convolution(ts, even_sized_kernel, CENTER);
+        MESSAGE("convolve_w_ts should not accept even sized kernel with CENTER policy");
+        REQUIRE(0);
+      } catch(...) {}
+      try {
+        time_series::convolve_w_ts<decltype(ts)> invalid_convolution(ts, large_kernel, CENTER);
+        MESSAGE("convolve_w_ts should not accept kernel larger than ts");
+        REQUIRE(0);
+      } catch (...) {}
 
-        // nan policy will fill in nan for the values before 0, -loosing some mass. inserting nan on the output
-        for (size_t i=0; i+1 <w.size(); ++i)
-            TS_ASSERT(!std::isfinite(cts_nan.value(i)));
-        std::vector<double> expected{10,10,10,10,10,10,10,10,10,10,9,7.6,2.85,2.1,2.0,3.5,5.15,8.4,9.4,10,10,10,10,10};
-        for(size_t i=4; i<w.size(); ++i) {
-            TS_ASSERT_DELTA(expected[i],cts_first.value(i),0.0001);
-            TS_ASSERT_DELTA(expected[i],cts_zero.value(i),0.0001);
-            TS_ASSERT_DELTA(expected[i],cts_nan.value(i),0.0001);
+      // Gaussian 5-element kernel
+      std::vector<double> g5 {0.06136, 0.24477, 0.38774, 0.24477, 0.06136};
+
+      // All valid combinations of policies
+      std::vector<convolve_policy> policies{
+          BACKWARD | USE_NEAREST,
+          BACKWARD | USE_ZERO,
+          BACKWARD | USE_NAN,
+          CENTER | USE_NEAREST,
+          CENTER | USE_ZERO,
+          CENTER | USE_NAN,
+          FORWARD | USE_NEAREST,
+          FORWARD | USE_ZERO,
+          FORWARD | USE_NAN
+            };
+
+      // Expected results
+      std::vector<std::vector<double>> expected{
+        {10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10},
+        {0.6136, 3.0613, 6.9387, 9.3864,  10, 10, 10, 10, 10, 10, 10, 10},
+        {shyft::nan, shyft::nan, shyft::nan, shyft::nan,  10, 10, 10, 10, 10, 10, 10, 10},
+        { 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10},
+        {6.9387, 9.3864,  10, 10, 10, 10, 10, 10, 10, 10, 9.3864, 6.9387},
+        {shyft::nan, shyft::nan,  10, 10, 10, 10, 10, 10, 10, 10, shyft::nan, shyft::nan},
+        {10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10},
+        {10, 10, 10, 10, 10, 10, 10, 10, 9.3864, 6.9387, 3.0613, 0.6136},
+        {10, 10, 10, 10, 10, 10, 10, 10, shyft::nan, shyft::nan, shyft::nan, shyft::nan}
+      };
+
+      for(size_t i = 0; i < policies.size(); ++i) {
+        time_series::convolve_w_ts<decltype(ts)> cts(ts, g5, policies[i]);
+
+        // Compare values with expected
+        for(size_t j = 0; j < cts.size(); ++j) {
+          if(!std::isfinite(expected[i][j])) {
+            TS_ASSERT(!std::isfinite(cts.value(j)));
+          } else {
+            TS_ASSERT_DELTA(expected[i][j], cts.value(j), 0.0001);
+          }
         }
-        //-- verify it can do some math.
-        auto c2 = 4.0*cts_first+2.0;
+
+        // Verify that we can do math with cts
+        auto c2 = 4.0*cts+2.0;
         auto cc = c2*c2;
-        for (size_t i = 0; i < c2.size(); ++i) {
-            double expected_value = 4 * cts_first.value(i) + 2.0;
-            TS_ASSERT_DELTA(expected_value, c2.value(i), 0.00001);
-            TS_ASSERT_DELTA(expected_value*expected_value, cc.value(i), 0.00001);
+        for (size_t j = 0; j < c2.size(); ++j) {
+          double expected_value = 4 * cts.value(j) + 2.0;
+          if(!std::isfinite(expected_value)) {
+            TS_ASSERT(!std::isfinite(c2.value(j)));
+            TS_ASSERT(!std::isfinite(cc.value(j)));
+          } else {
+            TS_ASSERT_DELTA(expected_value, c2.value(j), 0.00001);
+            TS_ASSERT_DELTA(expected_value*expected_value, cc.value(j), 0.00001);
+          }
         }
-
+      }
     }
 
     TEST_CASE("test_uniform_sum_ts") {

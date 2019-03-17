@@ -892,23 +892,41 @@ namespace shyft{
         };
 
 
-        /** The convolve_policy determines how the convolve_w_ts functions deals with the
-        *  initial boundary condition, i.e. when trying to convolve with values before
-        *  the first value, value(0)
-        * \sa convolve_w_ts
-        */
+        /** The convolve_policy determines how the convolve_w_ts function aligns the filter kernel,
+         *  and how it deals with the boundary.
+         *
+         * The policies BACKWARD, CENTER and FORWARD determines the alignment of the filter wrt
+         * the output value: BACKWARD will align the kernel from value(i) and backwards, FORWARD
+         * will align the kernel from value(i) and forwards, while CENTER will align the kernel
+         * centrally on value(i).
+         *
+         * The policies USE_NEAREST, USE_ZERO and USE_NAN determines which padding value to use
+         * for ts when the filter kernel slides outside ts, i.e. when trying to convolve with
+         * values before value(0) or after value(n-1).
+         *
+         * Two policies (alignment + padding) may be or'ed together. The output result will be
+         * undefined if an invalid combination of policies are supplied.
+         *
+         * \sa convolve_w_ts
+         */
         enum convolve_policy:int8_t {
-            USE_FIRST, ///< ts.value(0) is used for all values before value(0): 'mass preserving'
-            USE_ZERO, ///< fill in zero for all values before value(0):shape preserving
-            USE_NAN ///< nan filled in for the first length of the filter
+          BACKWARD = (1 << 6),
+          CENTER = (1 << 5),
+          FORWARD = (1 << 4),
+          USE_NEAREST = (1 << 0), ///< ts.value(0) or ts.value(n-1) is used for all values outside ts: 'mass preserving'
+          USE_ZERO = (1 << 1),  ///< fill in zero for all values outside ts: 'shape preserving'
+          USE_NAN  = (1 << 2),   ///< nan filled in outside the filter
         };
+        inline convolve_policy operator|(convolve_policy a, convolve_policy b)
+        {return static_cast<convolve_policy>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));}
         /** \brief convolve_w convolves a time-series with weights w
         *
         * The resulting time-series value(i) is the result of convolution (ts*w)|w.size()
-        *  value(i) => ts(i-k)*w(k), k is [0..w.size()>
+        *  value(i) => ts(i-k+a)*w(k), k is [0..w.size()>, a is {0,w.size()/2,w.size()}
         *
-        * the convolve_policy determines how to resolve start-condition-zone
-        * where i < w.size(), \ref convolve_policy
+        * The convolve_policy determines kernel alignment, and how to resolve boundaries
+        * where the kernel does not fully overlap the input ts.
+        * The default is BACKWARD | USE_NEAREST \ref convolve_policy
         *
         * \tparam Ts any time-series
         *  maybe \tparam W any container with .size() and [i] operator
@@ -920,18 +938,27 @@ namespace shyft{
             Ts ts;
             ts_point_fx fx_policy=POINT_AVERAGE_VALUE;
             W w;
-            convolve_policy policy = convolve_policy::USE_FIRST;
+            convolve_policy policy = convolve_policy::BACKWARD | convolve_policy::USE_NEAREST;
 			bool bound = false;
             //-- default stuff, ct/copy etc goes here
             convolve_w_ts() = default;
 
             //-- useful ct goes here
             template<class A_, class W_>
-            convolve_w_ts(A_ && tsx, W_ && w, convolve_policy policy = convolve_policy::USE_FIRST)
+            convolve_w_ts(A_ && tsx, W_ && w,
+                          convolve_policy policy = convolve_policy::BACKWARD | convolve_policy::USE_NEAREST)
                 :ts(std::forward<A_>(tsx)),
                 w(std::forward<W_>(w)),
                 policy(policy) {
                 //if( !(needs_bind<typename d_ref_t<Ts>::type>::value && e_needs_bind(ts))) {
+                if( (policy & convolve_policy::CENTER) ) {
+                  if(w.size() % 2 == 0) {
+                    throw std::runtime_error("convolve_w_ts: kernel must not be even-sized for convolve_policy::CENTER");
+                  }
+                  if(w.size() > ts.size()) {
+                    throw std::runtime_error("convolve_w_ts: kernel size must not exceed ts size for convolve_policy::CENTER");
+                  }
+                }
 				if ( ! e_needs_bind(d_ref(ts)) ) {
 					local_do_bind();
 				}
@@ -966,11 +993,34 @@ namespace shyft{
             double value(size_t i) const {
                 double v = 0.0;
                 for (size_t j = 0;j<w.size();++j)
-                    v += j <= i ?
-                    w[j] * ts.value(i - j)
-                    :
-                    (policy == convolve_policy::USE_FIRST ? w[j] * ts.value(0) :
-                    (policy == convolve_policy::USE_ZERO ? 0.0 : nan)); // or nan ? policy based ?
+                    v +=
+                      policy & convolve_policy::FORWARD ?
+                        //Forward looking kernel, boundary handling at the end of ts
+                        i+w.size() < ts.size()+1+j ?
+                          w[j] * ts.value(i+w.size()-1 - j) //Filter is inside ts
+                        :
+                          policy & convolve_policy::USE_NEAREST ? w[j] * ts.value(ts.size()-1) :
+                          policy & convolve_policy::USE_ZERO ? 0.0 : nan
+                      :
+                        policy & convolve_policy::CENTER ?
+                          // Centered kernel, boundary handling in both ends
+                          j <= i+w.size()/2 && i+w.size()/2 < ts.size()+j ?
+                            w[j] * ts.value(i+w.size()/2-j) // Filter is inside ts
+                          :
+                            j > i+w.size()/2 ? // boundary handling in the beginning
+                              policy & convolve_policy::USE_NEAREST ? w[j] * ts.value(0) :
+                              policy & convolve_policy::USE_ZERO ? 0.0 : nan
+                            : // boundary handling in the end
+                              policy & convolve_policy::USE_NEAREST ? w[j] * ts.value(ts.size()-1) :
+                              policy & convolve_policy::USE_ZERO ? 0.0 : nan
+                        :
+                          //Backward looking kernel, boundary handling at the beginning of ts
+                          j <= i ?
+                            w[j] * ts.value(i - j) //Filter is inside ts
+                          :
+                            policy & convolve_policy::USE_NEAREST ? w[j] * ts.value(0) :
+                            policy & convolve_policy::USE_ZERO ? 0.0 : nan
+                      ;
                 return  v;
             }
             double operator()(utctime t) const {
