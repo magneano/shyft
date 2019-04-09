@@ -124,10 +124,15 @@ class CFDataRepository(interfaces.GeoTsRepository):
             return T - 273.15
 
         def prec_conv(p):
-            return p[1:]
+            """Average the amount over the interval to get mm/hour.
+            Note that length of final interval must be inferred."""
+            time_diffs_in_hours = np.array((*np.diff(time), time[-1] - time[-2]), dtype=float) \
+                .reshape(-1,1) / float(api.deltahours(1))
+            return p / time_diffs_in_hours
 
         def prec_acc_conv(p):
-            return np.clip(p[1:] - p[:-1], 0.0, 1000.0)
+            """Deaccumuluate to mm/hour using forward differencing."""
+            return np.clip(np.diff(p, axis=0) * api.deltahours(1) / np.diff(time).rehape(-1,1), 0.0, 1000.0)
 
         def rad_conv(r):
             dr = r[1:] - r[:-1]
@@ -138,9 +143,10 @@ class CFDataRepository(interfaces.GeoTsRepository):
                        "relative_humidity": lambda x, t: (noop_space(x), noop_time(t)),
                        "temperature": lambda x, t: (noop_space(x), noop_time(t)),
                        "global_radiation": lambda x, t: (noop_space(x), noop_time(t)),
-                       "precipitation": lambda x, t: (noop_space(x), noop_time(t)),
+                       "precipitation": lambda x, t: (prec_conv(x), noop_time(t)),
                        "precipitation_amount_acc": lambda x, t: (prec_acc_conv(x), dacc_time(t)),
                        "discharge": lambda x, t: (noop_space(x), noop_time(t))}
+
         res = {}
         for k, (v, ak) in data.items():
             res[k] = convert_map[ak](v, time)
